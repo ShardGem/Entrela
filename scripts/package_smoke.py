@@ -1,0 +1,60 @@
+"""Import and open an extracted wheel outside the repository, in isolated Python."""
+
+import os
+from pathlib import Path
+import subprocess
+import sys
+from tempfile import TemporaryDirectory
+from zipfile import ZipFile
+
+CHECK = r"""
+import sys
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import gui,core
+assert Path(gui.__file__).is_relative_to(sys.argv[1])
+assert Path(core.__file__).is_relative_to(sys.argv[1])
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QSettings
+from PySide6.QtGui import QPixmap
+from gui.splash import SplashScreen,_ASSETS
+from gui.main_window import MainWindow
+from data.repository import ExperimentRepository
+from core.examples import create_example_config
+from core.simulation import run_experiment
+from dataclasses import replace
+app=QApplication([])
+assert not QPixmap(str(_ASSETS/'entrela_logo.png')).isNull()
+splash=SplashScreen()
+window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
+window.show();app.processEvents()
+exp=run_experiment(replace(create_example_config('bell'),shots=64))
+window.repository.save(exp)
+assert window.repository.load(exp.id).result.counts==exp.result.counts
+assert exp.result.metadata['entrela_version']=='0.11.0'
+window.close();splash.close();app.processEvents()
+print('PASS: isolated wheel, packaged assets, Qt window, scientific engine and persistence')
+"""
+
+
+def main():
+    wheel = Path(sys.argv[1]).resolve()
+    with TemporaryDirectory(prefix="entrela-wheel-") as temp:
+        target = Path(temp) / "installed"
+        with ZipFile(wheel) as archive:
+            archive.extractall(target)
+            entry = next(
+                name for name in archive.namelist() if name.endswith("entry_points.txt")
+            )
+            assert "entrela = gui.application:main" in archive.read(entry).decode()
+        env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+        subprocess.run(
+            [sys.executable, "-I", "-c", CHECK, str(target)],
+            cwd=temp,
+            env=env,
+            check=True,
+        )
+
+
+if __name__ == "__main__":
+    main()

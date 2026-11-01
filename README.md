@@ -11,6 +11,42 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Exportação CSV, JSON completo, pacote ZIP e figuras PNG; importação como cópia independente.
 - Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
+
+## Evolução 0.11
+
+A entrega e os limites de validação estão em [docs/evolucao-0.11.md](docs/evolucao-0.11.md).
+
+- Reprodução para no último snapshot; loop explícito, slider sincronizado e rastros derivados da trajetória real.
+- Câmera com zoom por roda, pan, reset e foco por qubit; Bloch e probabilidades ideal × ruidoso no mesmo instante.
+- Parâmetros importados mantêm precisão; **Reexecutar** usa a semente efetiva da execução selecionada.
+- **Análises**: métricas temporais, evolução exata, convergência Trotter, correlações, entropia e negatividade.
+- Varreduras com até 20 pontos, cinco sementes e 50 execuções; cancelamento entre pontos, CSV/JSON e análises reabertas pelo histórico da fonte.
+- ZNE com gráfico, referência ideal de Z, erros absolutos, resíduos e graus de liberdade.
+- Tema claro/escuro, fonte ajustável, navegação compacta e apresentação em tela cheia por **F11**.
+- Histórico paginado, resumos leves, salvamento automático em segundo plano, projetos, notas e modelos pessoais.
+- Relatórios acadêmicos **HTML/PDF** e distribuição Python com assets e comando `entrela`.
+
+Na página **Análises**, escolha o tipo e clique em **Calcular análise**. A análise temporal requer snapshots.
+As análises usam a execução selecionada; as configurações de varredura não modificam seus resultados.
+Clique em uma linha ou ponto da curva temporal para selecionar o mesmo snapshot em **Evolução 3D**.
+Em varreduras, use ponto decimal e vírgulas entre valores: `0, 0.01, 0.05`.
+
+Para instalar o pacote a partir do checkout:
+
+```bash
+python -m pip install .
+entrela
+```
+
+Para construir e validar o wheel fora do checkout:
+
+```bash
+python -m pip wheel --no-deps . -w dist
+python scripts/package_smoke.py dist/entrela-0.11.0-py3-none-any.whl
+```
+
+O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.
+
 ## Na nuvem
 
 ```bash

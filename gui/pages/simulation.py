@@ -1,10 +1,16 @@
 """Página principal de simulação: configuração + execução + status."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QLabel,
-    QFrame, QProgressBar
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QSplitter,
+    QLabel,
+    QFrame,
+    QProgressBar,
 )
 
 from gui.pages.base import PageBase
@@ -28,6 +34,7 @@ class SimulationStatus(QFrame):
         layout.addWidget(self._icon)
 
         self._text = QLabel("Pronto para executar")
+        self._text.setWordWrap(True)
         self._text.setStyleSheet(f"color: {PALETTE.text}; font-size: 13px;")
         layout.addWidget(self._text)
 
@@ -43,10 +50,10 @@ class SimulationStatus(QFrame):
 
     def _set_state(self, state: str):
         mapping = {
-            "idle":    ("info", PALETTE.text_muted, "Pronto para executar"),
-            "running": ("play", PALETTE.primary,    "Simulação em andamento..."),
-            "success": ("check", PALETTE.success,   "Simulação concluída"),
-            "error":   ("alert", PALETTE.danger,    "Erro na simulação"),
+            "idle": ("info", PALETTE.text_muted, "Pronto para executar"),
+            "running": ("play", PALETTE.primary, "Simulação em andamento..."),
+            "success": ("check", PALETTE.success, "Simulação concluída"),
+            "error": ("alert", PALETTE.danger, "Erro na simulação"),
         }
         icon_name, color, text = mapping.get(state, mapping["idle"])
         self._icon.setPixmap(get_pixmap(icon_name, color=color, size=18))
@@ -83,6 +90,7 @@ class SimulationPage(PageBase):
 
     def _build(self):
         splitter = QSplitter(Qt.Horizontal)
+        self.splitter = splitter
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(20)
 
@@ -103,14 +111,16 @@ class SimulationPage(PageBase):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(SPACING.lg)
 
-        summary = Card("Resumo da configuração",
-                       "Verifique os parâmetros antes de executar.")
+        summary = Card(
+            "Resumo da configuração", "Verifique os parâmetros antes de executar."
+        )
         self._summary_rows: dict[str, QLabel] = {}
         for key, label in [
             ("sistema", "Sistema"),
             ("protocolo", "Protocolo"),
             ("ruido", "Modelo de ruído"),
             ("shots", "Shots"),
+            ("resources", "Recursos"),
         ]:
             row = QHBoxLayout()
             row.setSpacing(16)
@@ -119,6 +129,7 @@ class SimulationPage(PageBase):
                 f"color: {PALETTE.text_muted}; font-size: 12px; min-width: 120px;"
             )
             val = QLabel("—")
+            val.setWordWrap(True)
             val.setStyleSheet(
                 f"color: {PALETTE.text}; font-size: 13px; font-weight: 500;"
             )
@@ -179,7 +190,18 @@ class SimulationPage(PageBase):
                 )
         else:
             self._summary_rows["ruido"].setText("Desativado (ideal)")
-        self._summary_rows["shots"].setText(f"{p['shots']:,} · semente {p['seed'] or 'automática'}")
+        from core.types import resource_estimate
+
+        try:
+            estimate = resource_estimate(self.config_panel.get_config())
+            self._summary_rows["resources"].setText(
+                f"{estimate['snapshots']} snapshots · {estimate['state_bytes'] / 1024**2:.2f} MiB de estados brutos; JSON e renderização consomem mais. Limites: 6 qubits, 200 passos."
+            )
+        except ValueError:
+            self._summary_rows["resources"].setText("Revise a configuração.")
+        self._summary_rows["shots"].setText(
+            f"{p['shots']:,} · semente {p['seed'] or 'automática'}"
+        )
 
     def set_running(self, running: bool):
         self.btn_run.setEnabled(not running)
@@ -188,3 +210,10 @@ class SimulationPage(PageBase):
         self.btn_run.setText("Executando..." if running else "Executar simulação")
         if running:
             self.status.set_running()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "splitter"):
+            self.splitter.setOrientation(
+                Qt.Vertical if self.width() < 950 else Qt.Horizontal
+            )

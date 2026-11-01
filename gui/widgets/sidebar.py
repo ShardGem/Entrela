@@ -1,10 +1,9 @@
 """Sidebar de navegação principal."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
-)
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
 
 from gui.icons import get_icon, get_pixmap
 from gui.theme import PALETTE
@@ -37,17 +36,19 @@ class Sidebar(QFrame):
     navigate = Signal(str)
 
     ITEMS = [
-        ("dashboard",  "Início"),
-        ("examples",   "Exemplos"),
+        ("dashboard", "Início"),
+        ("examples", "Exemplos"),
         ("simulation", "Simulação"),
-        ("circuit",    "Circuito"),
-        ("results",    "Resultados"),
-        ("bloch",      "Evolução 3D"),
+        ("circuit", "Circuito"),
+        ("results", "Resultados"),
+        ("bloch", "Evolução 3D"),
         ("mitigation", "Mitigação"),
         ("comparison", "Comparações"),
-        ("history",    "Histórico"),
-        ("docs",       "Aprender"),
-        ("settings",   "Configurações"),
+        ("history", "Histórico"),
+        ("analysis", "Análises"),
+        ("library", "Projetos"),
+        ("docs", "Aprender"),
+        ("settings", "Configurações"),
     ]
 
     def __init__(self, parent=None):
@@ -56,6 +57,7 @@ class Sidebar(QFrame):
         self.setFixedWidth(200)
         self.buttons: dict[str, NavButton] = {}
         self._build()
+        self._compact = False
 
     def _build(self):
         layout = QVBoxLayout(self)
@@ -71,6 +73,7 @@ class Sidebar(QFrame):
         logo.setPixmap(get_pixmap("simulation", color=PALETTE.primary, size=20))
 
         title = QLabel("Entrela")
+        self.logo_title = title
         title.setObjectName("SidebarLogo")
 
         logo_row.addWidget(logo)
@@ -93,3 +96,12 @@ class Sidebar(QFrame):
     def set_active(self, key: str):
         for k, btn in self.buttons.items():
             btn.setChecked(k == key)
+
+    def set_compact(self, compact):
+        self._compact = compact
+        self.setFixedWidth(64 if compact else 200)
+        self.logo_title.setVisible(not compact)
+        for key, label in self.ITEMS:
+            self.buttons[key].setText("" if compact else "   " + label)
+            self.buttons[key].setToolTip(label)
+            self.buttons[key].setAccessibleName(label)
