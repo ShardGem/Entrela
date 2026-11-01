@@ -1,3 +1,4 @@
+from core.types import system_label
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QHBoxLayout, QGridLayout, QPushButton
 from gui.pages.base import PageBase
@@ -89,9 +90,7 @@ class DashboardPage(PageBase):
                 if exp.result.error
                 else ("ZNE" if exp.result.mitigation else "Concluído")
             )
-            button = QPushButton(
-                f"{exp.config.system.hamiltonian} · {exp.id} · {state}"
-            )
+            button = QPushButton(f"{system_label(exp.config)} · {exp.id} · {state}")
             button.clicked.connect(lambda _, i=exp.id: self.experiment_selected.emit(i))
             self.recent.add(button)
 

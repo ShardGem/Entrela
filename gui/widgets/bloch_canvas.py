@@ -13,6 +13,7 @@ from gui.widgets.bloch_projection import BlochAxes3D
 
 class BlochCanvas(StableFigureCanvas):
     camera_changed = Signal()
+    qubit_selected = Signal(int)
     MIN_ZOOM = 0.5
     MAX_ZOOM = 3.0
 
@@ -35,6 +36,8 @@ class BlochCanvas(StableFigureCanvas):
         self._pan = np.zeros(3)
         self._applying_camera = False
         self._drag = None
+        self._click_origin = None
+        self.selected_qubit = -1
         self.projection = "persp"
         self._configure_axes()
         self.mpl_connect("scroll_event", self._on_scroll)
@@ -56,6 +59,7 @@ class BlochCanvas(StableFigureCanvas):
     def setup(self, num_qubits):
         if not 1 <= num_qubits <= 6:
             raise ValueError("São suportados de 1 a 6 qubits")
+        self.selected_qubit = -1
         self.ax.clear()
         self._configure_axes()
         columns = min(3, num_qubits)
@@ -217,19 +221,29 @@ class BlochCanvas(StableFigureCanvas):
         event.accept()
 
     def _on_press(self, event):
-        if (
-            self.mouse_enabled
-            and event.inaxes is self.ax
-            and event.button in (MouseButton.LEFT, MouseButton.MIDDLE)
+        if event.inaxes is not self.ax:
+            return
+        modifiers = getattr(event, "modifiers", ()) or ()
+        shift = "shift" in modifiers or "shift" in (getattr(event, "key", "") or "")
+        self._click_origin = (
+            (event.x, event.y)
+            if event.button == MouseButton.LEFT and not shift
+            else None
+        )
+        if self.mouse_enabled and event.button in (
+            MouseButton.LEFT,
+            MouseButton.MIDDLE,
         ):
-            self._drag = (event.button, event.x, event.y)
+            mode = MouseButton.MIDDLE if shift else event.button
+            self._drag = (mode, event.x, event.y)
 
     def _on_motion(self, event):
         if self._drag is None or not self.mouse_enabled:
             return
         button, x, y = self._drag
         if event.inaxes is not self.ax:
-            self._end_drag()
+            self._drag = None
+            self._click_origin = None
             return
         dx, dy = event.x - x, event.y - y
         self._drag = (button, event.x, event.y)
@@ -254,7 +268,64 @@ class BlochCanvas(StableFigureCanvas):
             self._apply_camera()
 
     def _end_drag(self, event=None):
+        origin = self._click_origin
         self._drag = None
+        self._click_origin = None
+        if (
+            origin is not None
+            and event is not None
+            and getattr(event, "inaxes", None) is self.ax
+        ):
+            distance = math.hypot(event.x - origin[0], event.y - origin[1])
+            if distance <= 6 * self.device_pixel_ratio:
+                qubit = self.pick_qubit(event.x, event.y)
+                if qubit is not None:
+                    self.select_qubit(qubit)
+                    self.qubit_selected.emit(qubit)
+
+    def pick_qubit(self, x, y):
+        from mpl_toolkits.mplot3d import proj3d
+
+        candidates = []
+        matrix = self.ax.get_proj()
+        samples = np.linspace(0, 2 * np.pi, 48)
+        rings = np.concatenate(
+            [
+                np.column_stack(
+                    (np.cos(samples), np.sin(samples), np.zeros(len(samples)))
+                ),
+                np.column_stack(
+                    (np.cos(samples), np.zeros(len(samples)), np.sin(samples))
+                ),
+                np.column_stack(
+                    (np.zeros(len(samples)), np.cos(samples), np.sin(samples))
+                ),
+            ]
+        )
+        for q, center in enumerate(self._sphere_centers):
+            if self.focus not in (-1, q):
+                continue
+            points = np.vstack((np.array(center), np.array(center) + rings))
+            px, py, _ = proj3d.proj_transform(*points.T, matrix)
+            projected = self.ax.transData.transform(np.column_stack((px, py)))
+            radius = np.max(np.abs(projected[1:] - projected[0]), axis=0)
+            if not np.isfinite(radius).all() or min(radius) < 1:
+                continue
+            score = np.sum(((np.array([x, y]) - projected[0]) / radius) ** 2)
+            if score <= 1:
+                candidates.append((score, q))
+        return min(candidates)[1] if candidates else None
+
+    def select_qubit(self, index):
+        self.selected_qubit = index if 0 <= index < len(self._sphere_centers) else -1
+        for q, artists in enumerate(self._qubit_artists):
+            artists[0].set_linewidth(0.95 if q == self.selected_qubit else 0.5)
+            artists[0].set_color(
+                getattr(PALETTE, f"q{q + 1}")
+                if q == self.selected_qubit
+                else PALETTE.border_strong
+            )
+        self.draw_idle()
 
     def set_mouse_enabled(self, enabled):
         self.mouse_enabled = bool(enabled)

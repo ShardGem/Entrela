@@ -85,13 +85,17 @@ class ResultsPage(PageBase):
     def show_experiment(self, experiment):
         r, c = experiment.result, experiment.config
         self.details.setText(
-            f"Experimento {experiment.id} · {c.system.hamiltonian} · {c.system.num_qubits} qubits · "
+            f"Experimento {experiment.id} · {'Circuito livre' if c.circuit is not None else c.system.hamiltonian} · {c.system.num_qubits} qubits · "
             f"{c.shots} shots · {experiment.duration_s:.3f} s · profundidade {r.circuit_depth}\n"
             f"Semente efetiva: {r.metadata.get('effective_seed', 'não registrada')}"
         )
         self.update_metrics(r.fidelity, r.purity, r.energy)
         self.results_tab.exibir_histograma(r.counts)
-        self.results_tab.exibir_evolucao_temporal(r.states, r.times)
+        self.results_tab.exibir_evolucao_temporal(
+            r.states,
+            r.times,
+            "Índice da porta" if c.circuit is not None else "Tempo (adimensional, ℏ=1)",
+        )
         self.interpretation.setText(result_interpretation(experiment))
         self.table.setRowCount(2**c.system.num_qubits)
         probabilities = (

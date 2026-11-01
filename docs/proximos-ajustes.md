@@ -4,7 +4,7 @@ A primeira entrega desta rodada corrige o viewport 3D: a projeção agora usa to
 
 ## Próximas entregas propostas
 
-Estas propostas ainda não estão implementadas. A ordem prioriza navegação visual e interpretação científica antes de ampliar o custo computacional.
+Os itens **1–4 foram entregues na versão 0.12**, junto com o editor de circuitos. Veja [manual e validação](circuitos-interativos-0.12.md). Os itens 5–8 continuam como propostas, na ordem abaixo.
 
 | Ordem | Ajuste / funcionalidade | Resultado esperado e critério de aceite |
 |---|---|---|

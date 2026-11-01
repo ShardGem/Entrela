@@ -30,6 +30,10 @@ def initial_state(system):
 
 def exact_states(config, times):
     config.validate()
+    if config.circuit is not None:
+        raise ValueError(
+            "Evolução exata por Hamiltoniano não se aplica ao circuito livre"
+        )
     H = _build_hamiltonian(
         config.system.num_qubits,
         config.system.hamiltonian,
@@ -56,7 +60,7 @@ def temporal_analysis(experiment, progress=None, is_cancelled=None):
     c, r = experiment.config, experiment.result
     if not r.states or not r.times:
         raise ValueError("Esta análise requer snapshots com tempos registrados.")
-    exact = exact_states(c, r.times)
+    exact = exact_states(c, r.times) if c.circuit is None else [None] * len(r.states)
     H = _build_hamiltonian(
         c.system.num_qubits,
         c.system.hamiltonian,
@@ -64,6 +68,8 @@ def temporal_analysis(experiment, progress=None, is_cancelled=None):
         c.system.h,
         c.system.periodic,
     )
+    if c.circuit is not None:
+        H = None
     rows = []
     for i, (time, state, target) in enumerate(zip(r.times, r.states, exact)):
         checkpoint(is_cancelled, progress, int(100 * i / len(r.states)))
@@ -78,10 +84,10 @@ def temporal_analysis(experiment, progress=None, is_cancelled=None):
             time=time,
             fidelity=None if ideal is None else fidelity(state, ideal),
             purity=purity(state),
-            energy=energy_expectation(state, H),
-            fidelity_exact=fidelity(state, target),
+            energy=None if H is None else energy_expectation(state, H),
+            fidelity_exact=None if target is None else fidelity(state, target),
             trotter_infidelity=None
-            if ideal is None
+            if ideal is None or target is None
             else max(0.0, 1 - fidelity(ideal, target)),
         )
         for q in range(c.system.num_qubits):
@@ -153,6 +159,10 @@ def convergence_analysis(
 def parameter_sweep(
     config, parameter, values, seeds=None, progress=None, is_cancelled=None
 ):
+    if config.circuit is not None and parameter in ("J", "h", "trotter_steps"):
+        raise ValueError(
+            "Este parâmetro pertence a uma evolução por Hamiltoniano, não ao circuito livre"
+        )
     values = list(values)
     if not values or len(values) > 20:
         raise ValueError("Use de 1 a 20 pontos.")

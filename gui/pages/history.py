@@ -1,3 +1,4 @@
+from core.types import system_label
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QTableWidget,
@@ -76,7 +77,7 @@ class HistoryPage(PageBase):
             values = [
                 exp.created_at.strftime("%d/%m/%Y %H:%M %z"),
                 exp.id,
-                exp.config.system.hamiltonian,
+                system_label(exp.config),
                 str(exp.config.system.num_qubits),
                 exp.config.noise.kind if exp.config.noise.enabled else "Ideal",
                 "—" if exp.result.fidelity is None else f"{exp.result.fidelity:.4f}",

@@ -9,6 +9,8 @@ from PySide6.QtSvg import QSvgRenderer
 
 
 _BODIES = {
+    "undo": '<path d="M3 7h11a6 6 0 1 1 0 12M3 7l5-5M3 7l5 5"/>',
+    "redo": '<path d="M21 7H10a6 6 0 1 0 0 12M21 7l-5-5M21 7l-5 5"/>',
     "examples": '<path d="M3 3h7v7H3V3zM14 3h7v7h-7V3zM3 14h7v7H3v-7zM14 14h7v7h-7v-7z"/>',
     "comparison": '<path d="M4 20V9h5v11M15 20V4h5v16M2 20h21"/>',
     "analysis": '<path d="M3 21h18M5 17l4-6 4 3 6-10"/>',

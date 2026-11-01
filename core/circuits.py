@@ -1,6 +1,6 @@
 """Hamiltonian convention: Ising H=+J ΣZZ+h ΣX; q0 is rightmost."""
 
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, transpile
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.synthesis import SuzukiTrotter
@@ -107,6 +107,57 @@ def build_circuit(
         circuit.measure(range(num_qubits), range(num_qubits))
         origins.extend(
             dict(stage="measurement", step=trotter_steps) for _ in range(num_qubits)
+        )
+    circuit.metadata = {"origins": origins}
+    return circuit, labels
+
+
+def build_editor_circuit(
+    document,
+    *,
+    snapshot_kind="statevector",
+    save_snapshots=True,
+    save_final=True,
+    measure=True,
+):
+    document.validate()
+    circuit = QuantumCircuit(document.num_qubits, document.num_qubits if measure else 0)
+    circuit.global_phase = document.global_phase
+    unitary = document.to_quantum_circuit()
+    save = SaveDensityMatrix if snapshot_kind == "density_matrix" else SaveStatevector
+    labels = []
+    origins = []
+
+    def snapshot(label, step):
+        circuit.append(save(document.num_qubits, label=label), circuit.qubits)
+        origins.append(dict(stage="snapshot", step=step))
+
+    if save_snapshots:
+        snapshot("t0", 0)
+        labels.append("t0")
+    for index, instruction in enumerate(unitary.data, 1):
+        piece = QuantumCircuit(document.num_qubits)
+        piece.append(
+            instruction.operation,
+            [unitary.find_bit(q).index for q in instruction.qubits],
+        )
+        if instruction.operation.num_qubits > 2 or instruction.operation.name == "ch":
+            piece = transpile(piece, basis_gates=["u", "cx"], optimization_level=0)
+        circuit.compose(piece, inplace=True)
+        origins.extend(
+            dict(stage="evolution", step=index, logical_gate=instruction.operation.name)
+            for _ in piece.data
+        )
+        if save_snapshots:
+            snapshot(f"t{index}", index)
+            labels.append(f"t{index}")
+    if save_final:
+        snapshot("final", len(unitary.data))
+    if measure:
+        circuit.measure(range(document.num_qubits), range(document.num_qubits))
+        origins.extend(
+            dict(stage="measurement", step=len(unitary.data))
+            for _ in range(document.num_qubits)
         )
     circuit.metadata = {"origins": origins}
     return circuit, labels

@@ -24,6 +24,8 @@ from gui.theme import PALETTE
 from gui.widgets.plot_canvas import MplCanvas
 from gui.widgets.bloch_canvas import BlochCanvas
 from gui.widgets.bloch_controls import BlochCameraPanel
+from gui.widgets.snapshot_metrics import SnapshotMetrics
+from PySide6.QtGui import QShortcut, QKeySequence
 
 
 def interpolate_statevectors(svs, steps_per_pair=20):
@@ -66,6 +68,7 @@ class QubitInfoPanel(QLabel):
 class BlochPage(PageBase):
     frame_changed = Signal(int)
     preferences_changed = Signal()
+    temporal_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(
@@ -83,6 +86,8 @@ class BlochPage(PageBase):
         self.speed_factor = 1.0
         self.times = None
         self._refreshing = False
+        self._maximized = False
+        self.time_unit = "adimensional (ℏ=1)"
         self.timer = QTimer(self)
         self.timer.setInterval(350)
         self.timer.timeout.connect(self._on_tick)
@@ -120,15 +125,30 @@ class BlochPage(PageBase):
         self.overlay.toggled.connect(self._refresh_ui)
         for w in (self.btn_play, self.btn_stop, self.btn_prev, self.btn_next):
             controls.addWidget(w)
-        controls.addStretch()
+        self.selection_label = QLabel("Clique numa esfera para selecionar")
+        self.selection_label.setWordWrap(True)
+        controls.addWidget(self.selection_label, 1)
+        self.maximize_button = GhostButton("Ampliar área 3D")
+        self.maximize_button.setCheckable(True)
+        self.maximize_button.toggled.connect(self.set_maximized)
+        controls.addWidget(self.maximize_button)
         controls.addWidget(QLabel("Velocidade"))
         controls.addWidget(self.speed_combo)
         controls.addWidget(self.loop)
         layout.addLayout(controls)
         self.canvas = BlochCanvas()
+        self.canvas.qubit_selected.connect(self._select_qubit)
         self.camera_panel = BlochCameraPanel(self.canvas)
         self.focus_combo = self.camera_panel.focus_combo
         self.focus_combo.currentIndexChanged.connect(self._focus)
+        self.focus_selected = GhostButton("Focar selecionado")
+        self.focus_selected.setEnabled(False)
+        self.focus_selected.clicked.connect(
+            lambda: self.focus_combo.setCurrentIndex(
+                self.focus_combo.findData(self.canvas.selected_qubit)
+            )
+        )
+        self.camera_panel.options_layout.addWidget(self.focus_selected)
         self.zoom_slider = self.camera_panel.zoom_slider
         self.zoom_label = self.camera_panel.zoom_label
         self.axes_check = QCheckBox("Eixos X, Y, Z")
@@ -171,6 +191,7 @@ class BlochPage(PageBase):
         QGridLayout(self._info_container)
         self._qubit_panels = []
         info_scroll = QScrollArea()
+        self.info_scroll = info_scroll
         info_scroll.setWidgetResizable(True)
         info_scroll.setWidget(self._info_container)
         info_scroll.setFixedHeight(145)
@@ -180,11 +201,30 @@ class BlochPage(PageBase):
         )
         note.setWordWrap(True)
         layout.addWidget(note)
+        self.scene_note = note
+        self.metrics = SnapshotMetrics()
+        self.metrics.analyze_requested.connect(self.temporal_requested.emit)
+        self.metrics.snapshot_selected.connect(self.slider.setValue)
+        layout.addWidget(self.metrics)
+        escape = QShortcut(QKeySequence("Esc"), self)
+        escape.setContext(Qt.WidgetWithChildrenShortcut)
+        escape.activated.connect(lambda: self.set_maximized(False))
+        self._escape = escape
         self.body().addWidget(self._content, 1)
         self._content.hide()
 
-    def load_statevectors(self, statevectors, times=None, ideal_statevectors=None):
+    def load_statevectors(
+        self,
+        statevectors,
+        times=None,
+        ideal_statevectors=None,
+        time_unit="adimensional (ℏ=1)",
+    ):
         self._pause()
+        self.time_unit = time_unit
+        self.metrics.clear("Índice da porta" if "porta" in time_unit else "Tempo (ℏ=1)")
+        self.selection_label.setText("Clique numa esfera para selecionar")
+        self.focus_selected.setEnabled(False)
         self.original_svs = list(statevectors or [])
         self.interpolated_svs = list(self.original_svs)
         self.precomputed_bloch = []
@@ -269,7 +309,11 @@ class BlochPage(PageBase):
         del blocker
         self.frame_label.setText(
             f"Snapshot {idx + 1} / {len(self.precomputed_bloch)}"
-            + (f" · t={self.times[idx]:.6g} (ℏ=1)" if self.times is not None else "")
+            + (
+                f" · {'porta' if 'porta' in self.time_unit else 't'}={self.times[idx]:.6g} ({self.time_unit})"
+                if self.times is not None
+                else ""
+            )
             + " · reprodução didática"
         )
         self.slider.blockSignals(True)
@@ -317,6 +361,7 @@ class BlochPage(PageBase):
             ax.set_xlabel("Bitstring (q0 à direita)")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
             self.probabilities_canvas.draw_idle()
+        self.metrics.select_snapshot(idx)
         self.frame_changed.emit(idx)
 
     def _on_tick(self):
@@ -382,4 +427,39 @@ class BlochPage(PageBase):
     def hideEvent(self, event):
         self._pause()
         self.canvas._end_drag()
+        if self._maximized:
+            self.set_maximized(False)
         super().hideEvent(event)
+
+    def set_maximized(self, enabled):
+        enabled = bool(enabled)
+        if self._maximized == enabled:
+            return
+        self._maximized = enabled
+        blocker = QSignalBlocker(self.maximize_button)
+        self.maximize_button.setChecked(enabled)
+        del blocker
+        self.maximize_button.setText(
+            "Restaurar painéis" if enabled else "Ampliar área 3D"
+        )
+        for widget in (
+            self._header,
+            self.camera_scroll,
+            self.info_scroll,
+            self.scene_note,
+            self.metrics,
+        ):
+            widget.setVisible(not enabled)
+
+    def _select_qubit(self, index):
+        self.selection_label.setText(f"Qubit q{index} selecionado")
+        self.focus_selected.setEnabled(True)
+        self.canvas.select_qubit(index)
+        for q, panel in enumerate(self._qubit_panels):
+            panel.setStyleSheet(
+                "border: 2px solid " + getattr(PALETTE, f"q{q + 1}") + ";"
+                if q == index
+                else ""
+            )
+        if index < len(self._qubit_panels):
+            self.info_scroll.ensureWidgetVisible(self._qubit_panels[index])

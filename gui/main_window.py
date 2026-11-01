@@ -1,3 +1,5 @@
+from core.types import system_label
+
 """Application controller: real executions, learning flows and durable records."""
 
 from dataclasses import asdict, replace
@@ -238,7 +240,11 @@ class MainWindow(QMainWindow):
         self.page_settings.restore_requested.connect(self._reset_preferences)
         self.page_bloch.preferences_changed.connect(self._persist_bloch_preferences)
         self.page_bloch.frame_changed.connect(self.page_analysis.select_frame)
-        self.page_circuit.snapshot_requested.connect(self.page_bloch.slider.setValue)
+        self.page_bloch.temporal_requested.connect(
+            lambda: self._run_analysis("temporal", {})
+        )
+        self.page_circuit.snapshot_requested.connect(self._show_circuit_snapshot)
+        self.page_circuit.run_requested.connect(self._run_editor_circuit)
         self.page_analysis.requested.connect(self._run_analysis)
         self.page_results.rerun_requested.connect(self._rerun_current)
         self.page_results.report_requested.connect(self._export_report)
@@ -279,7 +285,7 @@ class MainWindow(QMainWindow):
             ("example:" + e.id, "Exemplo: " + e.title, e.description) for e in EXAMPLES
         ]
         commands += [
-            ("run:" + e.id, "Abrir execução " + e.id, e.config.system.hamiltonian)
+            ("run:" + e.id, "Abrir execução " + e.id, system_label(e.config))
             for e in self._history[:20]
         ]
         commands += [
@@ -360,6 +366,11 @@ class MainWindow(QMainWindow):
         self._loading_draft = False
 
     def _apply_draft(self, config, title="Rascunho"):
+        if config.circuit is not None:
+            self.statusBar().showMessage(
+                "Circuito livre selecionado: use a página Circuitos para criar uma cópia editável."
+            )
+            return
         self._loading_draft = True
         try:
             self.page_simulation.config_panel.load_config(config)
@@ -540,6 +551,8 @@ class MainWindow(QMainWindow):
         self.page_simulation.set_running(True)
         self.page_mitigation.set_running(True)
         self.page_analysis.set_running(True)
+        self.page_circuit.set_running(True)
+        self.page_bloch.metrics.set_busy(True)
         worker.start()
 
     def _run_mitigation(self, qubit, method, shots):
@@ -596,12 +609,9 @@ class MainWindow(QMainWindow):
             experiment.result.states,
             experiment.result.times,
             experiment.result.ideal_statevectors,
+            time_unit=experiment.result.metadata.get("time_unit", "adimensional (ℏ=1)"),
         )
-        self.page_circuit.show_circuit(
-            experiment.result.circuit_text,
-            experiment.result.metadata.get("operations"),
-            bool(experiment.result.states),
-        )
+        self.page_circuit.show_experiment(experiment)
         self.page_analysis.load_experiment(experiment)
         self._refresh_library()
         self.page_mitigation.load_experiment(experiment)
@@ -666,7 +676,7 @@ class MainWindow(QMainWindow):
         latest = next((e for e in records if not e.result.error), None)
         self.page_dashboard.update_stats(
             len(records),
-            latest.config.system.hamiltonian if latest else None,
+            system_label(latest.config) if latest else None,
             latest.result.fidelity if latest else None,
             latest.result.purity if latest else None,
         )
@@ -705,6 +715,7 @@ class MainWindow(QMainWindow):
     def _on_error(self, message):
         if isinstance(self._current_worker, AnalysisWorker):
             self.page_analysis.message.setText(message)
+            self.page_bloch.metrics.summary.setText(message)
             self.page_simulation.status.set_error(message)
             return
         self.page_simulation.status.set_error(message)
@@ -732,6 +743,8 @@ class MainWindow(QMainWindow):
         self.page_simulation.set_running(False)
         self.page_mitigation.set_running(False)
         self.page_analysis.set_running(False)
+        self.page_circuit.set_running(False)
+        self.page_bloch.metrics.set_busy(False)
         if worker:
             worker.deleteLater()
         if self._close_pending:
@@ -916,6 +929,8 @@ class MainWindow(QMainWindow):
 
     def _on_analysis(self, data):
         self.page_analysis.show_analysis(data)
+        if data.get("kind") == "temporal":
+            self.page_bloch.metrics.set_rows(data["rows"])
         if self.repository is not None:
             folder = (
                 self.repository.base_dir / ".analyses" / self._current_experiment.id
@@ -1187,3 +1202,20 @@ class MainWindow(QMainWindow):
                 except (OSError, ValueError, KeyError, TypeError):
                     pass
         self.page_analysis.set_saved(paths)
+
+    def _show_circuit_snapshot(self, index):
+        self.page_bloch.slider.setValue(index)
+        self._show_page("bloch")
+
+    def _run_editor_circuit(self, config):
+        if self._current_worker is not None or not self._confirm_unsaved():
+            return
+        try:
+            config.validate()
+        except ValueError as exc:
+            self.page_circuit.editor.message.setText(str(exc))
+            return
+        if self.tutorial.active:
+            self.tutorial.pause()
+        self._pending_example_id = None
+        self._start_worker(SimulationWorker(config, self), self._on_experiment)

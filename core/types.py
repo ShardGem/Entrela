@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from math import isfinite
 from typing import Literal
 from uuid import uuid4
+from core.circuit_document import CircuitDocument
 
 HamiltonianType = Literal["Ising", "Heisenberg", "XY", "XXZ", "Custom"]
 NoiseType = Literal["Despolarizador", "Termico"]
@@ -113,8 +114,21 @@ class ExperimentConfig:
     noise: NoiseConfig
     shots: int = 8192
     seed: int | None = None
+    circuit: CircuitDocument | None = None
 
     def validate(self):
+        if self.circuit is not None:
+            self.circuit.validate()
+            if self.protocol.trotter_steps != max(
+                1, len(self.circuit.gates)
+            ) or self.protocol.total_time != float(max(1, len(self.circuit.gates))):
+                raise ValueError(
+                    "Circuitos livres usam índices das portas no protocolo"
+                )
+            if self.circuit.num_qubits != self.system.num_qubits:
+                raise ValueError(
+                    "Circuito e sistema têm quantidades diferentes de qubits"
+                )
         self.system.validate()
         self.protocol.validate()
         self.noise.validate()
@@ -135,6 +149,9 @@ def config_from_dict(raw):
             NoiseConfig(**raw["noise"]),
             raw.get("shots", 8192),
             raw.get("seed"),
+            CircuitDocument.from_dict(raw["circuit"])
+            if raw.get("circuit") is not None
+            else None,
         )
         config.validate()
         return config
@@ -185,3 +202,7 @@ def resource_estimate(config):
     stored = (snapshots + 1) * (dim * dim if config.noise.enabled else dim)
     stored += (snapshots + 1) * dim
     return {"snapshots": snapshots, "state_bytes": stored * 16}
+
+
+def system_label(config):
+    return "Circuito livre" if config.circuit is not None else config.system.hamiltonian

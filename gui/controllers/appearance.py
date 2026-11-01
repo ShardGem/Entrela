@@ -93,6 +93,8 @@ def apply_appearance(window, theme="dark", font_size=13):
             )
         if isinstance(widget, QAbstractButton) and getattr(widget, "_icon_name", None):
             widget.setIcon(get_icon(widget._icon_name, color=widget._icon_color()))
+        if hasattr(widget, "refresh_theme"):
+            widget.refresh_theme()
         if isinstance(widget, FigureCanvasQTAgg):
             for artist in widget.figure.findobj():
                 for getter, setter in [

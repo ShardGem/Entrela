@@ -12,6 +12,12 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Circuitos interativos — 0.12
+
+A tela agora oferece diagrama vetorial com inspeção de portas e um editor com paleta, parâmetros, fase global, controles/alvos, arraste, undo/redo e execução Qiskit/Aer. Importa/exporta circuito JSON e OpenQASM 2; exporta SVG. Circuitos editados geram novos registros, sem alterar as execuções de origem.
+
+A área 3D também ganhou ampliação, seleção por clique, pan com Shift e métricas sincronizadas. Veja [manual e imagens da versão 0.12](docs/circuitos-interativos-0.12.md).
+
 ## Visualização 3D e estabilidade
 
 A correção do fechamento, o painel de zoom vertical e os controles de câmera estão descritos em [docs/correcao-bloch.md](docs/correcao-bloch.md), com imagem e instruções de atualização no Windows.
@@ -48,7 +54,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.11.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.12.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.
