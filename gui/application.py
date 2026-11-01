@@ -8,6 +8,9 @@ from gui.main_window import MainWindow
 
 
 def main():
+    from gui.diagnostics import enable_diagnostics
+
+    enable_diagnostics()
     app = QApplication(sys.argv)
     splash = SplashScreen()
     splash.show()
