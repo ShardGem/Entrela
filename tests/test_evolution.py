@@ -175,9 +175,9 @@ def test_history_uses_summary_without_decoding_states(tmp_path, bell, monkeypatc
 def test_summary_invalidates_after_source_changes(tmp_path, bell):
     repo = ExperimentRepository(tmp_path)
     path = repo.save(bell)
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
     raw["result"]["metadata"] = None
-    path.write_text(json.dumps(raw))
+    path.write_text(json.dumps(raw), encoding="utf-8")
     assert repo.list_summaries() == []
     assert repo.load_errors
 
