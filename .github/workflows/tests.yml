@@ -4,14 +4,27 @@ on:
   pull_request:
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.12'
+            scale: '1'
+          - os: windows-latest
+            python: '3.14'
+            scale: '1.5'
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_SCALE_FACTOR: ${{ matrix.scale }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
           cache: pip
       - name: Qt runtime
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
       - name: Install
         run: |

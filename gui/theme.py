@@ -95,6 +95,12 @@ QTabBar::tab:selected {{ color: {p.primary}; border-bottom: 2px solid {p.primary
 QListWidget {{ background: {p.surface}; border: 1px solid {p.border}; padding: 8px; }}
 QListWidget::item {{ padding: 10px; }}
 QListWidget::item:selected {{ background: {p.primary_muted}; color: {p.primary}; }}
+QSlider {{ background: transparent; }}
+QSlider::groove:vertical {{ background: {p.border_strong}; width: 6px; border-radius: 3px; margin: 6px 0; }}
+QSlider::handle:vertical {{ background: {p.primary}; height: 16px; margin: 0 -6px; border-radius: 5px; border: 1px solid {p.primary_hover}; }}
+QSlider::add-page:vertical {{ background: {p.primary}; border-radius: 3px; }}
+QToolButton {{ color: {p.text}; background: {p.surface}; border: 1px solid {p.border_strong}; border-radius: 6px; padding: 6px; }}
+QToolButton:focus {{ border: 2px solid {p.primary}; }}
 QSlider::groove:horizontal {{ background: {p.border_strong}; height: 4px; }}
 QSlider::handle:horizontal {{ background: {p.primary}; width: 14px; margin: -5px 0; border-radius: 7px; }}
 
@@ -358,7 +364,7 @@ QComboBox QAbstractItemView {{
     outline: none;
 }}
 
-QCheckBox {{ color: {p.text}; spacing: 8px; }}
+QCheckBox {{ color: {p.text}; background: transparent; spacing: 8px; }}
 
 QCheckBox::indicator {{
     width: 14px; height: 14px;

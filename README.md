@@ -12,6 +12,10 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Visualização 3D e estabilidade
+
+A correção do fechamento, o painel de zoom vertical e os controles de câmera estão descritos em [docs/correcao-bloch.md](docs/correcao-bloch.md), com imagem e instruções de atualização no Windows.
+
 ## Evolução 0.11
 
 A entrega e os limites de validação estão em [docs/evolucao-0.11.md](docs/evolucao-0.11.md).

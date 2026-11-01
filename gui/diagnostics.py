@@ -21,6 +21,29 @@ def enable_diagnostics():
     from datetime import datetime, timezone
 
     _stream.write("\nEntrela launch " + datetime.now(timezone.utc).isoformat() + "\n")
+    import platform
+    from importlib.metadata import version, PackageNotFoundError
+
+    _stream.write(
+        "Python: "
+        + sys.version.replace("\n", " ")
+        + "\nPlatform: "
+        + platform.platform()
+        + "\n"
+    )
+    for package in (
+        "PySide6",
+        "shiboken6",
+        "matplotlib",
+        "numpy",
+        "qiskit",
+        "qiskit-aer",
+    ):
+        try:
+            _stream.write(package + ": " + version(package) + "\n")
+        except PackageNotFoundError:
+            pass
+    _stream.flush()
     faulthandler.enable(file=_stream, all_threads=True)
     previous = sys.excepthook
 

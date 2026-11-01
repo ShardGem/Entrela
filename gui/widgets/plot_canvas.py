@@ -1,16 +1,14 @@
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from gui.widgets.figure_canvas import StableFigureCanvas
 from matplotlib.figure import Figure
 from gui.theme import PALETTE
 
 
-class MplCanvas(FigureCanvas):
+class MplCanvas(StableFigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(
             figsize=(width, height), dpi=dpi, facecolor=PALETTE.bg, layout="constrained"
         )
-        super().__init__(self.fig)
-        self.setParent(parent)
-        self.setMinimumSize(240, 220)
+        super().__init__(self.fig, parent, preferred=(500, 320))
 
     def reset_axes(self):
         self.fig.clear()

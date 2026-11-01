@@ -1097,54 +1097,27 @@ class MainWindow(QMainWindow):
         if not canvas._sphere_centers:
             return
         try:
-            zoom = float(self.settings.value("bloch/zoom", 1.0))
-            elev = float(self.settings.value("bloch/elev", 22.0))
-            azim = float(self.settings.value("bloch/azim", -60.0))
             focus = int(self.settings.value("bloch/focus", -1))
-            import math
-
-            if not all(math.isfinite(x) for x in (zoom, elev, azim)):
-                return
-            index = self.page_bloch.focus_combo.findData(focus)
-            if index >= 0:
-                self.page_bloch.focus_combo.setCurrentIndex(index)
-            canvas.zoom = max(0.5, min(3.0, zoom))
-            canvas.ax.view_init(elev=elev, azim=azim)
-            pan = json.loads(self.settings.value("bloch/pan", "[0,0,0]"))
-            if (
-                isinstance(pan, list)
-                and len(pan) == 3
-                and all(isinstance(x, (int, float)) and math.isfinite(x) for x in pan)
-            ):
-                import numpy as np
-
-                _, half = canvas._bounds()
-                canvas._pan = np.clip(np.array(pan), -half, half)
-            canvas._apply_camera()
-        except (ValueError, TypeError):
-            pass
+            canvas.set_focus(focus)
+            canvas.restore_camera(
+                zoom=float(self.settings.value("bloch/zoom", 1.0)),
+                elev=float(self.settings.value("bloch/elev", 22.0)),
+                azim=float(self.settings.value("bloch/azim", -60.0)),
+                pan=json.loads(self.settings.value("bloch/pan", "[0,0,0]")),
+                projection=self.settings.value("bloch/projection", "persp"),
+            )
+        except (ValueError, TypeError, OverflowError):
+            canvas.reset_camera()
+        self.page_bloch._refresh_ui()
 
     def _persist_camera(self):
         canvas = self.page_bloch.canvas
         if not canvas._sphere_centers:
             return
-        import numpy as np
-
-        center, _ = canvas._bounds()
-        pan = (
-            np.array(
-                [
-                    np.mean(canvas.ax.get_xlim()),
-                    np.mean(canvas.ax.get_ylim()),
-                    np.mean(canvas.ax.get_zlim()),
-                ]
+        for key, value in canvas.camera_state().items():
+            self.settings.setValue(
+                "bloch/" + key, json.dumps(value) if key == "pan" else value
             )
-            - center
-        )
-        self.settings.setValue("bloch/pan", json.dumps(pan.tolist()))
-        self.settings.setValue("bloch/zoom", canvas.zoom)
-        self.settings.setValue("bloch/elev", canvas.ax.elev)
-        self.settings.setValue("bloch/azim", canvas.ax.azim)
 
     def _apply_preferences(self):
         if not hasattr(self, "page_settings"):
