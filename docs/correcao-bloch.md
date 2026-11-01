@@ -54,3 +54,11 @@ $env:QT_SCALE_FACTOR = "1.5"
 ```
 
 O arquivo `logs/entrela-crash.log` agora registra versões de Python, sistema, Qt, Matplotlib, NumPy e Qiskit para auxiliar investigações adicionais.
+
+## Viewport retangular e enquadramento
+
+A projeção de Bloch agora substitui o enquadramento quadrado padrão de `Axes3D` por uma área que ocupa todo o canvas. Uma correção da matriz de projeção preserva a escala nas duas direções: as esferas continuam redondas em janelas largas e altas. A área do mouse e o recorte acompanham o retângulo inteiro.
+
+**Enquadrar cena** centraliza os qubits visíveis e calcula um zoom que inclui esferas, pontas dos eixos e rótulos, com margem, sem modificar orientação nem projeção. O zoom manual pode ultrapassar as bordas reais do viewport; o corte no quadrado central foi removido. Para detalhes, combine zoom e foco; para voltar à visão completa, use enquadramento.
+
+Testes adicionais verificam viewport largo/alto, proporções sem distorção, desenho fora do antigo quadrado e enquadramento de 1, 2 e 6 qubits em perspectiva e projeção ortográfica. As propostas seguintes estão em [Próximos ajustes](proximos-ajustes.md).

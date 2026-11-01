@@ -16,6 +16,8 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 
 A correção do fechamento, o painel de zoom vertical e os controles de câmera estão descritos em [docs/correcao-bloch.md](docs/correcao-bloch.md), com imagem e instruções de atualização no Windows.
 
+As propostas de novas funcionalidades estão em [Próximos ajustes](docs/proximos-ajustes.md).
+
 ## Evolução 0.11
 
 A entrega e os limites de validação estão em [docs/evolucao-0.11.md](docs/evolucao-0.11.md).

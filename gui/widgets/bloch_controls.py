@@ -73,6 +73,12 @@ class BlochCameraPanel(QFrame):
             buttons.addWidget(button)
         zoom_row.addLayout(buttons, 1)
         body.addLayout(zoom_row)
+        self.fit_button = SecondaryButton("Enquadrar cena")
+        self.fit_button.setToolTip(
+            "Ajustar os qubits visíveis ao retângulo, preservando a orientação"
+        )
+        self.fit_button.clicked.connect(canvas.fit_scene)
+        body.addWidget(self.fit_button)
         reset = SecondaryButton("Restaurar câmera")
         reset.clicked.connect(canvas.reset_camera)
         body.addWidget(reset)

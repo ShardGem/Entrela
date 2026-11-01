@@ -223,3 +223,77 @@ def test_orientation_panel_expands_without_changing_camera(scene, qt_app):
     qt_app.processEvents()
     assert not scene.camera_panel.elevation.isVisible()
     assert scene.canvas.camera_state() == before
+
+
+@pytest.mark.parametrize("width,height", [(1200, 400), (400, 800)])
+def test_rectangular_viewport_uses_full_canvas_without_stretching_sphere(
+    qt_app, width, height
+):
+    from gui.widgets.bloch_canvas import BlochCanvas
+    from mpl_toolkits.mplot3d import proj3d
+
+    canvas = BlochCanvas()
+    canvas.setup(1)
+    canvas.resize(width, height)
+    canvas.set_projection("ortho")
+    canvas.set_view(0, -90)
+    canvas.draw()
+    np.testing.assert_allclose(canvas.ax.bbox.bounds, canvas.fig.bbox.bounds, atol=1e-8)
+    points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+    x, y, _ = proj3d.proj_transform(*points.T, canvas.ax.get_proj())
+    screen = canvas.ax.transData.transform(np.column_stack((x, y)))
+    assert np.linalg.norm(screen[1] - screen[0]) == pytest.approx(
+        np.linalg.norm(screen[2] - screen[0]), rel=1e-10
+    )
+    canvas.close()
+
+
+@pytest.mark.parametrize("num_qubits", [1, 2, 6])
+@pytest.mark.parametrize("projection", ["persp", "ortho"])
+def test_fit_scene_contains_visible_geometry_after_large_zoom(
+    qt_app, num_qubits, projection
+):
+    from gui.widgets.bloch_canvas import BlochCanvas
+    from mpl_toolkits.mplot3d import proj3d
+
+    canvas = BlochCanvas()
+    canvas.setup(num_qubits)
+    canvas.resize(1000, 420)
+    canvas.set_projection(projection)
+    canvas.set_view(35, 75)
+    canvas.set_zoom(3)
+    canvas.pan(0.5, dz=0.5)
+    canvas.draw()
+    canvas.fit_scene()
+    canvas.draw()
+    points = canvas.scene_corners()
+    x, y, _ = proj3d.proj_transform(*points.T, canvas.ax.get_proj())
+    screen = canvas.ax.transData.transform(np.column_stack((x, y)))
+    bbox = canvas.ax.bbox
+    assert np.all(screen[:, 0] > bbox.x0 + 5)
+    assert np.all(screen[:, 0] < bbox.x1 - 5)
+    assert np.all(screen[:, 1] > bbox.y0 + 5)
+    assert np.all(screen[:, 1] < bbox.y1 - 5)
+    assert canvas.projection == projection
+    assert canvas.ax.elev == 35 and canvas.ax.azim == 75
+    canvas.close()
+
+
+def test_zoom_draws_beyond_old_square_clip_in_wide_canvas(qt_app):
+    from gui.widgets.bloch_canvas import BlochCanvas
+    from matplotlib.colors import to_rgba
+    from gui.theme import PALETTE
+
+    canvas = BlochCanvas()
+    canvas.setup(1)
+    canvas.resize(1200, 400)
+    canvas.set_projection("ortho")
+    canvas.set_view(0, -90)
+    canvas.set_zoom(3)
+    canvas.draw()
+    pixels = np.asarray(canvas.buffer_rgba())
+    # Exclude legend/top edge. A centered 400px square would clip this region.
+    region = pixels[100:300, 260:380, :3]
+    bg = np.array(to_rgba(PALETTE.bg)[:3]) * 255
+    assert np.any(np.linalg.norm(region.astype(float) - bg, axis=2) > 15)
+    canvas.close()

@@ -1,12 +1,14 @@
 """Bloch scene and bounded camera. Drawing and playback never move the camera."""
 
 import math
+from itertools import product
 import numpy as np
 from PySide6.QtCore import Signal
 from matplotlib.backend_bases import MouseEvent, MouseButton
 from matplotlib.figure import Figure
 from gui.theme import PALETTE
 from gui.widgets.figure_canvas import StableFigureCanvas
+from gui.widgets.bloch_projection import BlochAxes3D
 
 
 class BlochCanvas(StableFigureCanvas):
@@ -17,7 +19,7 @@ class BlochCanvas(StableFigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(8, 5), facecolor=PALETTE.bg)
         super().__init__(self.fig, parent, minimum=(240, 280))
-        self.ax = self.fig.add_subplot(111, projection="3d")
+        self.ax = self.fig.add_subplot(111, projection=BlochAxes3D.name)
         self.fig.subplots_adjust(0, 0, 1, 1)
         self._sphere_centers = []
         self._line_handles = []
@@ -368,3 +370,58 @@ class BlochCanvas(StableFigureCanvas):
             legend.get_lines()[0].set_color(
                 getattr(PALETTE, f"q{max(0, self.focus) + 1}")
             )
+
+    def scene_corners(self):
+        """Conservative bounds include the spheres, axis tips and labels."""
+        return np.array(
+            [
+                np.array(center) + offset
+                for q, center in enumerate(self._sphere_centers)
+                if self.focus in (-1, q)
+                for offset in product((-1.55, 1.55), repeat=3)
+            ]
+        )
+
+    def fit_scene(self):
+        """Fit visible qubits at the current orientation without changing data."""
+        if not self._sphere_centers:
+            return
+        self.ax.apply_aspect()
+        points = self.scene_corners()
+        homogeneous = np.column_stack((points, np.ones(len(points))))
+        center, _ = self._bounds()
+        # Reuse the current projection to evaluate centered candidate zooms.
+        # Uniform scaling about the data center equals scaling all data limits.
+        translation = np.eye(4)
+        translation[:3, 3] = self._pan
+        centered = self.ax.get_proj() @ translation
+        margin = max(10.0, min(self.ax.bbox.width, self.ax.bbox.height) * 0.06)
+        bbox = self.ax.bbox
+
+        def fits(zoom):
+            ratio = zoom / self.zoom
+            scale = np.diag([ratio, ratio, ratio, 1.0])
+            scale[:3, 3] = center * (1 - ratio)
+            projected = homogeneous @ (centered @ scale).T
+            if np.any(projected[:, 3] <= 1e-9):
+                return False
+            xy = self.ax.transData.transform(projected[:, :2] / projected[:, 3, None])
+            return bool(
+                np.isfinite(xy).all()
+                and np.all(xy[:, 0] >= bbox.x0 + margin)
+                and np.all(xy[:, 0] <= bbox.x1 - margin)
+                and np.all(xy[:, 1] >= bbox.y0 + margin)
+                and np.all(xy[:, 1] <= bbox.y1 - margin)
+            )
+
+        low, high = self.MIN_ZOOM, self.MAX_ZOOM
+        for _ in range(18):
+            middle = (low + high) / 2
+            if fits(middle):
+                low = middle
+            else:
+                high = middle
+        self._pan = np.zeros(3)
+        self.zoom = max(self.MIN_ZOOM, low * 0.995)
+        self._end_drag()
+        self._apply_camera()
