@@ -1,9 +1,15 @@
 """Base para todas as páginas do app."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QFrame,
 )
 
 from gui.theme import PALETTE, SPACING
@@ -25,15 +31,16 @@ class PageBase(QWidget):
         text_col = QVBoxLayout()
         text_col.setSpacing(2)
         self._title = QLabel(title)
+        self._title.setWordWrap(True)
         self._title.setObjectName("PageTitle")
         self._subtitle = QLabel(subtitle)
+        self._subtitle.setWordWrap(True)
         self._subtitle.setObjectName("PageSubtitle")
         self._subtitle.setVisible(bool(subtitle))
         text_col.addWidget(self._title)
         text_col.addWidget(self._subtitle)
 
-        header_layout.addLayout(text_col)
-        header_layout.addStretch()
+        header_layout.addLayout(text_col, 1)
         self._actions_slot = QHBoxLayout()
         self._actions_slot.setSpacing(SPACING.sm)
         header_layout.addLayout(self._actions_slot)
@@ -64,3 +71,12 @@ class PageBase(QWidget):
         self._title.setText(title)
         self._subtitle.setText(subtitle)
         self._subtitle.setVisible(bool(subtitle))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        narrow = self.width() < 950
+        self._header.layout().setDirection(
+            QHBoxLayout.TopToBottom if narrow else QHBoxLayout.LeftToRight
+        )
+        self._header.layout().setContentsMargins(20, 16, 20, 12)
+        self._body.setContentsMargins(20, 8, 20, 24)

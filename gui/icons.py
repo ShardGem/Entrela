@@ -1,4 +1,5 @@
 """Ícones SVG (estilo Lucide, 24x24)."""
+
 from __future__ import annotations
 from functools import lru_cache
 
@@ -8,6 +9,10 @@ from PySide6.QtSvg import QSvgRenderer
 
 
 _BODIES = {
+    "examples": '<path d="M3 3h7v7H3V3zM14 3h7v7h-7V3zM3 14h7v7H3v-7zM14 14h7v7h-7v-7z"/>',
+    "comparison": '<path d="M4 20V9h5v11M15 20V4h5v16M2 20h21"/>',
+    "analysis": '<path d="M3 21h18M5 17l4-6 4 3 6-10"/>',
+    "library": '<path d="M3 5h7l2 3h9v12H3V5z"/>',
     "dashboard": (
         '<rect x="3" y="3" width="7.5" height="9" rx="1.5"/>'
         '<rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/>'

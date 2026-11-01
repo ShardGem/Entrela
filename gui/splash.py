@@ -26,7 +26,7 @@ from PySide6.QtGui import (
 import math
 from pathlib import Path
 
-_ASSETS = Path(__file__).resolve().parent.parent / "assets"
+_ASSETS = Path(__file__).resolve().parent / "assets"
 
 
 # =========================================================
@@ -72,10 +72,7 @@ class RotatingLogo(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
-        painter.translate(
-            self.width() / 2,
-            self.height() / 2
-        )
+        painter.translate(self.width() / 2, self.height() / 2)
 
         painter.rotate(self._angle)
 
@@ -84,7 +81,7 @@ class RotatingLogo(QWidget):
             -self.size_value // 2,
             self.size_value,
             self.size_value,
-            self.pixmap
+            self.pixmap,
         )
 
 
@@ -97,10 +94,7 @@ class QuantumBackground(QWidget):
 
         self._offset = 0
 
-        self.animation = QPropertyAnimation(
-            self,
-            b"offset"
-        )
+        self.animation = QPropertyAnimation(self, b"offset")
 
         self.animation.setDuration(18000)
 
@@ -109,9 +103,7 @@ class QuantumBackground(QWidget):
 
         self.animation.setLoopCount(-1)
 
-        self.animation.setEasingCurve(
-            QEasingCurve.Linear
-        )
+        self.animation.setEasingCurve(QEasingCurve.Linear)
 
         self.animation.start()
 
@@ -134,12 +126,7 @@ class QuantumBackground(QWidget):
         # =========================================================
         # Background Gradient
         # =========================================================
-        gradient = QLinearGradient(
-            0,
-            0,
-            rect.width(),
-            rect.height()
-        )
+        gradient = QLinearGradient(0, 0, rect.width(), rect.height())
 
         gradient.setColorAt(0, QColor("#04060a"))
         gradient.setColorAt(1, QColor("#0a1120"))
@@ -158,20 +145,10 @@ class QuantumBackground(QWidget):
         spacing = 50
 
         for x in range(0, rect.width(), spacing):
-            painter.drawLine(
-                x,
-                0,
-                x,
-                rect.height()
-            )
+            painter.drawLine(x, 0, x, rect.height())
 
         for y in range(0, rect.height(), spacing):
-            painter.drawLine(
-                0,
-                y,
-                rect.width(),
-                y
-            )
+            painter.drawLine(0, y, rect.width(), y)
 
         # =========================================================
         # Quantum Particles
@@ -184,50 +161,23 @@ class QuantumBackground(QWidget):
         particle_count = 90
 
         for i in range(particle_count):
-
-            angle = math.radians(
-                self._offset * (0.35 + i * 0.002)
-                + i * 17
-            )
+            angle = math.radians(self._offset * (0.35 + i * 0.002) + i * 17)
 
             radius = 120 + (i * 7)
 
-            wave = math.sin(
-                math.radians(
-                    self._offset * 2 + i * 9
-                )
-            ) * 30
+            wave = math.sin(math.radians(self._offset * 2 + i * 9)) * 30
 
-            x = (
-                center_x
-                + math.cos(angle)
-                * (radius + wave)
-            )
+            x = center_x + math.cos(angle) * (radius + wave)
 
-            y = (
-                center_y
-                + math.sin(angle)
-                * (radius * 0.35)
-            )
+            y = center_y + math.sin(angle) * (radius * 0.35)
 
             alpha = max(10, 120 - i)
 
             size = max(1.5, 4 - (i * 0.03))
 
-            painter.setBrush(
-                QColor(
-                    88,
-                    214,
-                    255,
-                    alpha
-                )
-            )
+            painter.setBrush(QColor(88, 214, 255, alpha))
 
-            painter.drawEllipse(
-                QPointF(x, y),
-                size,
-                size
-            )
+            painter.drawEllipse(QPointF(x, y), size, size)
 
         # =========================================================
         # Central Glow
@@ -237,25 +187,12 @@ class QuantumBackground(QWidget):
         painter.setPen(Qt.NoPen)
 
         for i in range(8):
-
             alpha = 18 - i * 2
 
-            painter.setBrush(
-                QColor(
-                    88,
-                    214,
-                    255,
-                    alpha
-                )
-            )
+            painter.setBrush(QColor(88, 214, 255, alpha))
 
             painter.drawEllipse(
-                QPointF(
-                    center_x,
-                    center_y
-                ),
-                glow_radius - i * 18,
-                glow_radius - i * 18
+                QPointF(center_x, center_y), glow_radius - i * 18, glow_radius - i * 18
             )
 
 
@@ -271,26 +208,16 @@ class SplashScreen(QSplashScreen):
 
         super().__init__(pixmap)
 
-        self.setWindowFlags(
-            Qt.WindowStaysOnTopHint |
-            Qt.FramelessWindowHint
-        )
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
 
-        self.setAttribute(
-            Qt.WA_TranslucentBackground
-        )
+        self.setAttribute(Qt.WA_TranslucentBackground)
 
         # =========================================================
         # Main Container
         # =========================================================
         self.container = QWidget(self)
 
-        self.container.setGeometry(
-            0,
-            0,
-            1100,
-            650
-        )
+        self.container.setGeometry(0, 0, 1100, 650)
 
         self.container.setStyleSheet("""
             QWidget {
@@ -302,28 +229,16 @@ class SplashScreen(QSplashScreen):
         # =========================================================
         # Background
         # =========================================================
-        self.bg = QuantumBackground(
-            self.container
-        )
+        self.bg = QuantumBackground(self.container)
 
-        self.bg.setGeometry(
-            0,
-            0,
-            1100,
-            650
-        )
+        self.bg.setGeometry(0, 0, 1100, 650)
 
         # =========================================================
         # Overlay
         # =========================================================
         overlay = QWidget(self.container)
 
-        overlay.setGeometry(
-            0,
-            0,
-            1100,
-            650
-        )
+        overlay.setGeometry(0, 0, 1100, 650)
 
         overlay.setStyleSheet("""
             background: transparent;
@@ -331,12 +246,7 @@ class SplashScreen(QSplashScreen):
 
         layout = QVBoxLayout(overlay)
 
-        layout.setContentsMargins(
-            60,
-            40,
-            60,
-            40
-        )
+        layout.setContentsMargins(60, 40, 60, 40)
 
         layout.setSpacing(0)
 
@@ -347,10 +257,7 @@ class SplashScreen(QSplashScreen):
         # =========================================================
         center_container = QWidget()
 
-        center_container.setFixedSize(
-            520,
-            520
-        )
+        center_container.setFixedSize(520, 520)
 
         center_container.setStyleSheet("""
             background: transparent;
@@ -360,9 +267,7 @@ class SplashScreen(QSplashScreen):
         # Rotating Logo
         # =========================================================
         self.logo = RotatingLogo(
-            str(_ASSETS / "entrela_logo.png"),
-            size=520,
-            parent=center_container
+            str(_ASSETS / "entrela_logo.png"), size=520, parent=center_container
         )
 
         self.logo.move(0, 0)
@@ -372,27 +277,15 @@ class SplashScreen(QSplashScreen):
         # =========================================================
         self.text = QLabel(center_container)
 
-        text_pixmap = QPixmap(
-            str(_ASSETS / "entrela_texto.png")
-        )
+        text_pixmap = QPixmap(str(_ASSETS / "entrela_texto.png"))
 
         self.text.setPixmap(
-            text_pixmap.scaled(
-                520,
-                520,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
+            text_pixmap.scaled(520, 520, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         )
 
-        self.text.setFixedSize(
-            520,
-            520
-        )
+        self.text.setFixedSize(520, 520)
 
-        self.text.setAlignment(
-            Qt.AlignCenter
-        )
+        self.text.setAlignment(Qt.AlignCenter)
 
         self.text.setStyleSheet("""
             background: transparent;
@@ -405,23 +298,16 @@ class SplashScreen(QSplashScreen):
         # =========================================================
         # Add Center
         # =========================================================
-        layout.addWidget(
-            center_container,
-            alignment=Qt.AlignCenter
-        )
+        layout.addWidget(center_container, alignment=Qt.AlignCenter)
 
         layout.addStretch()
 
         # =========================================================
         # Loading Text
         # =========================================================
-        self.loading = QLabel(
-            "Inicializando área de trabalho..."
-        )
+        self.loading = QLabel("Inicializando área de trabalho...")
 
-        self.loading.setAlignment(
-            Qt.AlignCenter
-        )
+        self.loading.setAlignment(Qt.AlignCenter)
 
         self.loading.setStyleSheet("""
             QLabel {
@@ -443,19 +329,14 @@ class SplashScreen(QSplashScreen):
         if supports_opacity:
             self.setWindowOpacity(0)
 
-        self.fade = QPropertyAnimation(
-            self,
-            b"windowOpacity"
-        )
+        self.fade = QPropertyAnimation(self, b"windowOpacity")
 
         self.fade.setDuration(1800)
 
         self.fade.setStartValue(0)
         self.fade.setEndValue(1)
 
-        self.fade.setEasingCurve(
-            QEasingCurve.OutCubic
-        )
+        self.fade.setEasingCurve(QEasingCurve.OutCubic)
 
         if supports_opacity:
             self.fade.start()

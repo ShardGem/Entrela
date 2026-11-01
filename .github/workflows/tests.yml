@@ -26,3 +26,9 @@ jobs:
         run: |
           python -m pip check
           python -m pytest -q -p no:cacheprovider
+      - name: Package and launch outside checkout
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -m pip wheel --no-deps . -w dist
+          python scripts/package_smoke.py dist/entrela-0.11.0-py3-none-any.whl
