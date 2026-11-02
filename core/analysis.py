@@ -1,6 +1,9 @@
 """Bounded scientific analyses with independent exact time evolution."""
 
-from dataclasses import replace
+from dataclasses import asdict, replace
+from datetime import datetime, timezone
+from importlib.metadata import version
+import platform
 from secrets import randbits
 import numpy as np
 from scipy.linalg import eigh
@@ -16,6 +19,40 @@ from qiskit.quantum_info import (
 from core.circuits import _build_hamiltonian
 from core.metrics import fidelity, purity, energy_expectation
 from core.simulation import run_experiment, SimulationCancelled
+from core import __version__
+
+
+def analysis_provenance(experiment=None):
+    """Record the environment doing the calculations, separate from old sources."""
+    provenance = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "analysis_environment": {
+            "entrela_version": __version__,
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "versions": {name: version(name) for name in ("numpy", "scipy", "qiskit", "qiskit-aer")},
+        },
+    }
+    if experiment is not None:
+        metadata = experiment.result.metadata
+        provenance["source_environment"] = {
+            key: metadata.get(key)
+            for key in ("entrela_version", "python", "versions", "method")
+        }
+        provenance["source_effective_seed"] = metadata.get("effective_seed")
+    return provenance
+
+
+def analysis_run_record(experiment):
+    """Complete effective inputs and raw measurements of a generated point."""
+    return {
+        "id": experiment.id,
+        "created_at": experiment.created_at.isoformat(),
+        "config": asdict(experiment.config),
+        "counts": dict(experiment.result.counts or {}),
+        "metadata": experiment.result.metadata,
+        "duration_s": experiment.duration_s,
+    }
 
 
 def initial_state(system):
@@ -60,6 +97,7 @@ def temporal_analysis(experiment, progress=None, is_cancelled=None):
     c, r = experiment.config, experiment.result
     if not r.states or not r.times:
         raise ValueError("Esta análise requer snapshots com tempos registrados.")
+    checkpoint(is_cancelled, progress, 0)
     exact = exact_states(c, r.times) if c.circuit is None else [None] * len(r.states)
     H = _build_hamiltonian(
         c.system.num_qubits,
@@ -113,7 +151,8 @@ def temporal_analysis(experiment, progress=None, is_cancelled=None):
         kind="temporal",
         source_id=experiment.id,
         rows=rows,
-        config=__import__("dataclasses").asdict(c),
+        config=asdict(c),
+        provenance=analysis_provenance(experiment),
         note="Entropia reduzida quantifica emaranhamento somente para estado global puro. Negatividade: bipartição q0|resto; zero não exclui todo emaranhamento em sistemas maiores.",
     )
 
@@ -129,7 +168,7 @@ def convergence_analysis(
     ):
         raise ValueError("Use até dez valores inteiros entre 1 e 200.")
     exact = exact_states(config, [config.protocol.total_time])[0]
-    rows = []
+    rows, runs = [], []
     for i, n in enumerate(steps):
         checkpoint(is_cancelled, progress, int(100 * i / len(steps)))
         cfg = replace(
@@ -140,6 +179,7 @@ def convergence_analysis(
             seed=42,
         )
         exp = run_experiment(cfg, is_cancelled=is_cancelled)
+        runs.append(analysis_run_record(exp))
         rows.append(
             dict(
                 steps=n,
@@ -151,7 +191,9 @@ def convergence_analysis(
     return dict(
         kind="convergence",
         rows=rows,
-        config=__import__("dataclasses").asdict(config),
+        config=asdict(config),
+        runs=runs,
+        provenance=analysis_provenance(),
         note="Aproximação Trotter ideal contra exp(−iHt), sem ruído e sem erro de amostragem na fidelidade.",
     )
 
@@ -197,10 +239,11 @@ def parameter_sweep(
             cfg = replace(config, seed=seed, **kwargs)
             cfg.validate()
             configs.append((value, cfg))
-    rows = []
+    rows, runs = [], []
     for i, (value, cfg) in enumerate(configs):
         checkpoint(is_cancelled, progress, int(100 * i / len(configs)))
         exp = run_experiment(cfg, is_cancelled=is_cancelled)
+        runs.append(analysis_run_record(exp))
         r = exp.result
         rows.append(
             dict(
@@ -222,6 +265,8 @@ def parameter_sweep(
         rows=rows,
         parameter=parameter,
         seeds=seeds,
-        config=__import__("dataclasses").asdict(config),
+        config=asdict(config),
+        runs=runs,
+        provenance=analysis_provenance(),
         note="Fidelidade/pureza/energia derivam do ensemble e não variam com a semente. Z0 amostrado varia; seeds não estimam incerteza do modelo de ruído.",
     )

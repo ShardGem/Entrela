@@ -12,9 +12,10 @@ class MitigationWorker(QThread):
     error = Signal(str)
     cancelled = Signal()
 
-    def __init__(self, config, qubit=0, method="linear", shots=8192, parent=None):
+    def __init__(self, config, qubit=0, method="linear", shots=8192, parent=None, *, scale_factors=None):
         super().__init__(parent)
         self.config, self.qubit, self.method, self.shots = config, qubit, method, shots
+        self.scale_factors = scale_factors
 
     def run(self):
         try:
@@ -44,6 +45,7 @@ class MitigationWorker(QThread):
             result = run_zne(
                 circuit,
                 build_noise_model(self.config.noise),
+                scale_factors=self.scale_factors,
                 shots=self.shots,
                 method=self.method,
                 seed=self.config.seed,

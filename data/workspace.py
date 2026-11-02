@@ -52,11 +52,19 @@ class WorkspaceLibrary:
     def template(self, name):
         return config_from_dict(self.read()["templates"][name])
 
-    def annotate(self, identifier, project, notes, tags):
+    def annotate(self, identifier, project, notes, tags, title=None):
+        if not isinstance(identifier, str) or not identifier:
+            raise ValueError("Identificador de execução inválido.")
+        if title is not None and (not isinstance(title, str) or len(title) > 160):
+            raise ValueError("O nome da execução deve ter até 160 caracteres.")
         raw = self.read()
         if project.strip():
             raw["projects"].setdefault(project.strip(), {"description": ""})
         raw["annotations"][identifier] = {
+            "title": (
+                title.strip() if title is not None
+                else raw["annotations"].get(identifier, {}).get("title", "")
+            ),
             "project": project.strip(),
             "notes": notes,
             "tags": list(tags),
@@ -67,3 +75,14 @@ class WorkspaceLibrary:
         raw = self.read()
         raw["templates"].pop(name, None)
         self._write(raw)
+
+
+def experiment_title(experiment, annotations=None):
+    """Presentation name; the immutable technical ID remains the lookup key."""
+    annotation = (annotations or {}).get(experiment.id, {})
+    title = annotation.get("title", "").strip()
+    if title:
+        return title
+    from core.types import system_label
+
+    return f"{system_label(experiment.config)} · {experiment.created_at.astimezone():%d/%m %H:%M}"

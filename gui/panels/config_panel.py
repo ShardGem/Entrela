@@ -47,6 +47,26 @@ SECTIONS = (
     ),
 )
 
+# Short explanations are shared by field tooltips and keyboard-accessible help.
+# They describe the selected configuration; no simulation runs while editing.
+PARAMETER_HELP = {
+    "Qubits": "Quantidade de sistemas de dois níveis. Cada qubit pode ser medido como 0 ou 1; o espaço de estados dobra a cada qubit.",
+    "Estado inicial": "Ponto de partida antes da evolução: zero, superposição uniforme ou o par emaranhado de Bell.",
+    "Hamiltoniano": "Modelo que define as interações e a evolução do sistema. Custom mantém compatibilidade com Ising; não é um editor de Hamiltonianos.",
+    "J — acoplamento": "Intensidade das interações entre vizinhos. No termo +J ZZ do Ising, J positivo favorece antialinhamento; o sinal faz parte do modelo.",
+    "h — campo": "Intensidade do campo transversal no Ising. Ele pode mudar as populações da base Z. Não é aplicado aos outros modelos deste formulário.",
+    "Tempo total (ℏ=1)": "Duração adimensional da evolução. Não corresponde ao tempo real de execução nem aos tempos T₁/T₂ do canal térmico.",
+    "Passos Trotter": "Divide a evolução em etapas. Mais etapas podem reduzir a aproximação, mas aumentam o número de portas sujeitas ao ruído.",
+    "Ordem Suzuki": "Ordem da aproximação de Suzuki–Trotter. Ordem 4 usa mais operações; sua vantagem depende do modelo e do ruído.",
+    "Modelo de ruído": "Despolarizador mistura o estado; térmico descreve relaxamento e perda de coerência. São modelos educativos por porta, não calibrações de hardware.",
+    "Despolarização 1q": "Parâmetro p₁ do canal despolarizador aplicado a cada porta de um qubit. Zero desliga esse canal; valores maiores aumentam a mistura.",
+    "Despolarização 2q": "Parâmetro p₂ do canal despolarizador aplicado a cada porta de dois qubits. Pode ser diferente de p₁.",
+    "T₁": "Tempo de relaxamento da população em microssegundos. Valores maiores significam relaxamento mais lento para a mesma duração de porta.",
+    "T₂": "Tempo de perda de coerência em microssegundos. Deve satisfazer T₂ ≤ 2T₁; maior T₂ significa perda de coerência mais lenta.",
+    "Shots": "Número de amostras de medição. Mais shots reduzem a flutuação das contagens, mas não corrigem ruído nem alteram as métricas calculadas do estado.",
+    "Semente": "Controla a amostragem aleatória. Vazio gera uma semente registrada no resultado. Reutilizar a mesma semente não cria uma observação independente.",
+}
+
 
 class ConfigPanel(QWidget):
     simulacao_acionada = Signal()
@@ -63,9 +83,15 @@ class ConfigPanel(QWidget):
         self.mode_combo = QComboBox()
         self.mode_combo.addItem("Guiado — aprenda enquanto configura", "guided")
         self.mode_combo.addItem("Avançado — todos os parâmetros", "advanced")
+        self.mode_combo.setAccessibleName("Modo de configuração")
         root.addWidget(self.mode_combo)
+        self.mode_explanation = QLabel()
+        self.mode_explanation.setWordWrap(True)
+        self.mode_explanation.setObjectName("LeadText")
+        root.addWidget(self.mode_explanation)
         nav = QHBoxLayout()
         nav_scroll = QScrollArea()
+        self.section_nav = nav_scroll
         nav_scroll.setWidgetResizable(True)
         nav_scroll.setFixedHeight(52)
         nav_widget = QWidget()
@@ -111,6 +137,8 @@ class ConfigPanel(QWidget):
             widget.setSingleStep(int(step) if integer else step)
             widget.setSuffix(suffix)
             widget.setAccessibleName(label)
+            widget.setToolTip(PARAMETER_HELP.get(label, ""))
+            widget.setWhatsThis(PARAMETER_HELP.get(label, ""))
             setattr(self, name, widget)
             forms[key].addRow(self._help(label), widget)
             return widget
@@ -124,12 +152,18 @@ class ConfigPanel(QWidget):
         ]:
             self.combo_initial.addItem(title, value)
         forms["system"].addRow(self._help("Estado inicial"), self.combo_initial)
+        self.initial_preview = QLabel()
+        self.initial_preview.setObjectName("LeadText")
+        self.initial_preview.setWordWrap(True)
+        self.initial_preview.setAccessibleName("Prévia descritiva do estado inicial")
+        forms["system"].addRow(self.initial_preview)
         self.combo_ham = QComboBox()
         self.combo_ham.addItems(["Ising", "Heisenberg", "XY", "XXZ", "Custom"])
         forms["hamiltonian"].addRow(self._help("Hamiltoniano"), self.combo_ham)
         spin("spin_J", "J — acoplamento", "hamiltonian", -5.0, 5.0, 1.0)
         spin("spin_h", "h — campo", "hamiltonian", -5.0, 5.0, 0.5)
         self.check_periodic = QCheckBox("Condições periódicas")
+        self.check_periodic.setToolTip("Fecha a cadeia ligando o último qubit ao primeiro quando há mais de dois qubits. Desmarcado mantém as extremidades abertas.")
         forms["hamiltonian"].addRow(self.check_periodic)
         spin("spin_tempo", "Tempo total (ℏ=1)", "evolution", 0.001, 10.0, 1.0)
         spin("spin_passos", "Passos Trotter", "evolution", 1, 200, 4, True, 1)
@@ -138,8 +172,10 @@ class ConfigPanel(QWidget):
             self.combo_order.addItem(str(order), order)
         forms["evolution"].addRow(self._help("Ordem Suzuki"), self.combo_order)
         self.check_snaps = QCheckBox("Salvar estados ao longo do tempo")
+        self.check_snaps.setToolTip("Guarda o estado inicial e o fim de cada passo Trotter para a evolução 3D e análises. Aumenta o uso de memória e o arquivo exportado.")
         forms["evolution"].addRow(self.check_snaps)
         self.check_ruido = QCheckBox("Ativar ruído")
+        self.check_ruido.setToolTip("Compare uma execução ideal e outra ruidosa com os mesmos parâmetros. O ruído incide também nas portas de preparação.")
         self.check_ruido.setChecked(True)
         forms["noise"].addRow(self.check_ruido)
         self.combo_modelo = QComboBox()
@@ -160,7 +196,13 @@ class ConfigPanel(QWidget):
         spin("spin_shots", "Shots", "execution", 1, 1_000_000, 8192, True, 1024)
         self.input_seed = QLineEdit("42")
         self.input_seed.setPlaceholderText("Automática (campo vazio)")
+        self.input_seed.setAccessibleName("Semente aleatória")
+        self.input_seed.setToolTip(PARAMETER_HELP["Semente"])
         forms["execution"].addRow(self._help("Semente"), self.input_seed)
+        for combo, label in ((self.combo_initial, "Estado inicial"), (self.combo_ham, "Hamiltoniano"), (self.combo_order, "Ordem Suzuki"), (self.combo_modelo, "Modelo de ruído")):
+            combo.setAccessibleName(label)
+            combo.setToolTip(PARAMETER_HELP[label])
+            combo.setWhatsThis(PARAMETER_HELP[label])
         body.addStretch()
         scroll.setWidget(container)
         root.addWidget(scroll, 1)
@@ -198,11 +240,15 @@ class ConfigPanel(QWidget):
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QLabel(text))
+        label = QLabel(text)
+        label.setWordWrap(True)
+        layout.addWidget(label, 1)
         button = QPushButton("?")
         button.setObjectName("HelpButton")
         button.setFixedSize(26, 26)
         button.setAccessibleName("Ajuda: " + text)
+        button.setToolTip(PARAMETER_HELP.get(text, "Abrir explicação no manual."))
+        widget.setToolTip(PARAMETER_HELP.get(text, ""))
         button.clicked.connect(lambda: self.ajuda_acionada.emit(text))
         layout.addWidget(button)
         return widget
@@ -233,6 +279,13 @@ class ConfigPanel(QWidget):
         )
 
     def _present(self):
+        guided = self.current_mode == "guided"
+        self.section_nav.setVisible(guided)
+        self.mode_explanation.setText(
+            "Uma etapa por vez. Navegue livremente e use ? para entender cada parâmetro."
+            if guided else
+            "Visão completa por categoria. Os valores são os mesmos do modo Guiado; use ? para consultar as referências."
+        )
         for key, widget in self.sections.items():
             widget.setVisible(
                 self.current_mode == "advanced" or key == self.current_section
@@ -256,6 +309,16 @@ class ConfigPanel(QWidget):
         )
 
     def _changed(self, *_):
+        initial = self.combo_initial.currentData()
+        n = self.spin_qubits.value()
+        preview = {
+            "zero": f"Prévia ideal da preparação: {n} qubits em |0⟩. Antes de evoluir, uma medição em Z retorna apenas zeros.",
+            "plus": "Prévia ideal da preparação: cada qubit aponta para +X na esfera de Bloch. Antes de evoluir, os resultados em Z têm probabilidades iguais.",
+            "bell": "Prévia ideal da preparação: (|00⟩ + |11⟩)/√2. O par é emaranhado; cada vetor de Bloch local é nulo, embora o estado global seja puro.",
+        }[initial]
+        if initial == "bell" and n != 2:
+            preview = "O exemplo de Bell requer exatamente dois qubits. Ajuste Qubits para 2 antes de executar."
+        self.initial_preview.setText(preview)
         self.spin_h.setEnabled(self.combo_ham.currentText() in ("Ising", "Custom"))
         noise = self._noise_config()
         thermal = noise.enabled and noise.kind == "Termico"

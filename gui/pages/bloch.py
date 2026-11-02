@@ -1,6 +1,8 @@
 """Snapshot viewer: the camera never changes scientific state."""
 
 from __future__ import annotations
+from collections import OrderedDict
+from hashlib import blake2b
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal, QSignalBlocker
 from PySide6.QtWidgets import (
@@ -80,6 +82,13 @@ class BlochPage(PageBase):
         self.interpolated_svs = []
         self.precomputed_bloch = []
         self.ideal_bloch = []
+        # Cache only small derived arrays, never copies of the scientific states.
+        # Content keys also make a deliberately modified state invalidate safely.
+        self._derived_cache = OrderedDict()
+        self._derived_cache_limit = 512
+        self.snapshot_probabilities = []
+        self.ideal_probabilities = []
+        self._probability_plot_key = None
         self.current_frame = 0
         self.num_qubits = 2
         self.playing = False
@@ -229,7 +238,12 @@ class BlochPage(PageBase):
         self.interpolated_svs = list(self.original_svs)
         self.precomputed_bloch = []
         self.ideal_bloch = []
+        self.snapshot_probabilities = []
+        self.ideal_probabilities = []
+        self._probability_plot_key = None
         self.ideal_states = list(ideal_statevectors or [])
+        if len(self.ideal_states) != len(self.original_svs):
+            self.ideal_states = []
         self.times = (
             times
             if times is not None and len(times) == len(self.original_svs)
@@ -241,20 +255,13 @@ class BlochPage(PageBase):
             return
         self.num_qubits = self.original_svs[0].num_qubits
         for state in self.original_svs:
-            self.precomputed_bloch.append(
-                [
-                    get_bloch_vector(state, q, self.num_qubits)
-                    for q in range(self.num_qubits)
-                ]
-            )
-        if ideal_statevectors and len(ideal_statevectors) == len(statevectors):
-            self.ideal_bloch = [
-                [
-                    get_bloch_vector(s, q, self.num_qubits)
-                    for q in range(self.num_qubits)
-                ]
-                for s in ideal_statevectors
-            ]
+            vectors, probabilities = self._derived_snapshot(state)
+            self.precomputed_bloch.append(vectors)
+            self.snapshot_probabilities.append(probabilities)
+        for state in self.ideal_states:
+            vectors, probabilities = self._derived_snapshot(state)
+            self.ideal_bloch.append(vectors)
+            self.ideal_probabilities.append(probabilities)
         old_focus = self.focus_combo.currentData()
         self.canvas.setup(self.num_qubits)
         self.focus_combo.blockSignals(True)
@@ -283,6 +290,29 @@ class BlochPage(PageBase):
         self.snapshot_spin.setRange(1, len(self.precomputed_bloch))
         self.current_frame = 0
         self._refresh_ui()
+
+    def _derived_snapshot(self, state):
+        data = np.asarray(state.data)
+        key = (
+            data.shape,
+            data.dtype.str,
+            blake2b(data.tobytes(), digest_size=20).digest(),
+        )
+        cached = self._derived_cache.get(key)
+        if cached is None:
+            vectors = np.asarray([
+                get_bloch_vector(state, q, state.num_qubits)
+                for q in range(state.num_qubits)
+            ])
+            probabilities = np.asarray(state.probabilities()).copy()
+            vectors.setflags(write=False)
+            probabilities.setflags(write=False)
+            cached = (vectors, probabilities)
+            self._derived_cache[key] = cached
+            while len(self._derived_cache) > self._derived_cache_limit:
+                self._derived_cache.popitem(last=False)
+        self._derived_cache.move_to_end(key)
+        return cached
 
     def _focus(self, *_):
         self.canvas.set_focus(
@@ -332,9 +362,10 @@ class BlochPage(PageBase):
         for q, panel in enumerate(self._qubit_panels):
             panel.update_values(self.precomputed_bloch[idx][q])
             panel.setVisible(self.canvas.focus in (-1, q))
-        if self.visual_tabs.currentIndex() == 1:
+        plot_key = (idx, self.overlay.isChecked(), PALETTE.primary, PALETTE.q2, PALETTE.surface, PALETTE.text)
+        if self.visual_tabs.currentIndex() == 1 and plot_key != self._probability_plot_key:
             ax = self.probabilities_canvas.reset_axes()
-            probabilities = self.original_svs[idx].probabilities()
+            probabilities = self.snapshot_probabilities[idx]
             positions = np.arange(len(probabilities))
             ax.bar(
                 positions - 0.18,
@@ -343,10 +374,10 @@ class BlochPage(PageBase):
                 color=PALETTE.primary,
                 label="Simulado",
             )
-            if self.overlay.isChecked() and getattr(self, "ideal_states", None):
+            if self.overlay.isChecked() and self.ideal_probabilities:
                 ax.bar(
                     positions + 0.18,
-                    self.ideal_states[idx].probabilities(),
+                    self.ideal_probabilities[idx],
                     width=0.36,
                     color=PALETTE.q2,
                     label="Circuito ideal",
@@ -361,6 +392,7 @@ class BlochPage(PageBase):
             ax.set_xlabel("Bitstring (q0 à direita)")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
             self.probabilities_canvas.draw_idle()
+            self._probability_plot_key = plot_key
         self.metrics.select_snapshot(idx)
         self.frame_changed.emit(idx)
 

@@ -4,7 +4,7 @@ A primeira entrega desta rodada corrige o viewport 3D: a projeção agora usa to
 
 ## Próximas entregas propostas
 
-Os itens **1–4 foram entregues na versão 0.12**, junto com o editor de circuitos. Veja [manual e validação](circuitos-interativos-0.12.md). Os itens 5–8 continuam como propostas, na ordem abaixo.
+Os itens **1–4 foram entregues na versão 0.12**, junto com o editor de circuitos. Veja [manual e validação](circuitos-interativos-0.12.md). O estudo conjunto de Trotter/ruído (item 6) e caches limitados de Bloch/probabilidades (parte do item 8) foram entregues na [0.13](evolucao-0.13.md). Comparação 3D, animação exportada e carregamento progressivo de registros continuam como propostas.
 
 | Ordem | Ajuste / funcionalidade | Resultado esperado e critério de aceite |
 |---|---|---|

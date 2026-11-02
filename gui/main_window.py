@@ -44,8 +44,9 @@ from gui.controllers.appearance import apply_appearance, DARK
 from gui.theme import PALETTE
 from gui.workers.analysis_worker import AnalysisWorker
 from gui.workers.storage_worker import StorageWorker
+from gui.workers.report_worker import ReportWorker
 from data.workspace import WorkspaceLibrary
-from core.report import export_report
+from core.report import export_rendered_report
 from gui.workers.simulation_worker import SimulationWorker
 from gui.workers.mitigation_worker import MitigationWorker
 from core.types import (
@@ -57,9 +58,10 @@ from core.types import (
     NoiseConfig,
     config_from_dict,
 )
+from copy import deepcopy
 from core.examples import EXAMPLES, get_example, create_example_config
 from core.export import (
-    export_counts_csv,
+    export_experiment_csv,
     export_experiment_json,
     import_experiment_json,
     export_run_bundle,
@@ -246,6 +248,7 @@ class MainWindow(QMainWindow):
         self.page_circuit.snapshot_requested.connect(self._show_circuit_snapshot)
         self.page_circuit.run_requested.connect(self._run_editor_circuit)
         self.page_analysis.requested.connect(self._run_analysis)
+        self.page_analysis.cancel_requested.connect(self._cancel_simulation)
         self.page_results.rerun_requested.connect(self._rerun_current)
         self.page_results.report_requested.connect(self._export_report)
         self.page_library.template_save_requested.connect(self._save_template)
@@ -547,6 +550,7 @@ class MainWindow(QMainWindow):
         worker.error.connect(self._on_error)
         worker.cancelled.connect(self._on_cancelled)
         worker.progress.connect(self.page_simulation.status._progress.setValue)
+        worker.progress.connect(self.page_analysis.progress.setValue)
         worker.finished.connect(self._on_thread_finished)
         self.page_simulation.set_running(True)
         self.page_mitigation.set_running(True)
@@ -592,9 +596,14 @@ class MainWindow(QMainWindow):
             return
         source = self._zne_source
         analysis = {**analysis, "source_experiment_id": source.id}
+        metadata = deepcopy(source.result.metadata)
+        metadata.setdefault("reproduction", {}).update(
+            mitigation_method="zne",
+            mitigation_parameters={key: analysis[key] for key in ("method", "scale_factors", "qubit", "shots", "seed")},
+        )
         self._current_experiment = Experiment(
             source.config,
-            replace(source.result, mitigation=analysis),
+            replace(source.result, mitigation=analysis, metadata=metadata),
             duration_s=analysis["duration_s"],
             tags=list(dict.fromkeys(source.tags + ["ZNE"])),
         )
@@ -682,6 +691,9 @@ class MainWindow(QMainWindow):
         )
 
     def _open_experiment(self, identifier):
+        if self._current_worker is not None or self._storage_worker is not None:
+            self.statusBar().showMessage("Aguarde ou cancele a tarefa atual antes de abrir outra execução.")
+            return
         if self.repository is None:
             return
         try:
@@ -708,11 +720,16 @@ class MainWindow(QMainWindow):
             )
 
     def _on_cancelled(self):
+        self.page_analysis.message.setText("Tarefa cancelada; resultados anteriores preservados.")
         self.page_simulation.status.set_idle(
             "Execução cancelada; resultados anteriores preservados"
         )
 
     def _on_error(self, message):
+        if isinstance(self._current_worker, ReportWorker):
+            self.statusBar().showMessage(message)
+            self.page_simulation.status.set_error(message)
+            return
         if isinstance(self._current_worker, AnalysisWorker):
             self.page_analysis.message.setText(message)
             self.page_bloch.metrics.summary.setText(message)
@@ -792,9 +809,10 @@ class MainWindow(QMainWindow):
         )
         if path:
             try:
-                export_counts_csv(self._current_experiment.result.counts, path)
-                self.statusBar().showMessage("CSV exportado")
-            except OSError as exc:
+                annotation = self._current_annotation()
+                export_experiment_csv(self._current_experiment, path, annotation=annotation)
+                self.statusBar().showMessage("CSV exportado com configuração e proveniência")
+            except (OSError, ValueError) as exc:
                 self.statusBar().showMessage(str(exc))
 
     def _export_experiment(self):
@@ -811,7 +829,8 @@ class MainWindow(QMainWindow):
                 if "ZIP" in kind and not Path(path).suffix:
                     path += ".zip"
                 if Path(path).suffix.lower() == ".zip":
-                    export_run_bundle(self._current_experiment, path)
+                    annotation = self._current_annotation()
+                    export_run_bundle(self._current_experiment, path, annotation=annotation, analysis=self.page_analysis.data)
                 else:
                     export_experiment_json(self._current_experiment, path)
                 self.statusBar().showMessage("Experimento completo exportado")
@@ -928,22 +947,30 @@ class MainWindow(QMainWindow):
         )
 
     def _on_analysis(self, data):
+        # Bind all artifacts to the source captured by the worker, never to a
+        # subsequently selected record. Inputs and effective seeds remain explicit.
+        worker = self._current_worker
+        if worker is not None and worker.isInterruptionRequested():
+            self._on_cancelled()
+            return
+        source = worker.source if isinstance(worker, AnalysisWorker) else self._current_experiment
+        data.setdefault("source_id", source.id)
+        data.setdefault("analysis_id", uuid4().hex[:12])
+        data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+        data.setdefault("config", asdict(source.config))
+        data.setdefault("source_metadata", source.result.metadata)
         self.page_analysis.show_analysis(data)
         if data.get("kind") == "temporal":
             self.page_bloch.metrics.set_rows(data["rows"])
         if self.repository is not None:
             folder = (
-                self.repository.base_dir / ".analyses" / self._current_experiment.id
+                self.repository.base_dir / ".analyses" / source.id
             )
-            folder.mkdir(parents=True, exist_ok=True)
-            data["source_id"] = self._current_experiment.id
-            path = folder / (uuid4().hex[:12] + ".json")
+            path = folder / (data["analysis_id"] + ".json")
             try:
-                path.write_text(
-                    json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False),
-                    encoding="utf-8",
-                )
-            except OSError as exc:
+                from data.analyses import save_analysis
+                save_analysis(data, path)
+            except (OSError, ValueError, TypeError) as exc:
                 self.statusBar().showMessage(
                     "Análise disponível; falha ao guardar: " + str(exc)
                 )
@@ -956,6 +983,21 @@ class MainWindow(QMainWindow):
         if self._current_experiment is None or self._current_worker is not None:
             return
         source = self._current_experiment
+        if source.result.mitigation:
+            m = source.result.mitigation
+            zne_seed = m.get("seed", source.result.metadata.get("effective_seed", source.config.seed))
+            if zne_seed is None:
+                self.statusBar().showMessage("Análise ZNE sem semente registrada; configure uma nova análise.")
+                return
+            if not self._confirm_unsaved():
+                return
+            self._zne_source = source
+            self._start_worker(
+                MitigationWorker(replace(source.config, seed=zne_seed), m["qubit"], m["method"], m["shots"], self, scale_factors=m["scale_factors"]),
+                self._on_mitigation,
+            )
+            self.statusBar().showMessage("Reproduzindo ZNE; métricas da execução de origem preservadas.")
+            return
         seed = source.result.metadata.get("effective_seed", source.config.seed)
         if seed is None:
             self.statusBar().showMessage(
@@ -970,7 +1012,7 @@ class MainWindow(QMainWindow):
         self._start_worker(SimulationWorker(config, self), self._on_experiment)
 
     def _export_report(self):
-        if self._current_experiment is None:
+        if self._current_experiment is None or self._current_worker is not None:
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -981,22 +1023,41 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            annotation = (
-                self._workspace_library()
-                .read()["annotations"]
-                .get(self._current_experiment.id)
+            annotation = self._current_annotation()
+            self._report_path = path
+            self._start_worker(
+                ReportWorker(self._current_experiment, self.page_analysis.data, annotation, self),
+                self._on_report_prepared,
             )
-            export_report(
-                self._current_experiment, path, self.page_analysis.data, annotation
-            )
-            self.statusBar().showMessage("Relatório exportado")
+            self.statusBar().showMessage("Preparando gráficos e relatório em segundo plano…")
         except (OSError, ValueError) as exc:
             self.statusBar().showMessage(str(exc))
+
+    def _on_report_prepared(self, html):
+        if self._current_worker and self._current_worker.isInterruptionRequested():
+            self._on_cancelled()
+            return
+        try:
+            # Qt printing requires the GUI thread; numerical work is already done.
+            export_rendered_report(html, self._report_path)
+            self.statusBar().showMessage("Relatório exportado: " + self._report_path)
+            self.page_simulation.status.set_success("Relatório concluído")
+        except (OSError, ValueError, RuntimeError) as exc:
+            self.statusBar().showMessage("Não foi possível exportar: " + str(exc))
 
     def _workspace_library(self):
         if self.repository is None:
             raise ValueError("Armazenamento indisponível.")
         return WorkspaceLibrary(self.repository.base_dir / ".workspace")
+
+    def _current_annotation(self):
+        # Exports remain a recovery path even if workspace storage is unavailable.
+        if self.repository is None or self._current_experiment is None:
+            return None
+        try:
+            return self._workspace_library().read()["annotations"].get(self._current_experiment.id)
+        except (OSError, ValueError, TypeError, KeyError):
+            return None
 
     def _refresh_library(self):
         try:
@@ -1007,6 +1068,13 @@ class MainWindow(QMainWindow):
             self.page_library.load(data, identifier)
             self.page_history.annotations = data["annotations"]
             self.page_history._filter()
+            self.page_comparison.annotations = data["annotations"]
+            self.page_comparison.load(list(self.page_comparison.records.values()))
+            if hasattr(self.page_dashboard, "set_annotations"):
+                self.page_dashboard.set_annotations(data["annotations"])
+            if identifier:
+                title = data["annotations"].get(identifier, {}).get("title", "")
+                self.page_results.set_title(title or "Resultados", "Dados da execução selecionada · ID " + identifier)
         except (OSError, ValueError, TypeError, KeyError) as exc:
             self.page_library.message.setText(str(exc))
 
@@ -1048,7 +1116,8 @@ class MainWindow(QMainWindow):
             return
         try:
             self._workspace_library().annotate(
-                self._current_experiment.id, project, notes, tags
+                self._current_experiment.id, project, notes, tags,
+                title=self.page_library.run_title.text(),
             )
             self._refresh_library()
             self.page_library.message.setText(
@@ -1197,6 +1266,8 @@ class MainWindow(QMainWindow):
                         "temporal": "Métricas temporais",
                         "convergence": "Convergência Trotter",
                         "sweep": "Varredura",
+                        "trotter_noise": "Trotter × ruído",
+                        "mitigation_benchmark": "Benchmark de mitigação",
                     }.get(data["kind"], "Análise")
                     paths.append((label + " · " + path.stem, path))
                 except (OSError, ValueError, KeyError, TypeError):

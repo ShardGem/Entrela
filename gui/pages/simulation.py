@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QFrame,
     QProgressBar,
+    QScrollArea,
 )
 
 from gui.pages.base import PageBase
@@ -112,11 +113,12 @@ class SimulationPage(PageBase):
         right_layout.setSpacing(SPACING.lg)
 
         summary = Card(
-            "Resumo da configuração", "Verifique os parâmetros antes de executar."
+            "Antes de executar", "Resumo dos parâmetros selecionados."
         )
         self._summary_rows: dict[str, QLabel] = {}
         for key, label in [
             ("sistema", "Sistema"),
+            ("initial", "Estado inicial"),
             ("protocolo", "Protocolo"),
             ("ruido", "Modelo de ruído"),
             ("shots", "Shots"),
@@ -138,6 +140,23 @@ class SimulationPage(PageBase):
             summary.add_layout(row)
             self._summary_rows[key] = val
         right_layout.addWidget(summary)
+        self.configuration_feedback = QLabel()
+        self.configuration_feedback.setWordWrap(True)
+        self.configuration_feedback.setObjectName("LeadText")
+        self.configuration_feedback.setAccessibleName("Validação da configuração")
+        right_layout.addWidget(self.configuration_feedback)
+
+        science = Card("Como ler os resultados")
+        explanation = QLabel(
+            "<b>Fidelidade</b> compara a execução ao mesmo circuito sem ruído. "
+            "<b>Pureza global</b> mede a mistura do estado completo. "
+            "<b>Energia</b> é a média do Hamiltoniano selecionado.<br><br>"
+            "Para separar ruído de aproximação Trotter, use a referência exata em Análises. "
+            "ZNE estima um observável e é calculado depois da execução; não produz um estado mitigado."
+        )
+        explanation.setWordWrap(True)
+        science.add(explanation)
+        right_layout.addWidget(science)
 
         self.status = SimulationStatus()
         right_layout.addWidget(self.status)
@@ -155,11 +174,24 @@ class SimulationPage(PageBase):
         btn_row.addWidget(self.btn_cancel)
         action_card.add_layout(btn_row)
         right_layout.addWidget(action_card)
+        # Keep execution available before the explanatory content. A scroll area
+        # honors labels' height-for-width; a raw splitter child can compress
+        # wrapped summary text to a few pixels on a projector-sized display.
+        right_layout.removeWidget(self.status)
+        right_layout.removeWidget(action_card)
+        right_layout.insertWidget(0, self.status)
+        right_layout.insertWidget(1, action_card)
 
         right_layout.addStretch()
 
         splitter.addWidget(left)
-        splitter.addWidget(right)
+        self.summary_scroll = QScrollArea()
+        self.summary_scroll.setFrameShape(QFrame.NoFrame)
+        self.summary_scroll.setWidgetResizable(True)
+        self.summary_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.summary_scroll.setMinimumWidth(300)
+        self.summary_scroll.setWidget(right)
+        splitter.addWidget(self.summary_scroll)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([560, 420])
@@ -174,6 +206,9 @@ class SimulationPage(PageBase):
         p = self.config_panel.coletar_tudo()
         self._summary_rows["sistema"].setText(
             f"{p['hamiltoniano']} · {p['qubits']} qubits · J={p['J']}, h={p['h']}"
+        )
+        self._summary_rows["initial"].setText(
+            self.config_panel.combo_initial.currentText()
         )
         self._summary_rows["protocolo"].setText(
             f"T={p['tempo']} · {p['passos']} passos Trotter"
@@ -193,12 +228,18 @@ class SimulationPage(PageBase):
         from core.types import resource_estimate
 
         try:
-            estimate = resource_estimate(self.config_panel.get_config())
+            config = self.config_panel.get_config()
+            estimate = resource_estimate(config)
             self._summary_rows["resources"].setText(
                 f"{estimate['snapshots']} snapshots · {estimate['state_bytes'] / 1024**2:.2f} MiB de estados brutos; JSON e renderização consomem mais. Limites: 6 qubits, 200 passos."
             )
-        except ValueError:
+            self.configuration_feedback.setText(
+                "Configuração válida. Este resumo não simula nem prevê as métricas; "
+                "execute para obter os resultados e registrá-los no histórico."
+            )
+        except ValueError as exc:
             self._summary_rows["resources"].setText("Revise a configuração.")
+            self.configuration_feedback.setText(f"Antes de executar, ajuste: {exc}")
         self._summary_rows["shots"].setText(
             f"{p['shots']:,} · semente {p['seed'] or 'automática'}"
         )

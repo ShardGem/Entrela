@@ -1,6 +1,7 @@
 """One scientific engine for all UI modes, counts and snapshots."""
 
 from time import perf_counter
+from dataclasses import asdict, replace
 from secrets import randbits
 from importlib.metadata import version
 import platform
@@ -148,6 +149,16 @@ def run_experiment(config, progress=None, is_cancelled=None):
             "ising_convention": "+J ΣZZ +h ΣX",
             "bit_order": "q0 à direita",
             "thermal_gate_time_ns": 50.0,
+            "reproduction": {
+                "schema_version": 1,
+                "config": asdict(replace(config, seed=seed)),
+                "simulator": "AerSimulator",
+                "simulation_method": kind,
+                "mitigation_method": "none",
+                "max_parallel_threads": 2,
+                "platform": platform.platform(),
+                "note": "Use a configuração com semente efetiva e as versões registradas. Semente não garante identidade entre versões ou plataformas.",
+            },
         },
     )
     checkpoint(100)

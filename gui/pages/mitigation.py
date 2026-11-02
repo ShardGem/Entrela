@@ -78,6 +78,9 @@ class MitigationPage(PageBase):
         ax = self.canvas.reset_axes()
         m = experiment.result.mitigation
         if m:
+            self.qubit.setValue(m["qubit"])
+            self.shots.setValue(m["shots"])
+            self.method.setCurrentIndex(max(0, self.method.findData(m["method"])))
             for f, y, e in zip(m["scale_factors"], m["measured"], m["stderr"]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)

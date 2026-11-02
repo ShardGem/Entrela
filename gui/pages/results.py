@@ -84,6 +84,8 @@ class ResultsPage(PageBase):
 
     def show_experiment(self, experiment):
         r, c = experiment.result, experiment.config
+        self.btn_rerun.setText("Reproduzir ZNE" if r.mitigation else "Reexecutar")
+        self.btn_rerun.setToolTip("Recalcula a análise ZNE com método, fatores, shots e seed registrados; preserva as métricas da fonte." if r.mitigation else "Executa novamente a configuração com a semente efetiva registrada.")
         self.details.setText(
             f"Experimento {experiment.id} · {'Circuito livre' if c.circuit is not None else c.system.hamiltonian} · {c.system.num_qubits} qubits · "
             f"{c.shots} shots · {experiment.duration_s:.3f} s · profundidade {r.circuit_depth}\n"

@@ -1,4 +1,6 @@
 from core.types import system_label
+from data.workspace import experiment_title
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
@@ -40,7 +42,15 @@ class ComparisonPage(PageBase):
         )
         row = QHBoxLayout()
         self.first_run, self.second_run = QComboBox(), QComboBox()
+        self.first_run.setAccessibleName("Execução A")
+        self.second_run.setAccessibleName("Execução B")
+        self.first_run.setMinimumContentsLength(12)
+        self.second_run.setMinimumContentsLength(12)
+        self.first_run.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.second_run.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        row.addWidget(QLabel("A"))
         row.addWidget(self.first_run)
+        row.addWidget(QLabel("B"))
         row.addWidget(self.second_run)
         self.body().addLayout(row)
         self.message = QLabel("São necessárias duas execuções.")
@@ -54,6 +64,7 @@ class ComparisonPage(PageBase):
         self.canvas = MplCanvas()
         self.body().addWidget(self.canvas, 1)
         self.records = {}
+        self.annotations = {}
         self.first_run.currentIndexChanged.connect(self._compare)
         self.second_run.currentIndexChanged.connect(self._compare)
 
@@ -65,12 +76,13 @@ class ComparisonPage(PageBase):
         for combo in (self.first_run, self.second_run):
             combo.clear()
             for e in experiments:
-                label = f"{e.id} · {system_label(e.config)} · " + (
+                label = f"{experiment_title(e, self.annotations)} · " + (
                     "ZNE (métricas da fonte)"
                     if e.result.mitigation
                     else (e.config.noise.kind if e.config.noise.enabled else "Ideal")
                 )
                 combo.addItem(label, e.id)
+                combo.setItemData(combo.count() - 1, f"{e.id} · {e.created_at.isoformat()} · {system_label(e.config)}", Qt.ToolTipRole)
         self.first_run.setCurrentIndex(max(0, self.first_run.findData(selected[0])))
         fallback = min(1, len(experiments) - 1)
         self.second_run.setCurrentIndex(
@@ -105,7 +117,8 @@ class ComparisonPage(PageBase):
             self.message.setText(error)
             self.canvas.draw()
             return
-        note = "Comparação compatível. Distribuições normalizadas pelo número observado de medições."
+        note = "Comparação compatível. Distribuições normalizadas pelo número observado de medições. "
+        note += f"A: {a.config.shots} shots / {a.duration_s:.4g} s · B: {b.config.shots} shots / {b.duration_s:.4g} s. "
         if a.result.mitigation or b.result.mitigation:
             note += " Os registros ZNE mantêm as métricas da simulação de origem; não são estados mitigados."
         self.message.setText(note)

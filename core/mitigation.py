@@ -42,6 +42,42 @@ def _expectation_z(counts, num_qubits, qubit=0):
     return total / shots
 
 
+def compile_unitary(circuit, seed):
+    """Compile once before folding; keep global phase and remove unused clbits."""
+    for instruction in circuit.data:
+        op = instruction.operation
+        if op.name in ("measure", "reset") or op.name.startswith("save_") or op.num_clbits:
+            raise ValueError("ZNE requer circuito unitário sem medições ou snapshots")
+    compiled = transpile(
+        circuit, basis_gates=["u", "cx"], optimization_level=0,
+        seed_transpiler=seed,
+    )
+    native = QuantumCircuit(compiled.num_qubits)
+    native.global_phase = compiled.global_phase
+    for instruction in compiled.data:
+        native.append(instruction.operation, [compiled.find_bit(q).index for q in instruction.qubits])
+    return native
+
+
+def fit_zne_samples(factors, measured, errors, method):
+    """Unweighted polynomial fit; propagated error covers independent shot sampling."""
+    if method not in ("linear", "quadratic"):
+        raise ValueError("Ajuste não suportado")
+    degree = 1 if method == "linear" else 2
+    xs = np.asarray(factors, float)
+    if len(xs) < degree + 1 or len(set(factors)) != len(factors):
+        raise ValueError("Pontos insuficientes ou repetidos")
+    weights = np.linalg.pinv(np.vander(xs, degree + 1))[-1]
+    coefficients = np.polyfit(xs, measured, degree)
+    return dict(
+        coefficients=coefficients.tolist(),
+        residuals=(np.asarray(measured) - np.polyval(coefficients, xs)).tolist(),
+        degrees_of_freedom=len(factors) - degree - 1,
+        extrapolated=float(coefficients[-1]),
+        extrapolated_stderr=float(np.sqrt(np.sum(weights**2 * np.square(errors)))),
+    )
+
+
 def run_zne(
     circuit_without_measure,
     noise_model,
@@ -55,6 +91,8 @@ def run_zne(
     is_cancelled=None,
 ):
     integer(shots, "Shots")
+    if shots > 1_000_000:
+        raise ValueError("Limite de 1.000.000 shots por fator")
     integer(qubit, "Qubit", 0)
     if qubit >= circuit_without_measure.num_qubits:
         raise ValueError("Qubit inválido")
@@ -69,35 +107,18 @@ def run_zne(
     factors = list([1, 3, 5] if scale_factors is None else scale_factors)
     if (
         len(factors) < degree + 1
+        or len(factors) > 5
         or len(set(factors)) != len(factors)
         or 1 not in factors
     ):
         raise ValueError("Forneça pontos distintos, incluindo fator 1")
     for factor in factors:
         integer(factor, "Fator")
-        if factor % 2 != 1:
-            raise ValueError("Fatores efetivos devem ser ímpares: 1,3,5")
-    for instruction in circuit_without_measure.data:
-        op = instruction.operation
-        if (
-            op.name in ("measure", "reset")
-            or op.name.startswith("save_")
-            or op.num_clbits
-        ):
-            raise ValueError("ZNE requer circuito unitário sem medições ou snapshots")
-    compiled = transpile(
-        circuit_without_measure,
-        basis_gates=["u", "cx"],
-        optimization_level=0,
-        seed_transpiler=seed,
-    )
-    native = QuantumCircuit(compiled.num_qubits)
-    native.global_phase = compiled.global_phase
-    for instruction in compiled.data:
-        native.append(
-            instruction.operation,
-            [compiled.find_bit(q).index for q in instruction.qubits],
-        )
+        if factor % 2 != 1 or factor > 9:
+            raise ValueError("Fatores efetivos devem ser ímpares entre 1 e 9")
+    native = compile_unitary(circuit_without_measure, seed)
+    if len(native.data) * max(factors) > 100_000:
+        raise ValueError("Limite de 100.000 portas por circuito dobrado; reduza passos ou fatores")
     if noise_model is not None and not set(noise_model.noise_instructions).intersection(
         native.count_ops()
     ):
@@ -105,7 +126,7 @@ def run_zne(
     sim = AerSimulator(
         method="density_matrix", noise_model=noise_model, max_parallel_threads=2
     )
-    measured, errors, gate_counts = [], [], []
+    measured, errors, gate_counts, samples = [], [], [], []
     for i, factor in enumerate(factors):
         if is_cancelled and is_cancelled():
             raise SimulationCancelled()
@@ -114,20 +135,21 @@ def run_zne(
         folded = _insert_identity_pairs(native, (factor - 1) // 2)
         gate_counts.append(dict(folded.count_ops()))
         folded.measure_all()
+        sample_seed = (seed + i) % 2**32
         execution = sim.run(
-            folded, shots=shots, seed_simulator=(seed + i) % 2**32
+            folded, shots=shots, seed_simulator=sample_seed
         ).result()
         if not execution.success:
             raise RuntimeError(str(execution.status))
-        mean = _expectation_z(execution.get_counts(), native.num_qubits, qubit)
+        counts = dict(execution.get_counts())
+        samples.append(dict(scale_factor=factor, effective_seed=sample_seed, shots=shots,
+                            counts=counts, gate_counts=gate_counts[-1]))
+        mean = _expectation_z(counts, native.num_qubits, qubit)
         measured.append(mean)
         errors.append(float(np.sqrt(max(0.0, 1 - mean**2) / shots)))
     if is_cancelled and is_cancelled():
         raise SimulationCancelled()
-    xs = np.asarray(factors, float)
-    weights = np.linalg.pinv(np.vander(xs, degree + 1))[-1]
-    coefficients = np.polyfit(xs, measured, degree)
-    residuals = (np.asarray(measured) - np.polyval(coefficients, xs)).tolist()
+    fit = fit_zne_samples(factors, measured, errors, method)
     label = ["I"] * native.num_qubits
     label[-1 - qubit] = "Z"
     ideal = float(
@@ -137,24 +159,32 @@ def run_zne(
             )
         )
     )
-    extrapolated = float(coefficients[-1])
+    extrapolated = fit["extrapolated"]
     baseline = measured[factors.index(1)]
     return dict(
-        coefficients=coefficients.tolist(),
-        residuals=residuals,
-        degrees_of_freedom=len(factors) - degree - 1,
+        **fit,
         ideal_observable=ideal,
         baseline_absolute_error=abs(baseline - ideal),
         extrapolated_absolute_error=abs(extrapolated - ideal),
         success=True,
-        extrapolated=float(np.polyfit(xs, measured, degree)[-1]),
-        extrapolated_stderr=float(np.sqrt(np.sum(weights**2 * np.square(errors)))),
         measured=measured,
         stderr=errors,
         scale_factors=factors,
         method=method,
         qubit=qubit,
         folded_gate_counts=gate_counts,
+        samples=samples,
+        native_circuit=dict(
+            num_qubits=native.num_qubits,
+            global_phase=float(native.global_phase),
+            operations=[dict(
+                name=ins.operation.name,
+                qubits=[native.find_bit(q).index for q in ins.qubits],
+                parameters=[float(v) for v in ins.operation.params],
+            ) for ins in native.data],
+        ),
+        optimization_level=0,
+        folding="local U (U† U)^k; sem otimização após folding",
         native_basis=["u", "cx"],
         shots=shots,
         seed=seed,

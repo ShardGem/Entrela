@@ -12,6 +12,19 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Pesquisa e experiência de uso — 0.13
+
+- Guiado mostra uma etapa por vez; Avançado reúne as categorias e oculta a navegação de etapas. Ambos preservam os mesmos parâmetros.
+- Início explica o fluxo científico; campos têm ajuda e uma prévia descritiva do estado inicial.
+- Em **Projetos**, dê um nome à execução selecionada e registre hipótese, projeto, tags e observações. O ID técnico e o resultado permanecem preservados.
+- Em **Análises**, escolha **Trotter × ruído** para comparar ideal e ruidoso contra a evolução exata, ou **Benchmark de mitigação** para comparar erro de ⟨Z⟩, custos e tempos.
+- O benchmark compara sem mitigação, ZNE linear/quadrática (variantes da mesma técnica) e verificação de paridade Z quando o estado ideal tem paridade determinística. Fidelidade de ZNE fica indisponível, pois o método não reconstrói um estado.
+- Análises podem ser canceladas, reabertas pelo histórico da fonte e reproduzidas com as opções registradas. Exportação CSV acompanha `.metadata.json`; preserve os dois arquivos.
+- CSV de resultados inclui configuração e proveniência. O pacote ZIP inclui a análise selecionada e as anotações; o relatório HTML/PDF inclui curvas reais, referências e limitações.
+- Cálculos dos relatórios rodam fora da thread gráfica; caches limitados evitam repetir derivações de Bloch e desenhos de probabilidades.
+
+Veja [uso, metodologia e limites da versão 0.13](docs/evolucao-0.13.md). Os dados produzidos para validar a aplicação não substituem o protocolo experimental do TCC.
+
 ## Circuitos interativos — 0.12
 
 A tela agora oferece diagrama vetorial com inspeção de portas e um editor com paleta, parâmetros, fase global, controles/alvos, arraste, undo/redo e execução Qiskit/Aer. Importa/exporta circuito JSON e OpenQASM 2; exporta SVG. Circuitos editados geram novos registros, sem alterar as execuções de origem.
@@ -54,7 +67,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.12.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.13.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

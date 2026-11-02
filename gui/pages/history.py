@@ -1,4 +1,5 @@
 from core.types import system_label
+from data.workspace import experiment_title
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QTableWidget,
@@ -23,13 +24,13 @@ class HistoryPage(PageBase):
             parent,
         )
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Buscar identificador, modelo, ruído ou estado…")
+        self.search.setPlaceholderText("Buscar nome, identificador, projeto, tags ou observações…")
         self.body().addWidget(self.search)
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels(
             [
                 "Data / fuso",
-                "Identificador",
+                "Experimento",
                 "Modelo",
                 "Qubits",
                 "Ruído",
@@ -75,8 +76,8 @@ class HistoryPage(PageBase):
                 else ("ZNE" if exp.result.mitigation else "Concluído")
             )
             values = [
-                exp.created_at.strftime("%d/%m/%Y %H:%M %z"),
-                exp.id,
+                exp.created_at.astimezone().strftime("%d/%m/%Y %H:%M %z"),
+                experiment_title(exp, self.annotations),
                 system_label(exp.config),
                 str(exp.config.system.num_qubits),
                 exp.config.noise.kind if exp.config.noise.enabled else "Ideal",
@@ -89,7 +90,7 @@ class HistoryPage(PageBase):
             )
             if (
                 query
-                not in (" ".join(values) + " " + annotation.get("notes", "")).casefold()
+                not in (" ".join(values) + " " + exp.id + " " + annotation.get("notes", "")).casefold()
             ):
                 continue
             matches.append((exp, values))
@@ -101,6 +102,7 @@ class HistoryPage(PageBase):
             self.table.insertRow(row)
             for col, text in enumerate(values):
                 item = QTableWidgetItem(text)
+                item.setToolTip(f"Identificador técnico: {exp.id}")
                 if col == 0:
                     item.setData(Qt.UserRole, exp.id)
                 self.table.setItem(row, col, item)

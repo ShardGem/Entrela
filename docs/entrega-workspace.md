@@ -1,5 +1,7 @@
 # Recuperação e integração do workspace
 
+Documento histórico da recuperação inicial. Para o estado atual, consulte [Evolução 0.13](evolucao-0.13.md), [Circuitos 0.12](circuitos-interativos-0.12.md) e [Evolução 0.11](evolucao-0.11.md).
+
 O pacote original de 54 arquivos foi recuperado do anexo parte_001.zip. As correções científicas
 e de persistência foram reconstruídas e a integração didática foi concluída nesta entrega.
 A especificação de produto descreve também etapas futuras; não representa uma lista de funções já implementadas.
@@ -35,8 +37,8 @@ nem acessibilidade com leitor de tela. Cancelar aguarda a operação Aer atual c
 
 ## Escopo seguinte
 
-Organização em projetos, varreduras paramétricas, editor de Hamiltoniano personalizado e relatórios
-acadêmicos formatados permanecem evoluções futuras. Comparação de métricas mitigadas exige antes
+Projetos, varreduras e relatórios foram entregues posteriormente (0.11); circuitos editáveis, na 0.12.
+Um editor de Hamiltoniano personalizado permanece fora do escopo atual. Comparação de métricas mitigadas exige antes
 um método que reconstrua um estado mitigado válido; o ZNE atual estima apenas um observável.
 
 Publicação do ambiente e sincronização Git são operações separadas. A entrega só deve ser anunciada
