@@ -1,6 +1,7 @@
 """Documentable exports assembled from immutable runs and real snapshots."""
 
 import csv
+from dataclasses import asdict
 from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO, StringIO
@@ -13,6 +14,7 @@ import zipfile
 import numpy as np
 from PIL import Image
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib import rc_context
 from core import __version__
 from core.analysis import checkpoint
 from core.export import export_experiment_json, export_experiment_csv, export_analysis, _atomic_text
@@ -21,6 +23,7 @@ from core.figures import (figure, snapshot, bloch_figure, histogram_figure, temp
 from core.figures import analysis_table_figures
 from core.figures import zne_comparison_figure
 from core.metrics import bloch_vector
+from core.pdf_layout import A4_INCHES, A4Pages, report_options, validate_raster_dpi, export_figure_a4
 
 
 def latex_escape(value):
@@ -116,30 +119,29 @@ def export_animation(experiments, filepath, max_frames=40, frame_ms=350, progres
 
 
 def _text_page(title, text):
-    fig=figure(8.27,11.69)
-    fig.text(.07,.96,title,va="top",fontsize=16,color="#006e96",parse_math=False)
-    fig.text(.07,.9,text,va="top",fontsize=8,family="monospace",linespacing=1.6,parse_math=False)
+    fig=figure(*A4_INCHES)
+    fig.set_layout_engine(None)
+    fig.text(.086,.865,text,va="top",fontsize=8,family="monospace",linespacing=1.55,parse_math=False)
     return fig
 
 
-def _save_formats(fig, folder, name):
-    for extension in ("png","svg","pdf"):
-        fig.savefig(folder/(name+"."+extension),dpi=140)
+def _save_formats(fig, folder, name, raster_dpi=300):
+    for extension in ("png","svg"):
+        fig.savefig(folder/(name+"."+extension),dpi=raster_dpi)
+    export_figure_a4(fig,folder/(name+".pdf"),raster_dpi=raster_dpi,title=name.replace("_"," "))
     fig.clear()
 
 
 def _cover(experiments,annotations):
-    fig=figure(8.27,11.69)
+    fig=figure(*A4_INCHES)
     fig.set_layout_engine(None)
-    fig.text(.08,.95,"ENTRELA",fontsize=11,color="#007ea7",weight="bold")
-    fig.text(.08,.90,"Relatório científico",fontsize=26,color="#18364e",weight="bold")
-    fig.text(.08,.865,"Experimentos, resultados e evidências reproduzíveis",fontsize=11,color="#526a7c")
+    fig.text(.086,.852,"Experimentos e evidências reproduzíveis",fontsize=18,color="#18364e",weight="bold")
     for i,exp in enumerate(experiments):
         y=.79-i*.17
         name=(annotations or {}).get(exp.id,{}).get("title") or ("Circuito livre" if exp.config.circuit else exp.config.system.hamiltonian)
         name=name[:117]+"..." if len(name)>120 else name
         fig.text(.08,y,"AB"[i]+" · "+textwrap.fill(name,60),fontsize=14,color="#006e96",va="top",parse_math=False)
-        details=(f"ID {exp.id} · {exp.created_at.isoformat()}\n"
+        details=(f"{exp.created_at.isoformat()} · duração {exp.duration_s:.6g} s\n"
                  f"{exp.config.system.num_qubits} qubits · {exp.config.shots} shots · seed efetiva {exp.result.metadata.get('effective_seed','—')}\n"
                  +("Ruído: "+exp.config.noise.kind if exp.config.noise.enabled else "Condição ideal, sem ruído"))
         fig.text(.08,y-.045,details,fontsize=9,color="#243d52",va="top",linespacing=1.6)
@@ -163,7 +165,7 @@ def _cover(experiments,annotations):
           "Figuras usam snapshots reais. Preserve o pacote ZIP para os dados integrais, configurações, versões e análises.")
     fig.text(.08,.32,"Referências e interpretação",fontsize=12,color="#006e96",weight="bold")
     fig.text(.08,.285,textwrap.fill(note,91),fontsize=9,color="#344e63",va="top",linespacing=1.7)
-    fig.text(.08,.075,"Entrela "+__version__+" · documentação computacional",fontsize=9,color="#526a7c")
+    fig.text(.08,.13,"Entrela "+__version__+" · documentação computacional",fontsize=9,color="#526a7c")
     return fig
 
 
@@ -183,56 +185,97 @@ def _bloch_csv(experiment, filepath):
     _atomic_text(filepath,out.getvalue())
 
 
-def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=None, is_cancelled=None):
+def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=None, is_cancelled=None,
+               *, options=None, raster_dpi=300):
     if not 1 <= len(experiments) <= 2:
         raise ValueError("Selecione uma ou duas execuções para o PDF.")
     ids={e.id for e in experiments}
     if any(data.get("source_id") not in ids for data in analyses):
         raise ValueError("Análise não pertence às fontes do PDF.")
+    if len(ids) != len(experiments):
+        raise ValueError("Escolha execuções distintas para comparar.")
+    selected=report_options(options)
+    validate_raster_dpi(raster_dpi)
+    from core.report import _printed_summary, hamiltonian_description
     path=Path(filepath)
     with tempfile.TemporaryDirectory(prefix=".entrela-pdf-",dir=path.parent) as directory:
         temp=Path(directory)/"report.pdf"
-        with PdfPages(temp) as pdf:
-            def page(fig):
-                checkpoint(is_cancelled,None,0)
-                pdf.savefig(fig)
-                fig.clear()
-            page(_cover(experiments,annotations))
-            page(histogram_figure(experiments,side_by_side=len(experiments)==2))
-            page(temporal_figure(experiments))
-            if any(e.result.mitigation for e in experiments):
-                page(zne_comparison_figure(experiments))
-            if all(e.result.final_state is not None or e.result.states for e in experiments):
-                page(bloch_figure(experiments))
-            for i,e in enumerate(experiments):
-                checkpoint(is_cancelled,progress,int(50*(i+1)/len(experiments)))
-                page(circuit_figure(e))
-                content=json.dumps(dict(source_id=e.id,config=__import__("dataclasses").asdict(e.config),
-                                        versions=e.result.metadata.get("versions"),
-                                        annotation=(annotations or {}).get(e.id)),ensure_ascii=False,indent=2)
+        with rc_context({"pdf.fonttype":42}), PdfPages(temp,metadata={"Title":"Entrela · relatório científico", "Author":"Entrela",
+                                    "Subject":"Simulação computacional reproduzível · páginas A4"}) as pdf:
+            pages=A4Pages(pdf,raster_dpi=raster_dpi,is_cancelled=is_cancelled)
+            def page(fig,title,*,text_page=False):
+                pages.add(fig,title,text_page=text_page)
+            def text_pages(title,content):
                 lines=[]
                 for line in content.splitlines():
-                    lines.extend(textwrap.wrap(line,width=95,replace_whitespace=False) or [""])
+                    lines.extend(textwrap.wrap(line,width=93,replace_whitespace=False) or [""])
                 for start in range(0,len(lines),47):
-                    page(_text_page("Configuração e proveniência · "+e.id,"\n".join(lines[start:start+47])))
-            for data in analyses:
-                page(analysis_figure(data))
+                    page(_text_page(title,"\n".join(lines[start:start+47])),title,text_page=True)
+            page(_cover(experiments,annotations),"Resultados do experimento" if len(experiments)==1 else "Comparação de experimentos",text_page=True)
+            for i,e in enumerate(experiments):
+                annotation=(annotations or {}).get(e.id) or {}
+                fields=[("Descrição",annotation.get("description")),("Objetivo",annotation.get("objective")),
+                        ("Hipótese",annotation.get("hypothesis")),("Metodologia registrada",annotation.get("methodology")),
+                        ("Observações e discussão do pesquisador",annotation.get("notes"))]
+                content="Metodologia\n"+hamiltonian_description(e.config)+"\n\n"
+                content+="Referência das métricas\nFidelidade de Uhlmann ao quadrado ao mesmo circuito sem ruído.\nPureza global Tr(ρ²); energia apenas para Hamiltonianos definidos.\n"
+                from core.export import result_interpretation
+                content+="\nInterpretação dos resultados registrados\n"+result_interpretation(e)+"\n"
+                if e.result.error:
+                    content+="\nExecução com falha\n"+e.result.error+"\n"
+                for label,value in fields:
+                    if value:
+                        content+="\n"+label+"\n"+str(value)+"\n"
+                text_pages("Metodologia e anotações · "+"AB"[i],content)
+            if selected.include_distribution:
+                page(histogram_figure(experiments,side_by_side=len(experiments)==2),"Distribuição das medições")
+            if selected.include_temporal:
+                if len({bool(e.config.circuit) for e in experiments})>1:
+                    for i,e in enumerate(experiments):
+                        page(temporal_figure([e]),"Evolução · "+"AB"[i]+" · eixos incompatíveis exibidos separadamente")
+                else:
+                    page(temporal_figure(experiments),"Evolução dos snapshots registrados")
+            if any(e.result.mitigation for e in experiments):
+                page(zne_comparison_figure(experiments),"Mitigação de observáveis ZNE")
+            if selected.include_bloch and all(e.result.final_state is not None or e.result.states for e in experiments):
+                for start in range(0,max(e.config.system.num_qubits for e in experiments),3):
+                    qubits=range(start,min(start+3,max(e.config.system.num_qubits for e in experiments)))
+                    page(bloch_figure(experiments,qubits=qubits),"Estados locais finais de Bloch")
+            for i,e in enumerate(experiments):
+                checkpoint(is_cancelled,progress,int(50*(i+1)/len(experiments)))
+                if selected.include_circuit:
+                    operations=e.result.metadata.get("operations",[])
+                    for start in range(0,max(1,min(80,len(operations))),24):
+                        page(circuit_figure(e,limit=min(24,80-start),start=start,per_row=12),"Circuito quântico · "+"AB"[i])
+                if selected.include_configuration:
+                    # Full operations and complex states belong to the raw JSON;
+                    # a report must remain bounded for large circuits.
+                    content=json.dumps(_printed_summary(dict(source_id=e.id,config=asdict(e.config),
+                                            provenance=e.result.metadata,
+                                            annotation=(annotations or {}).get(e.id))),ensure_ascii=False,indent=2,allow_nan=False)
+                    text_pages("Configuração e proveniência · "+"AB"[i],content)
+            for data in analyses if selected.include_analyses else ():
+                page(analysis_figure(data),"Resultados do estudo · "+data["kind"])
                 for fig in analysis_table_figures(data):
-                    page(fig)
+                    page(fig,"Tabela de resultados do estudo")
                 fields=data.get("protocol",{}).get("fields",{})
                 text=json.dumps(dict(analysis_id=data.get("analysis_id"),source_id=data.get("source_id"),protocol=fields),ensure_ascii=False,indent=2)
-                wrapped=[]
-                for line in (text+"\n\n"+data.get("note","")).splitlines():
-                    wrapped.extend(textwrap.wrap(line,width=95) or [""])
-                for start in range(0,len(wrapped),47):
-                    page(_text_page("Referência e interpretação do estudo", "\n".join(wrapped[start:start+47])))
+                text_pages("Referência e interpretação do estudo",text+"\n\n"+data.get("note",""))
+            text_pages("Referências metodológicas e limites", "\n".join([
+                "Nielsen, M. A.; Chuang, I. L. Quantum Computation and Quantum Information. Cambridge University Press, edição do décimo aniversário, 2010.",
+                "", "Temme, K.; Bravyi, S.; Gambetta, J. M. Error Mitigation for Short-Depth Quantum Circuits. Physical Review Letters 119, 180509 (2017).",
+                "", "Li, Y.; Benjamin, S. C. Efficient Variational Quantum Simulator Incorporating Active Error Minimization. Physical Review X 7, 021050 (2017).",
+                "", "As referências fundamentam conceitos e métodos; os valores deste relatório provêm exclusivamente das simulações e análises identificadas no pacote de dados.",
+                "", "Este documento não relata execuções em hardware quântico. Seeds e versões devem ser preservadas. Resultados de ZNE são estimativas de observáveis e podem piorar com o ajuste; não constituem um estado quântico reconstruído.",
+            ]))
         checkpoint(is_cancelled,progress,100)
         temp.replace(path)
     return path
 
 
 def export_documentation(experiments, filepath, analyses=(), annotations=None, protocols=(),
-                         include_gif=True, max_frames=40, frame_ms=350, progress=None, is_cancelled=None):
+                         include_gif=True, max_frames=40, frame_ms=350, progress=None, is_cancelled=None,
+                         *, report_options=None, raster_dpi=300):
     if not 1 <= len(experiments) <= 2:
         raise ValueError("Escolha uma ou duas execuções.")
     ids={e.id for e in experiments}
@@ -242,6 +285,7 @@ def export_documentation(experiments, filepath, analyses=(), annotations=None, p
     protocols=[p for p in protocols if p.get("source_id") in ids]
     if any(data.get("source_id") not in ids for data in analyses):
         raise ValueError("Análise não pertence às fontes exportadas.")
+    validate_raster_dpi(raster_dpi)
     path=Path(filepath)
     omissions=[]
     with tempfile.TemporaryDirectory(prefix=".entrela-doc-",dir=path.parent) as directory:
@@ -256,18 +300,21 @@ def export_documentation(experiments, filepath, analyses=(), annotations=None, p
             _atomic_text(target/"circuit.txt",exp.result.circuit_text)
             if exp.result.states or exp.result.final_state is not None:
                 _bloch_csv(exp,target/"bloch.csv")
-                _save_formats(bloch_figure([exp]),target,"bloch_final")
-            _save_formats(histogram_figure([exp]),target,"distribution")
-            _save_formats(temporal_figure([exp]),target,"temporal")
-            _save_formats(circuit_figure(exp),target,"circuit_preview")
+                _save_formats(bloch_figure([exp]),target,"bloch_final",raster_dpi)
+            _save_formats(histogram_figure([exp]),target,"distribution",raster_dpi)
+            _save_formats(temporal_figure([exp]),target,"temporal",raster_dpi)
+            _save_formats(circuit_figure(exp),target,"circuit_preview",raster_dpi)
             if exp.result.mitigation:
-                _save_formats(zne_comparison_figure([exp]),target,"zne_observable")
+                _save_formats(zne_comparison_figure([exp]),target,"zne_observable",raster_dpi)
         checkpoint(is_cancelled,progress,30)
         if len(experiments)==2:
-            _save_formats(histogram_figure(experiments,side_by_side=True),folder,"comparison_distributions")
-            _save_formats(temporal_figure(experiments),folder,"comparison_temporal")
+            _save_formats(histogram_figure(experiments,side_by_side=True),folder,"comparison_distributions",raster_dpi)
+            if len({bool(e.config.circuit) for e in experiments}) == 1:
+                _save_formats(temporal_figure(experiments),folder,"comparison_temporal",raster_dpi)
+            else:
+                omissions.append("Curvas temporais sobrepostas: índice da porta e tempo de evolução são eixos incompatíveis; consulte as figuras individuais.")
             if all(e.result.states or e.result.final_state is not None for e in experiments):
-                _save_formats(bloch_figure(experiments),folder,"comparison_bloch")
+                _save_formats(bloch_figure(experiments),folder,"comparison_bloch",raster_dpi)
         studyfolder=folder/"analyses"
         studyfolder.mkdir()
         for i,data in enumerate(analyses):
@@ -276,7 +323,7 @@ def export_documentation(experiments, filepath, analyses=(), annotations=None, p
             export_analysis(data,studyfolder/(name+".json"))
             export_analysis(data,studyfolder/(name+".csv"))
             export_latex(data,studyfolder/(name+".tex"))
-            _save_formats(analysis_figure(data),studyfolder,name)
+            _save_formats(analysis_figure(data),studyfolder,name,raster_dpi)
         _atomic_text(folder/"protocols.json",json.dumps(list(protocols),ensure_ascii=False,indent=2,allow_nan=False))
         _atomic_text(folder/"README.md", """# Pacote de reprodução Entrela
 
@@ -306,7 +353,8 @@ Análises permite Reproduzir análise ao reabrir a fonte e o estudo no workspace
 GIFs usam somente os snapshots indicados no comentário JSON embutido, reprodução
 única e duração didática. Diagramas são prévias; as operações completas estão no JSON.
 """)
-        export_pdf(experiments,folder/"report.pdf",analyses,annotations,is_cancelled=is_cancelled)
+        export_pdf(experiments,folder/"report.pdf",analyses,annotations,is_cancelled=is_cancelled,
+                   options=report_options,raster_dpi=raster_dpi)
         checkpoint(is_cancelled,progress,65)
         animation=None
         if include_gif:
@@ -321,6 +369,7 @@ GIFs usam somente os snapshots indicados no comentário JSON embutido, reproduç
         manifest=dict(schema_version=1,kind="documentation",entrela_version=__version__,
                       created_at=datetime.now(timezone.utc).isoformat(),source_ids=[e.id for e in experiments],
                       annotations=annotations or {},animation=animation,omissions=omissions,
+                      report_options=asdict(__import__("core.pdf_layout",fromlist=["report_options"]).report_options(report_options)),raster_dpi=raster_dpi,
                       lineage=[dict(source_id=d.get("source_id"),analysis_id=d.get("analysis_id",d.get("id")),
                                     protocol_id=d.get("protocol",{}).get("protocol_id"),
                                     evidence_ref=d.get("protocol",{}).get("fields",{}).get("evidence_ref"),

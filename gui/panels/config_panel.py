@@ -1,10 +1,11 @@
 """Guided and advanced presentations of the SAME controls and domain configuration."""
 
-from PySide6.QtCore import Signal, QSignalBlocker
+from PySide6.QtCore import Signal, QSignalBlocker, QEvent
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QFormLayout,
     QScrollArea,
     QPushButton,
@@ -89,22 +90,20 @@ class ConfigPanel(QWidget):
         self.mode_explanation.setWordWrap(True)
         self.mode_explanation.setObjectName("LeadText")
         root.addWidget(self.mode_explanation)
-        nav = QHBoxLayout()
-        nav_scroll = QScrollArea()
-        self.section_nav = nav_scroll
-        nav_scroll.setWidgetResizable(True)
-        nav_scroll.setFixedHeight(52)
-        nav_widget = QWidget()
-        nav_widget.setLayout(nav)
+        self.section_nav = QWidget()
+        nav = QGridLayout(self.section_nav)
+        nav.setContentsMargins(0, 0, 0, 0)
+        nav.setSpacing(4)
+        self._section_layout = nav
+        self._section_columns = 0
         self.section_buttons = {}
         for key, title, _ in SECTIONS:
             button = QPushButton(title)
             button.setCheckable(True)
             button.clicked.connect(lambda _, k=key: self.set_section(k))
-            nav.addWidget(button)
+            nav.addWidget(button, 0, len(self.section_buttons))
             self.section_buttons[key] = button
-        nav_scroll.setWidget(nav_widget)
-        root.addWidget(nav_scroll)
+        root.addWidget(self.section_nav)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         container = QWidget()
@@ -400,6 +399,32 @@ class ConfigPanel(QWidget):
         self.input_seed.setText("" if config.seed is None else str(config.seed))
         del blockers
         self._changed()
+
+    def _arrange_sections(self):
+        if not hasattr(self, "_section_layout"):
+            return
+        buttons = list(self.section_buttons.values())
+        widest = max((button.sizeHint().width() for button in buttons), default=100)
+        columns = max(1, min(len(buttons), (max(1, self.width()) + 4) // (widest + 4)))
+        if columns == self._section_columns:
+            return
+        for column in range(max(self._section_columns, columns)):
+            self._section_layout.setColumnStretch(column, 0)
+        for index, button in enumerate(buttons):
+            self._section_layout.removeWidget(button)
+            self._section_layout.addWidget(button, index // columns, index % columns)
+        for column in range(columns):
+            self._section_layout.setColumnStretch(column, 1)
+        self._section_columns = columns
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._arrange_sections()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._arrange_sections()
 
     def coletar_tudo(self):
         return {

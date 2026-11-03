@@ -3,6 +3,7 @@ from pathlib import Path
 from hashlib import sha256
 from io import BytesIO
 import json
+import re
 import zipfile
 import numpy as np
 from PIL import Image
@@ -65,11 +66,20 @@ def test_complete_bundle_contains_traceable_science_and_rendered_assets(run,tmp_
             assert "\\" not in entry["path"]
             assert sha256(archive.read(entry["path"])).hexdigest()==entry["sha256"]
         assert archive.read("report.pdf").startswith(b"%PDF")
+        from core.pdf_layout import A4_POINTS
+        for name in archive.namelist():
+            if name.endswith(".pdf"):
+                boxes=re.findall(rb"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]",archive.read(name))
+                assert boxes
+                for width,height in boxes:
+                    assert float(width)==pytest.approx(A4_POINTS[0],abs=1e-5)
+                    assert float(height)==pytest.approx(A4_POINTS[1],abs=1e-5)
         assert json.loads(archive.read(f"run_{run.id}/experiment.json"))["id"]==run.id
         assert archive.read("analyses/analysis_001.tex")
         assert archive.read(f"run_{run.id}/bloch_final.svg").lstrip().startswith(b"<?xml")
         with Image.open(BytesIO(archive.read(f"run_{run.id}/bloch_final.png"))) as image:
             assert image.width>400
+            assert image.info["dpi"][0]==pytest.approx(300,abs=.1)
         assert archive.read(f"run_{run.id}/bloch.csv").count(b"simulated")==10
 
 

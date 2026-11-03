@@ -52,23 +52,48 @@ class WorkspaceLibrary:
     def template(self, name):
         return config_from_dict(self.read()["templates"][name])
 
-    def annotate(self, identifier, project, notes, tags, title=None):
+    def annotate(
+        self, identifier, project, notes, tags, title=None, *,
+        description=None, objective=None, hypothesis=None, methodology=None,
+        categories=None,
+    ):
         if not isinstance(identifier, str) or not identifier:
             raise ValueError("Identificador de execução inválido.")
         if title is not None and (not isinstance(title, str) or len(title) > 160):
             raise ValueError("O nome da execução deve ter até 160 caracteres.")
+        for label, value in (("Projeto", project), ("Observações", notes)):
+            if not isinstance(value, str):
+                raise ValueError(f"{label} deve ser texto.")
+        if not isinstance(tags, (list, tuple)) or any(not isinstance(tag, str) for tag in tags):
+            raise ValueError("Etiquetas devem ser uma lista de textos.")
+        extras = dict(description=description, objective=objective, hypothesis=hypothesis, methodology=methodology)
+        for key, value in extras.items():
+            if value is not None and (not isinstance(value, str) or len(value) > 20_000):
+                raise ValueError("Os campos científicos devem conter até 20.000 caracteres.")
+        if categories is not None and (
+            not isinstance(categories, (list, tuple))
+            or any(not isinstance(value, str) for value in categories)
+        ):
+            raise ValueError("Categorias devem ser uma lista de textos.")
         raw = self.read()
         if project.strip():
             raw["projects"].setdefault(project.strip(), {"description": ""})
-        raw["annotations"][identifier] = {
+        annotation = dict(raw["annotations"].get(identifier, {}))
+        annotation.update({
             "title": (
                 title.strip() if title is not None
                 else raw["annotations"].get(identifier, {}).get("title", "")
             ),
             "project": project.strip(),
             "notes": notes,
-            "tags": list(tags),
-        }
+            "tags": list(dict.fromkeys(tag.strip() for tag in tags if tag.strip())),
+        })
+        for key, value in extras.items():
+            if value is not None:
+                annotation[key] = value.strip()
+        if categories is not None:
+            annotation["categories"] = list(dict.fromkeys(value.strip() for value in categories if value.strip()))
+        raw["annotations"][identifier] = annotation
         self._write(raw)
 
     def delete_template(self, name):

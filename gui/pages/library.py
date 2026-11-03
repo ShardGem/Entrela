@@ -1,7 +1,7 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QLabel, QLineEdit, QComboBox, QPlainTextEdit, QFormLayout,
-    QGroupBox, QVBoxLayout,
+    QGroupBox, QVBoxLayout, QTabWidget, QWidget,
 )
 from gui.pages.base import PageBase
 from gui.widgets.button import SecondaryButton
@@ -24,7 +24,10 @@ class LibraryPage(PageBase):
         self.body().addWidget(self.context)
 
         self.annotation_group = QGroupBox("Execução selecionada")
-        form = QFormLayout(self.annotation_group)
+        group_layout = QVBoxLayout(self.annotation_group)
+        tabs = QTabWidget()
+        identification = QWidget()
+        form = QFormLayout(identification)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.run_title = QLineEdit()
         self.run_title.setMaxLength(160)
@@ -34,17 +37,48 @@ class LibraryPage(PageBase):
         self.project.setPlaceholderText("Ex.: TCC — estudo de ruído")
         self.tags = QLineEdit()
         self.tags.setPlaceholderText("Bell, referência, capítulo 4")
+        self.categories = QLineEdit()
+        self.categories.setPlaceholderText("Ex.: decoerência, mitigação")
+        self.categories.setToolTip("Categorias organizam linhas de pesquisa; etiquetas descrevem detalhes da execução.")
+        self.description = QPlainTextEdit()
+        self.description.setMaximumHeight(100)
+        self.description.setPlaceholderText("Descreva o que foi investigado e por que esta execução foi realizada.")
         self.notes = QPlainTextEdit()
         self.notes.setMaximumHeight(160)
-        self.notes.setPlaceholderText("Hipótese, observações, limitações e próximos passos…")
+        self.notes.setPlaceholderText("Registre observações posteriores, limitações e próximos passos. Os resultados brutos permanecem preservados.")
         for label, widget in [
             ("Nome da execução", self.run_title),
+            ("Descrição", self.description),
             ("Projeto", self.project),
-            ("Tags (vírgulas)", self.tags),
-            ("Descrição e observações", self.notes),
+            ("Categorias (vírgulas)", self.categories),
+            ("Etiquetas (vírgulas)", self.tags),
         ]:
             widget.setAccessibleName(label)
             form.addRow(label, widget)
+        tabs.addTab(identification, "Identificação")
+        planning = QWidget()
+        planning_form = QFormLayout(planning)
+        planning_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        self.objective = QPlainTextEdit()
+        self.hypothesis = QPlainTextEdit()
+        self.methodology = QPlainTextEdit()
+        for label, field, example in (
+            ("Objetivo científico", self.objective, "Ex.: medir a perda de fidelidade conforme aumenta a probabilidade de erro."),
+            ("Hipótese", self.hypothesis, "Ex.: aumentar a profundidade reduz o erro de Trotter, mas amplia o efeito do ruído."),
+            ("Metodologia e controles", self.methodology, "Ex.: manter Hamiltoniano, estado inicial e tempo; variar somente p₂ e registrar shots e seed."),
+        ):
+            field.setMaximumHeight(105)
+            field.setAccessibleName(label)
+            field.setPlaceholderText(example)
+            field.setToolTip(example)
+            planning_form.addRow(label, field)
+        tabs.addTab(planning, "Plano científico")
+        notes_page = QWidget()
+        notes_layout = QVBoxLayout(notes_page)
+        notes_layout.addWidget(QLabel("Anotações de interpretação e acompanhamento"))
+        notes_layout.addWidget(self.notes)
+        tabs.addTab(notes_page, "Anotações")
+        group_layout.addWidget(tabs)
         self.save_annotation = SecondaryButton("Salvar identificação e observações")
         self.save_annotation.clicked.connect(
             lambda: self.annotation_requested.emit(
@@ -52,7 +86,7 @@ class LibraryPage(PageBase):
                 [x.strip() for x in self.tags.text().split(",") if x.strip()],
             )
         )
-        form.addRow(self.save_annotation)
+        group_layout.addWidget(self.save_annotation)
         self.body().addWidget(self.annotation_group)
 
         templates_group = QGroupBox("Modelos pessoais de configuração")
@@ -82,7 +116,18 @@ class LibraryPage(PageBase):
         self.body().addWidget(self.message)
         self.body().addStretch()
 
-    def load(self, data, identifier=None):
+    def annotation_payload(self):
+        """Additional annotation fields; the legacy three-argument signal is stable."""
+        return {
+            "title": self.run_title.text(),
+            "description": self.description.toPlainText(),
+            "objective": self.objective.toPlainText(),
+            "hypothesis": self.hypothesis.toPlainText(),
+            "methodology": self.methodology.toPlainText(),
+            "categories": [value.strip() for value in self.categories.text().split(",") if value.strip()],
+        }
+
+    def load(self, data, identifier=None, title=None):
         selected = self.templates.currentText()
         self.templates.clear()
         self.templates.addItems(sorted(data["templates"]))
@@ -92,10 +137,15 @@ class LibraryPage(PageBase):
         self.run_title.setText(annotation.get("title", ""))
         self.project.setText(annotation.get("project", ""))
         self.notes.setPlainText(annotation.get("notes", ""))
+        self.description.setPlainText(annotation.get("description", ""))
+        self.objective.setPlainText(annotation.get("objective", ""))
+        self.hypothesis.setPlainText(annotation.get("hypothesis", ""))
+        self.methodology.setPlainText(annotation.get("methodology", ""))
+        self.categories.setText(", ".join(annotation.get("categories", [])))
         self.tags.setText(", ".join(annotation.get("tags", [])))
         self.annotation_group.setEnabled(bool(identifier))
         self.context.setText(
-            "Identificador técnico: " + identifier
+            "Organizando: " + (annotation.get("title") or title or "execução selecionada")
             if identifier
             else "Modelos usam o formulário atual. Abra uma execução para nomear e anotar resultados."
         )

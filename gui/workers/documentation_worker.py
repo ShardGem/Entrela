@@ -11,7 +11,8 @@ class DocumentationWorker(QThread):
     error=Signal(str)
 
     def __init__(self,experiments,path,kind,repository=None,annotations=None,protocols=(),
-                 include_analyses=True,include_gif=True,max_frames=30,frame_ms=350,parent=None,*,live_analyses=()):
+                 include_analyses=True,include_gif=True,max_frames=30,frame_ms=350,parent=None,*,live_analyses=(),
+                 report_options=None,export_dpi=300):
         super().__init__(parent)
         self.experiments=experiments
         self.config=experiments[0].config
@@ -25,6 +26,8 @@ class DocumentationWorker(QThread):
         self.max_frames=max_frames
         self.frame_ms=frame_ms
         self.live_analyses=live_analyses
+        self.report_options=report_options
+        self.export_dpi=export_dpi
 
     def run(self):
         try:
@@ -49,10 +52,12 @@ class DocumentationWorker(QThread):
             if self.kind=="gif":
                 export_animation(self.experiments,self.path,self.max_frames,self.frame_ms,**callbacks)
             elif self.kind=="pdf":
-                export_pdf(self.experiments,self.path,analyses,self.annotations,**callbacks)
+                export_pdf(self.experiments,self.path,analyses,self.annotations,
+                           options=self.report_options,raster_dpi=self.export_dpi,**callbacks)
             else:
                 export_documentation(self.experiments,self.path,analyses,self.annotations,self.protocols,
-                                     self.include_gif,self.max_frames,self.frame_ms,**callbacks)
+                                     self.include_gif,self.max_frames,self.frame_ms,
+                                     report_options=self.report_options,raster_dpi=self.export_dpi,**callbacks)
             self.completed.emit(str(self.path))
         except SimulationCancelled:
             self.cancelled.emit()

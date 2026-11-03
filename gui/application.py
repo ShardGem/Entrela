@@ -2,7 +2,8 @@
 
 import sys
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QSettings
+from gui.branding import configure_application_identity
 from gui.splash import SplashScreen
 from gui.main_window import MainWindow
 
@@ -12,9 +13,11 @@ def main():
 
     enable_diagnostics()
     app = QApplication(sys.argv)
+    configure_application_identity(app)
+    app.setProperty('entrelaReduceMotion', QSettings('Entrela', 'TCC').value('appearance/reduce_motion', False, type=bool))
     splash = SplashScreen()
     splash.show()
     app.processEvents()
     window = MainWindow()
-    QTimer.singleShot(1500, lambda: (splash.finish(window), window.show()))
+    splash.finish_after_minimum(window)
     return app.exec()

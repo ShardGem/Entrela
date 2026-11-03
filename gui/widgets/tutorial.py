@@ -8,7 +8,7 @@ STEPS=(
     ("Registre a evolução","Ative Salvar estados ao longo do tempo.","evolution"),
     ("Execute","Clique em Executar simulação e aguarde o resultado real.","execution"),
     ("Interprete","Abra Resultados. Observe a distribuição 00/11 e a interpretação.","execution"),
-    ("Reabra","Abra Histórico e dê duplo clique na execução deste tutorial.","execution"))
+    ("Reabra","Abra Histórico, use Visualizar para consultar a execução deste tutorial e depois Abrir para reabrir seus resultados.","execution"))
 
 class BellTutorial(QWidget):
     section_requested=Signal(str)
@@ -106,7 +106,7 @@ class BellTutorial(QWidget):
             counts=self.experiment.result.counts or {}
             total=sum(counts.values())
             correlated=(counts.get("00",0)+counts.get("11",0))/total if total else 0
-            self.feedback.setText(f"Execução {self.run_id}: {total} medições; {correlated:.1%} em 00 ou 11.")
+            self.feedback.setText(f"Seu Bell: {total} medições; {correlated:.1%} em 00 ou 11.")
         else:self.feedback.setText("Ação reconhecida." if self.ready() else "Realize a ação para continuar.")
     def advance(self):
         if not self.active or not self.ready():return

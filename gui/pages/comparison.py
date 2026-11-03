@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from gui.pages.base import PageBase
 from gui.widgets.plot_canvas import MplCanvas,style_axes
 from gui.theme import PALETTE
+from gui.widgets.data_table import configure_table
 
 
 from core.comparison import incompatibility
@@ -45,7 +46,7 @@ class ComparisonPage(PageBase):
         self.body().addWidget(self.message)
         tools=QHBoxLayout()
         self.btn_prepare=QPushButton("Carregar estados e curvas")
-        self.btn_prepare.clicked.connect(lambda: self.prepare_requested.emit(self.first_run.currentData() or "",self.second_run.currentData() or ""))
+        self.btn_prepare.clicked.connect(self._request_prepare)
         self.btn_document=QPushButton("Documentar comparação")
         self.btn_document.clicked.connect(self.documentation_requested.emit)
         tools.addWidget(self.btn_prepare)
@@ -55,6 +56,7 @@ class ComparisonPage(PageBase):
         self.metrics_table.setHorizontalHeaderLabels(["Métrica", "A", "B", "B − A"])
         self.metrics_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        configure_table(self.metrics_table)
         self.body().addWidget(self.metrics_table)
         self.tabs=QTabWidget()
         self.canvas = MplCanvas()
@@ -114,8 +116,15 @@ class ComparisonPage(PageBase):
         self.tabs.setMinimumHeight(420)
         self.body().addWidget(self.tabs,1)
         self.full_data=None
-        self.tabs.setTabEnabled(1,False)
-        self.tabs.setTabEnabled(2,False)
+        self._running = False
+        self._desired_focus = -1
+        self._suppress_load = False
+        self._requested_pair = None
+        self._load_timer = QTimer(self)
+        self._load_timer.setSingleShot(True)
+        self._load_timer.setInterval(120)
+        self._load_timer.timeout.connect(self._request_prepare)
+        self.tabs.currentChanged.connect(self._tab_selected)
         self.timer=QTimer(self)
         self.timer.setInterval(350)
         self.timer.timeout.connect(self._tick)
@@ -162,8 +171,9 @@ class ComparisonPage(PageBase):
         self.timer.stop()
         self.play.setText("Reproduzir snapshots")
         self.full_data=None
-        self.tabs.setTabEnabled(1,False)
-        self.tabs.setTabEnabled(2,False)
+        self._load_timer.stop()
+        self._requested_pair = None
+        self._clear_state_views()
         self.slider.setEnabled(False)
         self.play.setEnabled(False)
         self.metrics_table.setRowCount(0)
@@ -178,7 +188,8 @@ class ComparisonPage(PageBase):
             else incompatibility(a, b)
         )
         if error:
-            self.tabs.setTabEnabled(4,False)
+            self._placeholder(self.observable_canvas, "A comparação precisa de duas execuções compatíveis.")
+            self.differences.setPlainText(error)
             self.btn_prepare.setEnabled(False)
             self.btn_document.setEnabled(False)
             self.message.setText(error)
@@ -189,7 +200,8 @@ class ComparisonPage(PageBase):
         if a.result.mitigation or b.result.mitigation:
             note += " Os registros ZNE mantêm as métricas da simulação de origem; não são estados mitigados."
         self.message.setText(note)
-        self.tabs.setTabEnabled(4,bool(a.result.mitigation or b.result.mitigation))
+        if not (a.result.mitigation or b.result.mitigation):
+            self._placeholder(self.observable_canvas, "Nenhuma das execuções contém uma análise ZNE.\nSelecione um registro com mitigação para comparar observáveis.")
         if a.result.mitigation or b.result.mitigation:
             from core.figures import zne_comparison_figure
             zne_comparison_figure([a,b],self.observable_canvas.fig)
@@ -201,13 +213,13 @@ class ComparisonPage(PageBase):
                     for text in legend.get_texts():
                         text.set_color(PALETTE.text)
             self.observable_canvas.draw_idle()
-        self.btn_prepare.setEnabled(True)
+        self.btn_prepare.setEnabled(not self._running)
         self.btn_document.setEnabled(False)
         from dataclasses import asdict
         import json
         def mitigation_summary(exp):
-            return {key:value for key,value in (exp.result.mitigation or {}).items() if key in ("method","qubit","shots","seed","scale_factors","extrapolated","extrapolated_stderr","ideal_observable","source_experiment_id")}
-        self.differences.setPlainText(json.dumps({"A":{"id":a.id,"config":asdict(a.config),"mitigation":mitigation_summary(a)},"B":{"id":b.id,"config":asdict(b.config),"mitigation":mitigation_summary(b)},"reference":"Fidelidade compara o próprio circuito ideal de cada execução. Registros ZNE preservam estados da fonte. Contagens/folding completos ficam nos arquivos JSON."},ensure_ascii=False,indent=2))
+            return {key:value for key,value in (exp.result.mitigation or {}).items() if key in ("method","qubit","shots","seed","scale_factors","extrapolated","extrapolated_stderr","ideal_observable")}
+        self.differences.setPlainText(json.dumps({"A":{"nome":experiment_title(a,self.annotations),"config":asdict(a.config),"mitigation":mitigation_summary(a)},"B":{"nome":experiment_title(b,self.annotations),"config":asdict(b.config),"mitigation":mitigation_summary(b)},"reference":"Fidelidade compara o próprio circuito ideal de cada execução. Registros ZNE preservam estados da fonte. Contagens/folding completos ficam nos arquivos JSON."},ensure_ascii=False,indent=2))
         for row, (label, key) in enumerate(
             [
                 ("Fidelidade", "fidelity"),
@@ -253,19 +265,20 @@ class ComparisonPage(PageBase):
         self.canvas.draw()
         if previous and tuple(e.id for e in previous["experiments"])==(a.id,b.id):
             self.full_data=previous
-            self.tabs.setTabEnabled(1,True)
-            self.tabs.setTabEnabled(2,True)
-            self.slider.setEnabled(previous["synchronous"])
-            self.play.setEnabled(previous["synchronous"])
-            self.btn_document.setEnabled(True)
+            self.set_full_data(previous)
+        elif self.tabs.currentIndex() in (1, 2) and not self._suppress_load:
+            self._load_timer.start()
 
     def set_full_data(self,data):
         identifiers=tuple(e.id for e in data["experiments"])
         if identifiers!=(self.first_run.currentData(),self.second_run.currentData()):
             return
         self.full_data=data
-        self.tabs.setTabEnabled(1,True)
-        self.tabs.setTabEnabled(2,True)
+        self._requested_pair = None
+        self._load_timer.stop()
+        self.focus.setEnabled(True)
+        for scene in self.scenes:
+            scene.setEnabled(True)
         for i,exp in enumerate(data["experiments"]):
             self.scene_labels[i].setText(f"{'AB'[i]} · {experiment_title(exp,self.annotations)} · "+(exp.config.noise.kind if exp.config.noise.enabled else "Ideal"))
             self.scene_labels[i].setToolTip(exp.id)
@@ -278,11 +291,16 @@ class ComparisonPage(PageBase):
         self.focus.addItem("Todos os qubits",-1)
         for q in range(data["experiments"][0].config.system.num_qubits):
             self.focus.addItem(f"q{q}",q)
+        self.focus.setCurrentIndex(max(0, self.focus.findData(self._desired_focus)))
         del blocker
+        self._focus()
         self.slider.setRange(0,len(data["vectors"][0])-1 if data["synchronous"] else 0)
+        blocker=QSignalBlocker(self.slider)
+        self.slider.setValue(0)
+        del blocker
         self.slider.setEnabled(data["synchronous"])
         self.play.setEnabled(data["synchronous"])
-        self.btn_document.setEnabled(True)
+        self.btn_document.setEnabled(not self._running)
         self.curve_canvas.fig.clear()
         for index,key in enumerate(("fidelity","purity","energy")):
             ax=self.curve_canvas.fig.add_subplot(3,1,index+1)
@@ -295,11 +313,48 @@ class ComparisonPage(PageBase):
                 if points:
                     ax.plot([r["time"] for r in points],[r[key] for r in points],label="AB"[run],color=PALETTE.primary if run==0 else PALETTE.q2)
             ax.set_ylabel({"fidelity":"F ao circuito ideal","purity":"Pureza","energy":"Energia"}[key])
+            if not ax.lines:
+                ax.text(.5, .5, "Métrica indisponível para estes registros.", ha="center", va="center", transform=ax.transAxes, color=PALETTE.text_muted)
             if ax.lines:
                 ax.legend(facecolor=PALETTE.surface,labelcolor=PALETTE.text)
             ax.set_xlabel("Índice da porta" if data["experiments"][0].config.circuit else "Tempo (ℏ=1)")
         self.curve_canvas.draw_idle()
         self._frame(0)
+        if not any(exp.result.states for exp in data["experiments"]):
+            self._placeholder(self.curve_canvas, "Estas execuções não salvaram snapshots.\nReexecute com snapshots para obter curvas temporais.")
+
+    def _placeholder(self, canvas, message):
+        ax = canvas.reset_axes()
+        ax.text(.5, .5, message, transform=ax.transAxes, ha="center", va="center", wrap=True, color=PALETTE.text_muted)
+        ax.set_axis_off()
+        canvas.draw_idle()
+
+    def _clear_state_views(self):
+        self._placeholder(self.curve_canvas, "Selecione esta aba para carregar as curvas das execuções.\nAs curvas dependem dos snapshots salvos.")
+        self.frame_label.setText("Selecione esta aba para carregar os estados de A e B.")
+        self.focus.setEnabled(False)
+        for scene, label in zip(self.scenes, self.scene_labels):
+            scene.setEnabled(False)
+            scene.ax.clear()
+            scene.ax.text2D(.5, .5, "Estados ainda não carregados", transform=scene.ax.transAxes, ha="center", color=PALETTE.text_muted)
+            scene.draw_idle()
+            label.setText("Execução aguardando carregamento")
+
+    def _tab_selected(self, index):
+        if index in (1, 2) and self.full_data is None:
+            self._load_timer.start()
+
+    def _request_prepare(self):
+        a, b = self.records.get(self.first_run.currentData()), self.records.get(self.second_run.currentData())
+        if a is None or b is None or incompatibility(a, b):
+            return
+        pair = (a.id, b.id)
+        if pair == self._requested_pair:
+            return
+        self._requested_pair = pair
+        self.frame_label.setText("Carregando os estados selecionados…")
+        self._placeholder(self.curve_canvas, "Preparando as curvas dos registros selecionados…")
+        self.prepare_requested.emit(*pair)
 
     def _frame(self,index):
         data=self.full_data
@@ -319,6 +374,7 @@ class ComparisonPage(PageBase):
         del blocker
 
     def _focus(self,*_):
+        self._desired_focus = self.focus.currentData() if self.focus.currentData() is not None else -1
         for scene in self.scenes:
             scene.set_focus(self.focus.currentData() if self.focus.currentData() is not None else -1)
 
@@ -339,12 +395,54 @@ class ComparisonPage(PageBase):
         else:
             self.slider.setValue(self.slider.value()+1)
 
+    def collect_view_preferences(self):
+        return {
+            "hist_layout": self.hist_layout.currentIndex(),
+            "tab": self.tabs.currentIndex(),
+            "camera_sync": self.camera_sync.isChecked(),
+            "focus": self._desired_focus,
+        }
+
+    def apply_view_preferences(self, values):
+        if not isinstance(values, dict):
+            return
+        blockers = [QSignalBlocker(widget) for widget in (self.hist_layout, self.tabs, self.camera_sync, self.focus)]
+        for key, widget in (("hist_layout", self.hist_layout), ("tab", self.tabs)):
+            index = values.get(key, 0)
+            if isinstance(index, int) and not isinstance(index, bool) and 0 <= index < widget.count():
+                widget.setCurrentIndex(index)
+        if isinstance(values.get("camera_sync"), bool):
+            self.camera_sync.setChecked(values["camera_sync"])
+        focus = values.get("focus", -1)
+        self._desired_focus = focus if isinstance(focus, int) and not isinstance(focus, bool) and -1 <= focus <= 5 else -1
+        index = self.focus.findData(self._desired_focus)
+        if index >= 0:
+            self.focus.setCurrentIndex(index)
+        del blockers
+        self._suppress_load = True
+        try:
+            self._compare()
+        finally:
+            self._suppress_load = False
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._tab_selected(self.tabs.currentIndex())
+
     def hideEvent(self,event):
+        self._load_timer.stop()
         self.timer.stop()
         self.play.setText("Reproduzir snapshots")
         super().hideEvent(event)
 
     def set_running(self,running):
-        for widget in (self.first_run,self.second_run,self.hist_layout,self.btn_prepare):
+        self._running = running
+        for widget in (self.first_run,self.second_run,self.hist_layout):
             widget.setEnabled(not running)
+        a, b = self.records.get(self.first_run.currentData()), self.records.get(self.second_run.currentData())
+        self.btn_prepare.setEnabled(not running and a is not None and b is not None and not incompatibility(a,b))
         self.btn_document.setEnabled(not running and self.full_data is not None)
+        if not running:
+            if self._requested_pair is not None and self.full_data is None:
+                self._clear_state_views()
+            self._requested_pair = None

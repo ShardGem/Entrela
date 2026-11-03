@@ -4,6 +4,7 @@ Fonte única de verdade para cores, tipografia e espaçamento.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -79,7 +80,7 @@ FONT_FAMILY = '"Inter", "Segoe UI", "SF Pro Text", system-ui, sans-serif'
 FONT_MONO = '"JetBrains Mono", "Cascadia Code", "Consolas", monospace'
 
 
-def build_qss() -> str:
+def build_qss(*, density="comfortable") -> str:
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QFontDatabase
     family = FONT_FAMILY
@@ -89,6 +90,8 @@ def build_qss() -> str:
         if chosen:
             family = '"' + chosen + '"'
     p = PALETTE
+    icons = (Path(__file__).resolve().parent / 'assets' / 'icons').as_posix()
+    pad = {"compact": 5, "comfortable": 8, "spacious": 11}.get(density, 8)
     return f"""
 * {{ font-family: {family}; font-size: 13px; outline: none; }}
 
@@ -144,6 +147,7 @@ QPushButton#NavGroup {{
     padding: 6px 10px; text-align: left; font-weight: 600; font-size: 13px;
 }}
 QPushButton#NavGroup:hover {{ background: {p.surface}; }}
+QPushButton#NavGroup[compact="true"] {{ padding: 6px 1px; text-align: center; font-size: 10px; letter-spacing: 0.1px; qproperty-iconSize: 10px 10px; }}
 QPushButton#NavGroup[activeGroup="true"] {{ color: {p.primary}; background: {p.primary_faint}; }}
 QPushButton#SidebarToggle {{ background: transparent; text-align: left; padding: 6px; color: {p.text_muted}; }}
 QPushButton#NavButton[compact="true"] {{ padding: 7px 4px; text-align: center; }}
@@ -242,7 +246,7 @@ QPushButton {{
     color: {p.text};
     border: 1px solid {p.border_strong};
     border-radius: {RADIUS.md}px;
-    padding: 7px 14px;
+    padding: {max(4, pad - 1)}px 14px;
     font-size: 13px;
     font-weight: 500;
     min-height: 20px;
@@ -269,7 +273,7 @@ QPushButton#PrimaryButton {{
     color: {p.primary_on};
     border: none;
     font-weight: 600;
-    padding: 8px 16px;
+    padding: {pad}px 16px;
 }}
 
 QPushButton#PrimaryButton:hover {{
@@ -313,7 +317,7 @@ QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{
     color: {p.text};
     border: 1px solid {p.border_strong};
     border-radius: {RADIUS.sm}px;
-    padding: 6px 10px;
+    padding: {max(4, pad - 2)}px 10px;
     font-size: 13px;
     selection-background-color: {p.primary_faint};
 }}
@@ -331,27 +335,13 @@ QSpinBox::down-button, QDoubleSpinBox::down-button {{
 }}
 
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-    image: none;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-bottom: 4px solid {p.text_dim};
-    width: 0; height: 0;
+    image: url("{icons}/chevron-up.svg");
+    width: 12px; height: 12px;
 }}
 
 QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-    image: none;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-top: 4px solid {p.text_dim};
-    width: 0; height: 0;
-}}
-
-QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{
-    border-bottom-color: {p.primary};
-}}
-
-QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {{
-    border-top-color: {p.primary};
+    image: url("{icons}/chevron-down.svg");
+    width: 12px; height: 12px;
 }}
 
 QComboBox::drop-down {{
@@ -360,16 +350,9 @@ QComboBox::drop-down {{
 }}
 
 QComboBox::down-arrow {{
-    image: none;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-top: 4px solid {p.text_dim};
-    width: 0; height: 0;
+    image: url("{icons}/chevron-down.svg");
+    width: 14px; height: 14px;
     margin-right: 8px;
-}}
-
-QComboBox::down-arrow:hover {{
-    border-top-color: {p.primary};
 }}
 
 QComboBox QAbstractItemView {{
@@ -456,8 +439,10 @@ QScrollBar::handle:horizontal {{
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 
 /* ============ MISC ============ */
-QSplitter::handle {{ background: {p.border}; }}
-QSplitter::handle:horizontal {{ width: 1px; }}
+QSplitter::handle {{ background: {p.bg}; border: none; margin: 1px; }}
+QSplitter::handle:hover {{ background: {p.border_strong}; border-radius: 2px; }}
+QSplitter::handle:horizontal {{ width: 5px; }}
+QSplitter::handle:vertical {{ height: 5px; }}
 
 QStatusBar {{
     background-color: {p.bg};
@@ -468,6 +453,7 @@ QStatusBar {{
 
 QTableWidget, QTableView {{
     background-color: {p.surface};
+    alternate-background-color: {p.surface_hover};
     color: {p.text};
     border: 1px solid {p.border};
     border-radius: {RADIUS.md}px;
@@ -482,19 +468,20 @@ QHeaderView::section {{
     color: {p.text_dim};
     border: none;
     border-bottom: 1px solid {p.border};
-    padding: 10px 14px;
+    padding: {pad + 2}px 14px;
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.4px;
 }}
 
-QTableWidget::item {{
+QTableWidget::item, QTableView::item {{
     padding: 8px 14px;
     border-bottom: 1px solid {p.border};
 }}
 
-QTableWidget::item:selected {{ background-color: {p.surface_active}; }}
-QTableWidget::item:focus {{ border: none; }}
+QTableWidget::item:alternate, QTableView::item:alternate {{ background-color: {p.surface_hover}; color: {p.text}; }}
+QTableWidget::item:selected, QTableView::item:selected {{ background-color: {p.surface_active}; color: {p.text}; }}
+QTableWidget::item:focus, QTableView::item:focus {{ border: none; }}
 
 QTextBrowser {{
     background-color: {p.surface};

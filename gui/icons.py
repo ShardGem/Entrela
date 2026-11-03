@@ -86,6 +86,13 @@ _BODIES = {
 }
 
 _BODIES.update({
+    "group-start": '<circle cx="12" cy="12" r="9"/><path d="m16 8-3 5-5 3 3-5 5-3z"/>',
+    "group-lab": '<path d="M9 3h6M10 3v6l-6 10a1.3 1.3 0 0 0 1 2h14a1.3 1.3 0 0 0 1-2L14 9V3M7 15h10M10 18h.01M14 12h.01"/>',
+    "group-research": '<path d="m9 3 5 5-3 3-5-5 3-3zM13 7l3-3M9 11l-2 2M4 21h16M10 14a4 4 0 0 0 8 0V9M7 17v4M17 18v3"/>',
+    "group-organize": '<path d="m12 3 10 5-10 5L2 8l10-5zM2 12l10 5 10-5M2 16l10 5 10-5"/>',
+    "chevron-up": '<path d="m6 15 6-6 6 6"/>',
+    "collapse": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m8-11-3 3 3 3"/>',
+    "expand": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m5-11 3 3-3 3"/>',
     "examples": '<path d="M3 4h7a3 3 0 0 1 2 1 3 3 0 0 1 2-1h7v15h-7a3 3 0 0 0-2 1 3 3 0 0 0-2-1H3V4zM12 5v15M6 8h3M15 8h3M6 12h3M15 12h3"/>',
     "comparison": '<rect x="3" y="4" width="7" height="16" rx="2"/><rect x="14" y="4" width="7" height="16" rx="2"/><path d="M5 15l2-5 1 2M16 14l2-5 1 3"/>',
     "documentation": '<path d="M7 3h8l4 4v13H7V3zM15 3v5h4M4 7v15h12M10 12h6M10 16h4"/>',
@@ -103,7 +110,11 @@ class _SvgEngine(QIconEngine):
         return _SvgEngine(self.svg)
 
     def paint(self,painter,rect,mode,state):
+        painter.save()
+        if mode == QIcon.Disabled:
+            painter.setOpacity(.4)
         QSvgRenderer(QByteArray(self.svg.encode('utf-8'))).render(painter,QRectF(rect))
+        painter.restore()
 
     def pixmap(self,size,mode,state):
         result=QPixmap(size)

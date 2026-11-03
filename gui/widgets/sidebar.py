@@ -1,8 +1,9 @@
 """Grouped navigation with an accessible accordion and a compact rail."""
-from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtWidgets import QFrame,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QLabel,QScrollArea
+from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation, QEasingCurve
+from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QLabel,QScrollArea
 from gui.icons import get_icon,get_pixmap
 from gui.theme import PALETTE
+from gui.branding import application_icon
 
 
 class NavButton(QPushButton):
@@ -35,12 +36,19 @@ class Sidebar(QFrame):
     ITEMS=[('dashboard','Visão geral'),('examples','Exemplos prontos'),('simulation','Configurar experimento'),
            ('circuit','Editor de circuitos'),('results','Resultados'),('bloch','Estados em 3D'),
            ('mitigation','Mitigação de ruído'),('comparison','Comparar execuções'),('history','Histórico'),
-           ('analysis','Estudos científicos'),('library','Projetos e modelos'),('documentation','Exportar e documentar'),
+           ('analysis','Análises e varreduras'),('library','Projetos e modelos'),('documentation','Exportar e documentar'),
            ('docs','Conceitos e tutoriais'),('settings','Preferências')]
-    GROUPS=[('start','Começar','dashboard',('dashboard','examples','docs')),
-            ('lab','Laboratório','simulation',('simulation','circuit','results','bloch')),
-            ('research','Pesquisa','analysis',('analysis','mitigation','comparison')),
-            ('organize','Organização','library',('history','library','documentation'))]
+    GROUPS=[('start','Aprender','group-start',('dashboard','examples','docs')),
+            ('lab','Experimentar','group-lab',('simulation','circuit','results','bloch')),
+            ('research','Analisar','group-research',('analysis','mitigation','comparison')),
+            ('organize','Organizar','group-organize',('history','library','documentation'))]
+    COMPACT_LABELS={'start':'GUIAS','lab':'LAB','research':'ANÁLISE','organize':'ACERVO'}
+    DESCRIPTIONS={
+        'analysis':'Varreduras de parâmetros e benchmark de mitigação.',
+        'simulation':'Defina o sistema, a evolução temporal e o modelo de ruído.',
+        'comparison':'Compare métricas, curvas temporais e estados de duas execuções.',
+        'documentation':'Exporte dados, figuras, animações e relatórios científicos.',
+    }
 
     def __init__(self,parent=None):
         super().__init__(parent)
@@ -48,6 +56,7 @@ class Sidebar(QFrame):
         self.buttons={}
         self.group_buttons={}
         self.group_bodies={}
+        self._animations={}
         self._compact=False
         self._active='dashboard'
         self._expanded='start'
@@ -62,7 +71,7 @@ class Sidebar(QFrame):
         brand=QHBoxLayout()
         logo=QLabel()
         self.logo=logo
-        logo.setPixmap(get_pixmap('simulation',PALETTE.primary,28))
+        logo.setPixmap(application_icon().pixmap(28,28))
         logo.setFixedSize(30,30)
         brand.addWidget(logo)
         self.logo_title=QLabel('Entrela')
@@ -100,10 +109,16 @@ class Sidebar(QFrame):
             children.setSpacing(4)
             for page in items:
                 button=NavButton(page,labels[page])
+                button.setToolTip(f'{title} · {labels[page]}\n{self.DESCRIPTIONS.get(page,labels[page])}')
                 button.clicked.connect(lambda checked=False,page=page:self._on_click(page))
                 children.addWidget(button)
                 self.buttons[page]=button
             self.group_bodies[key]=body
+            animation=QPropertyAnimation(body,b'maximumHeight',self)
+            animation.setDuration(180)
+            animation.setEasingCurve(QEasingCurve.InOutCubic)
+            animation.finished.connect(lambda key=key:self._finish_animation(key))
+            self._animations[key]=animation
             layout.addWidget(body)
         layout.addStretch()
         self.scroll.setWidget(content)
@@ -114,20 +129,44 @@ class Sidebar(QFrame):
 
     def _expand(self,key):
         self._expanded=None if self._expanded==key else key
-        self._refresh_groups()
+        self._refresh_groups(animate=True)
 
-    def _refresh_groups(self):
+    def _finish_animation(self,key):
+        body=self.group_bodies[key]
+        expanded=key==self._expanded
+        body.setVisible(expanded)
+        body.setMaximumHeight(16777215 if expanded else 0)
+
+    def _refresh_groups(self,animate=False):
+        app=QApplication.instance()
+        motion=self.isVisible() and not bool(app.property('entrelaReduceMotion') if app else False)
         for key,title,icon,items in self.GROUPS:
             expanded=key==self._expanded
-            self.group_bodies[key].setVisible(expanded)
+            body=self.group_bodies[key]
+            animation=self._animations[key]
+            current=body.height() if body.isVisible() else 0
+            changed=bool(body.property('expanded'))!=expanded
+            animation.stop()
+            body.setProperty('expanded',expanded)
+            if animate and changed and motion:
+                body.setVisible(True)
+                body.setMaximumHeight(current)
+                animation.setStartValue(current)
+                animation.setEndValue(body.sizeHint().height() if expanded else 0)
+                animation.start()
+            else:
+                self._finish_animation(key)
             button=self.group_buttons[key]
-            button.setText('' if self._compact else title+'   '+('−' if expanded else '+'))
-            button.setToolTip(title+(' — recolher' if expanded else ' — expandir'))
+            button.setText(self.COMPACT_LABELS[key] if self._compact else title+'   '+('−' if expanded else '+'))
+            button.setToolTip(title+(' — recolher grupo' if expanded else ' — expandir grupo')+'\n'+' · '.join(dict(self.ITEMS)[page] for page in items))
+            button.setAccessibleName(title+(' — grupo expandido' if expanded else ' — grupo recolhido'))
             button.setProperty('activeGroup',self._active in items)
+            button.setProperty('compact',self._compact)
+            button.setProperty('expanded',expanded)
             button.style().unpolish(button)
             button.style().polish(button)
-            button.setIcon(get_icon(icon,PALETTE.primary if self._active in items else PALETTE.text_muted))
-            button.setIconSize(QSize(24,24))
+            button.setIcon(get_icon('chevron-up' if expanded else 'chevron-down',PALETTE.text_muted) if self._compact else get_icon(icon,PALETTE.primary if self._active in items else PALETTE.text_muted))
+            button.setIconSize(QSize(12,12) if self._compact else QSize(24,24))
 
     def _on_click(self,key):
         self.set_active(key)
@@ -146,10 +185,10 @@ class Sidebar(QFrame):
 
     def set_compact(self,compact):
         self._compact=bool(compact)
-        self.setFixedWidth(80 if compact else 268)
+        self.setFixedWidth(96 if compact else 280)
         self.logo_title.setVisible(not compact)
         self.toggle.setText('' if compact else '  Recolher navegação')
-        self.toggle.setIcon(get_icon('menu',PALETTE.text_muted))
+        self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.text_muted))
         self.toggle.setToolTip('Expandir navegação' if compact else 'Recolher navegação')
         self.toggle.setAccessibleName(self.toggle.toolTip())
         for key,label in self.ITEMS:
@@ -164,7 +203,7 @@ class Sidebar(QFrame):
 
     def refresh_theme(self):
         if hasattr(self,'toggle'):
-            self.logo.setPixmap(get_pixmap('simulation',PALETTE.primary,28))
+            self.logo.setPixmap(application_icon().pixmap(28,28))
             self.set_compact(self._compact)
             for button in self.buttons.values():
                 button._refresh_icon()

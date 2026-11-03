@@ -1,5 +1,5 @@
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtWidgets import QLabel,QCheckBox,QSpinBox,QFormLayout,QHBoxLayout,QTableWidget,QTableWidgetItem,QHeaderView,QProgressBar
+from PySide6.QtWidgets import QLabel,QCheckBox,QSpinBox,QFormLayout,QHBoxLayout,QTableWidget,QTableWidgetItem,QHeaderView,QProgressBar,QComboBox,QGroupBox,QVBoxLayout
 from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton,SecondaryButton
 
@@ -23,6 +23,25 @@ class DocumentationPage(PageBase):
         self.include_gif.setChecked(True)
         for widget in (self.use_comparison,self.include_analyses,self.include_gif):
             self.body().addWidget(widget)
+        content=QGroupBox("Conteúdo do relatório PDF")
+        content_layout=QVBoxLayout(content)
+        self.report_template=QComboBox()
+        self.report_template.addItem("Completo · metodologia, resultados e reprodução","complete")
+        self.report_template.addItem("Resumido · principais resultados","summary")
+        content_layout.addWidget(self.report_template)
+        self.report_sections={}
+        for key,label in (("include_distribution","Distribuição das medições"),
+                          ("include_temporal","Curvas dos snapshots registrados"),
+                          ("include_bloch","Estados locais de Bloch"),
+                          ("include_circuit","Diagrama do circuito"),
+                          ("include_configuration","Configuração e proveniência técnica"),
+                          ("include_analyses","Gráficos e tabelas dos estudos")):
+            checkbox=QCheckBox(label)
+            checkbox.setChecked(True)
+            self.report_sections[key]=checkbox
+            content_layout.addWidget(checkbox)
+        self.report_template.currentIndexChanged.connect(self._apply_template)
+        self.body().addWidget(content)
         form=QFormLayout()
         self.max_frames=QSpinBox()
         self.max_frames.setRange(2,80)
@@ -67,17 +86,41 @@ class DocumentationPage(PageBase):
         if data:
             self.analysis_selected.emit(*data)
 
-    def set_lineage(self,sources,analyses,protocols):
-        self.context.setText("Fontes: "+" · ".join(f"{e.id} ({e.config.system.num_qubits} qubits)" for e in sources) if sources else "Abra uma execução ou carregue uma comparação com estados completos.")
+    def _apply_template(self):
+        complete=self.report_template.currentData()=="complete"
+        for key,widget in self.report_sections.items():
+            widget.setChecked(complete or key not in ("include_circuit","include_configuration"))
+
+    def report_options(self):
+        return dict(template=self.report_template.currentData(),
+                    **{key:widget.isChecked() for key,widget in self.report_sections.items()})
+
+    def apply_report_options(self,mapping):
+        from PySide6.QtCore import QSignalBlocker
+        from core.pdf_layout import report_options
+        from dataclasses import asdict
+        resolved=asdict(report_options(mapping))
+        blockers=[QSignalBlocker(widget) for widget in (self.report_template,*self.report_sections.values())]
+        self.report_template.setCurrentIndex(self.report_template.findData(resolved["template"]))
+        for key,widget in self.report_sections.items():
+            widget.setChecked(resolved[key])
+        del blockers
+
+    def set_lineage(self,sources,analyses,protocols,annotations=None):
+        from data.workspace import experiment_title
+        titles={source.id:experiment_title(source,annotations or {}) for source in sources}
+        self.context.setText("Fontes: "+" · ".join(f"{titles[e.id]} ({e.config.system.num_qubits} qubits)" for e in sources) if sources else "Abra uma execução ou carregue uma comparação com estados completos.")
         self.table.setRowCount(0)
         records=[]
         for source in sources:
-            parent=(source.result.mitigation or {}).get("source_experiment_id") or source.result.metadata.get("reproduced_from_id") or source.result.metadata.get("imported_from_id") or "original"
-            records.append(([parent,source.id,"Execução","",source.created_at.isoformat()],None))
+            parent=(source.result.mitigation or {}).get("source_experiment_id") or source.result.metadata.get("reproduced_from_id") or source.result.metadata.get("imported_from_id")
+            origin=titles.get(parent,"Execução anterior") if parent else "Registro original"
+            records.append(([origin,titles[source.id],"Execução","",source.created_at.isoformat()],None))
         for data,path in analyses:
-            records.append(([data.get("source_id",""),data.get("analysis_id",_path_name(path)),data["kind"],data.get("protocol",{}).get("fields",{}).get("evidence_ref",""),data.get("created_at","")],(data["source_id"],str(path))))
+            fields=data.get("protocol",{}).get("fields",{})
+            records.append(([titles.get(data.get("source_id"),"Experimento"),fields.get("title") or _kind_name(data["kind"]),_kind_name(data["kind"]),fields.get("evidence_ref",""),data.get("created_at","")],(data["source_id"],str(path))))
         for data in protocols:
-            records.append(([data["source_id"],data["fields"]["title"]+" · "+data["protocol_id"],"Protocolo",data["fields"].get("evidence_ref",""),data["created_at"]],None))
+            records.append(([titles.get(data["source_id"],"Experimento"),data["fields"]["title"],"Protocolo",data["fields"].get("evidence_ref",""),data["created_at"]],None))
         for values,payload in records:
             row=self.table.rowCount()
             self.table.insertRow(row)
@@ -88,7 +131,7 @@ class DocumentationPage(PageBase):
                 self.table.setItem(row,col,item)
 
     def set_running(self,running):
-        for widget in (*self.buttons,self.use_comparison,self.include_analyses,self.include_gif,self.max_frames,self.frame_ms):
+        for widget in (*self.buttons,self.use_comparison,self.include_analyses,self.include_gif,self.max_frames,self.frame_ms,self.report_template,*self.report_sections.values()):
             widget.setEnabled(not running)
         self.cancel.setVisible(running)
         self.progress.setVisible(running)
@@ -99,3 +142,10 @@ class DocumentationPage(PageBase):
 def _path_name(path):
     from pathlib import Path
     return Path(path).stem
+
+
+def _kind_name(kind):
+    return {"temporal":"Evolução temporal","convergence":"Convergência de Trotter",
+            "trotter_noise":"Trotterização e ruído","sweep":"Varredura de parâmetros",
+            "mitigation_benchmark":"Benchmark de mitigação","heatmap":"Mapa de parâmetros",
+            "zne_stability":"Estabilidade da ZNE","equal_budget":"Comparação com orçamento igual"}.get(kind,kind)

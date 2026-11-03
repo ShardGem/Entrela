@@ -302,7 +302,13 @@ table{{border-collapse:collapse;width:100%;font-size:10pt}}td,th{{border-bottom:
 </body></html>'''
 
 
-def export_report(experiment, filepath, analysis=None, annotation=None):
+def export_report(experiment, filepath, analysis=None, annotation=None, *, options=None, raster_dpi=300):
+    from pathlib import Path
+    if Path(filepath).suffix.lower() == ".pdf":
+        from core.documentation import export_pdf
+        return export_pdf([experiment], filepath, [analysis] if analysis else (),
+                          {experiment.id: annotation or {}}, options=options,
+                          raster_dpi=raster_dpi)
     return export_rendered_report(report_html(experiment, analysis, annotation), filepath)
 
 

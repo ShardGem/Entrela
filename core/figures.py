@@ -9,7 +9,7 @@ from core.metrics import bloch_vector, fidelity, purity, energy_expectation
 COLORS = ("#007ea7", "#8157c4", "#cb6500", "#16834a", "#c63e62", "#3a62b0")
 
 
-def figure(width=9, height=4):
+def figure(width=7, height=4):
     fig = Figure(figsize=(width, height), layout="constrained", facecolor="white")
     FigureCanvasAgg(fig)
     return fig
@@ -30,19 +30,24 @@ def snapshot(experiment, index=None):
     return states[index], ideal[index] if ideal and len(ideal) == len(states) else None, index, experiment.result.times[index]
 
 
-def bloch_figure(experiments, indices=None):
+def bloch_figure(experiments, indices=None, *, qubits=None):
     indices = [None] * len(experiments) if indices is None else indices
     if len(experiments) not in (1, 2) or len(indices) != len(experiments):
         raise ValueError("Selecione uma ou duas execuções e seus snapshots.")
     max_qubits = max(e.config.system.num_qubits for e in experiments)
-    cols = min(3, max_qubits)
-    per_run_rows = int(np.ceil(max_qubits / cols))
-    fig = figure(10 if len(experiments) == 1 else 12, 3.0 * per_run_rows * len(experiments))
+    selected=list(range(max_qubits)) if qubits is None else list(qubits)
+    if not selected or any(type(q) is not int or q<0 or q>=max_qubits for q in selected) or len(set(selected))!=len(selected):
+        raise ValueError("Selecione qubits existentes para a figura de Bloch.")
+    cols = min(3, len(selected))
+    per_run_rows = int(np.ceil(len(selected) / cols))
+    fig = figure(7, 3.0 * per_run_rows * len(experiments))
     u, v = np.meshgrid(np.linspace(0, 2*np.pi, 20), np.linspace(0, np.pi, 13))
     for run, (exp, index) in enumerate(zip(experiments, indices)):
         state, ideal, actual, time = snapshot(exp, index)
-        for q in range(exp.config.system.num_qubits):
-            ax = fig.add_subplot(per_run_rows * len(experiments), cols, run * per_run_rows * cols + q + 1, projection="3d")
+        for position,q in enumerate(selected):
+            if q>=exp.config.system.num_qubits:
+                continue
+            ax = fig.add_subplot(per_run_rows * len(experiments), cols, run * per_run_rows * cols + position + 1, projection="3d")
             ax.plot_wireframe(np.cos(u)*np.sin(v), np.sin(u)*np.sin(v), np.cos(v), color="#b5c3cf", linewidth=.4, alpha=.6)
             vector = bloch_vector(state, q)
             ax.plot([0, vector[0]], [0, vector[1]], [0, vector[2]], color=COLORS[q], linewidth=3, label="Simulado")
@@ -52,9 +57,9 @@ def bloch_figure(experiments, indices=None):
             ax.set(xlim=(-1.1, 1.1), ylim=(-1.1, 1.1), zlim=(-1.1, 1.1), xlabel="X", ylabel="Y", zlabel="Z")
             ax.set_box_aspect((1,1,1))
             when = "estado final" if actual is None else f"snapshot {actual} · {'porta' if exp.config.circuit else 't'}={time:g}"
-            ax.set_title(f"{'AB'[run]} · q{q} · {exp.id}\n{when}", fontsize=9)
+            ax.set_title(f"{'AB'[run]} · q{q}\n{when}", fontsize=9)
             ax.tick_params(labelsize=7)
-            if q == 0:
+            if position == 0:
                 ax.legend(loc="upper left", fontsize=7)
     fig.suptitle("Estados locais de Bloch · comprimento não mede sozinho emaranhamento", fontsize=11)
     return fig
@@ -64,13 +69,16 @@ def histogram_figure(experiments, side_by_side=False):
     fig = figure()
     keys = sorted(set().union(*(set(e.result.counts or {}) for e in experiments)))
     if not keys:
+        ax=fig.add_subplot(111)
+        ax.axis("off")
+        ax.text(.5,.5,"Esta execução não possui contagens registradas.",ha="center",va="center",transform=ax.transAxes)
         return fig
     for i, exp in enumerate(experiments):
         ax = fig.add_subplot(1, len(experiments), i+1) if side_by_side else (fig.axes[0] if fig.axes else fig.add_subplot(111))
         total = sum((exp.result.counts or {}).values())
         width = .8 if side_by_side or len(experiments) == 1 else .36
         xs = np.arange(len(keys)) + (0 if side_by_side or len(experiments) == 1 else (i-.5)*width)
-        ax.bar(xs, [exp.result.counts.get(k,0)/total if total else 0 for k in keys], width=width, color=COLORS[i], label=f"{'AB'[i]} · {exp.id}")
+        ax.bar(xs, [exp.result.counts.get(k,0)/total if total else 0 for k in keys], width=width, color=COLORS[i], label=f"Execução {'AB'[i]}")
         ax.set_xticks(range(len(keys)), keys, rotation=90 if len(keys)>8 else 0, fontsize=8)
         ax.set_ylabel("Frequência observada")
         ax.set_xlabel("Bitstring · q0 à direita")
@@ -81,8 +89,10 @@ def histogram_figure(experiments, side_by_side=False):
 
 def temporal_figure(experiments, series=None):
     from core.circuits import _build_hamiltonian
+    if len({bool(exp.config.circuit) for exp in experiments}) > 1:
+        raise ValueError("Curvas temporais exigem o mesmo tipo de eixo: tempo de evolução ou índice da porta.")
     keys = [series] if series else ["fidelity", "purity", "energy"]
-    fig = figure(9, 2.6 * len(keys))
+    fig = figure(7, 2.6 * len(keys))
     labels = {"fidelity": "Fidelidade ao circuito ideal", "purity": "Pureza global", "energy": "Energia ⟨H⟩"}
     for j, key in enumerate(keys):
         ax = fig.add_subplot(len(keys), 1, j+1)
@@ -104,7 +114,7 @@ def temporal_figure(experiments, series=None):
                 else:
                     value = energy_expectation(r.states[k], H)
                 values.append(float("nan") if value is None else value)
-            ax.plot([r.times[k] for k in indices],values, label=f"{'AB'[i]} · {exp.id}",color=COLORS[i],marker="." if len(indices)<30 else None)
+            ax.plot([r.times[k] for k in indices],values, label=f"Execução {'AB'[i]}",color=COLORS[i],marker="." if len(indices)<30 else None)
         ax.set_ylabel(labels[key])
         ax.set_xlabel("Índice da porta" if experiments[0].config.circuit else "Tempo adimensional (ℏ=1)")
         ax.grid(alpha=.2)
@@ -156,18 +166,22 @@ def analysis_figure(data, key=None, fig=None):
             ax.legend(fontsize=8)
         ax.set_xlabel("Índice da porta" if xkey == "time" and data.get("config",{}).get("circuit") else xkey)
         ax.grid(alpha=.2)
-    ax.set_title(data["kind"]+" · fonte "+data.get("source_id","—"),fontsize=11)
+    ax.set_title(data.get("protocol",{}).get("fields",{}).get("title") or data["kind"],fontsize=11,parse_math=False)
     return fig
 
 
-def circuit_figure(experiment, limit=80):
+def circuit_figure(experiment, limit=80, *, start=0, per_row=16):
     operations = experiment.result.metadata.get("operations", [])
     # All operations remain in raw JSON; the presentation is explicitly bounded.
-    ops = operations[:limit]
-    per_row = 16
+    ops = operations[start:start+limit]
     n = experiment.config.system.num_qubits
     blocks = max(1,int(np.ceil(len(ops)/per_row)))
-    fig = figure(12,max(2.5,blocks*(.4*n+1.2)))
+    fig = figure(7,max(2.8,blocks*(.4*n+1.2)))
+    if not ops:
+        ax=fig.add_subplot(111)
+        ax.axis("off")
+        ax.text(.5,.5,"Não há operações registradas para este diagrama.",ha="center",va="center",transform=ax.transAxes)
+        return fig
     for block in range(blocks):
         ax = fig.add_subplot(blocks,1,block+1)
         for q in range(n):
@@ -197,8 +211,8 @@ def circuit_figure(experiment, limit=80):
                 if op.get("parameters"):
                     ax.text(i,q+.33,",".join(format(v,".3g") for v in op["parameters"][:2]),ha="center",fontsize=4.5)
         ax.set(xlim=(-.8,per_row-.1),ylim=(n-.5,-.6),yticks=range(n),yticklabels=[f"q{q}" for q in range(n)],xticks=[])
-        ax.set_title(f"Operações {block*per_row+1}–{min(len(ops),(block+1)*per_row)}",fontsize=8)
-    fig.suptitle(f"{experiment.id} · primeiras {len(ops)} de {len(operations)} operações; parâmetros completos no JSON",fontsize=10)
+        ax.set_title(f"Operações {start+block*per_row+1}–{start+min(len(ops),(block+1)*per_row)}",fontsize=8)
+    fig.suptitle(f"Circuito · operações {start+1}–{start+len(ops)} de {len(operations)}; parâmetros completos no JSON",fontsize=10)
     return fig
 
 
@@ -232,21 +246,47 @@ def analysis_table_figures(data):
                "ideal_infidelity","noisy_infidelity","fidelity_ideal_exact","fidelity_noisy_exact",
                "fidelity_exact","fidelity","purity","energy","absolute_error","estimate","stderr","infidelity","depth")
     rows=data["rows"]
-    columns=[key for key in preferred if key in rows[0]][:7]
+    if not rows:
+        return
+    columns=[key for key in preferred if key in rows[0]][:5]
     if not columns:
-        columns=list(rows[0])[:7]
-    for start in range(0,len(rows),22):
-        fig=figure(11.69,8.27)
+        columns=list(rows[0])[:5]
+    import textwrap
+    formatted=[]
+    for row in rows:
+        cells=[]
+        for key in columns:
+            value="—" if row.get(key) is None else format(row[key],".7g") if isinstance(row[key],float) else str(row[key])
+            value=value[:77]+"…" if len(value)>80 else value
+            cells.append(textwrap.fill(value,20))
+        formatted.append(cells)
+    start=0
+    while start<len(rows):
+        stop=start
+        used=4
+        while stop<len(rows):
+            height=max(cell.count("\n")+1 for cell in formatted[stop])+1
+            if used+height>42 and stop>start:
+                break
+            used+=height
+            stop+=1
+        fig=figure(210/25.4,297/25.4)
         ax=fig.add_subplot(111)
         ax.axis("off")
-        cells=[]
-        for row in rows[start:start+22]:
-            cells.append(["—" if row.get(key) is None else format(row[key],".7g") if isinstance(row[key],float) else str(row[key]) for key in columns])
-        table=ax.table(cellText=cells,colLabels=columns,loc="center",cellLoc="center")
+        table=ax.table(cellText=formatted[start:stop],colLabels=[textwrap.fill(key.replace("_"," "),20) for key in columns],loc="center",cellLoc="center")
         table.auto_set_font_size(False)
         table.set_fontsize(8)
-        table.scale(1,1.6)
+        for (row, col), cell in table.get_celld().items():
+            # 42 line units fit inside the reserved page body. Each row is tall
+            # enough for its tallest wrapped cell, including long method names.
+            lines=3 if row==0 else max(c.count("\n")+1 for c in formatted[start+row-1])+1
+            cell.set_height(lines/48)
+            cell.set_edgecolor("#d1dfe8")
+            if row == 0:
+                cell.set_facecolor("#e8f3f9")
+                cell.set_text_props(weight="bold",color="#18364e")
         reference=data.get("protocol",{}).get("fields",{}).get("evidence_ref","")
-        fig.suptitle(f"{data['kind']} · fonte {data.get('source_id','—')}\n{reference} · linhas {start+1}–{min(start+22,len(rows))} do JSON",fontsize=12,parse_math=False)
-        fig.text(.05,.035,"Colunas selecionadas. Todos os valores e metadados integrais permanecem nos CSV/JSON. Análise: "+str(data.get("analysis_id",data.get("id","—"))),fontsize=8)
+        fig.suptitle(f"{data['kind']}\n{reference} · linhas {start+1}–{stop} do JSON",fontsize=11,parse_math=False)
+        ax.text(.5,-.02,"Colunas e textos selecionados; dados e precisão integrais nos CSV/JSON.",ha="center",transform=ax.transAxes,fontsize=8)
         yield fig
+        start=stop

@@ -5,6 +5,7 @@ from qiskit.quantum_info import partial_trace
 import numpy as np
 
 def bloch_vector(state, qubit):
+    _validate(state)
     if type(qubit) is not int or not 0 <= qubit < state.num_qubits:
         raise ValueError("Qubit fora do sistema")
     rho = DensityMatrix(partial_trace(state, [q for q in range(state.num_qubits) if q != qubit])).data
@@ -27,4 +28,9 @@ def purity(state):
 
 def energy_expectation(state,hamiltonian):
     _validate(state)
+    matrix=np.asarray(hamiltonian.to_matrix() if hasattr(hamiltonian,'to_matrix') else hamiltonian,dtype=complex)
+    if matrix.shape!=(state.dim,state.dim) or not np.all(np.isfinite(matrix)):
+        raise ValueError("Observável incompatível com a dimensão do estado")
+    if not np.allclose(matrix,matrix.conj().T,rtol=0,atol=1e-10):
+        raise ValueError("Energia exige um observável hermitiano")
     return float(state.expectation_value(hamiltonian).real)

@@ -13,6 +13,8 @@ from gui.widgets.card import MetricCard
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.tabs.results_tab import ResultsTab
 from core.export import result_interpretation
+from data.workspace import experiment_title
+from gui.widgets.data_table import configure_table
 import json, numpy as np
 
 
@@ -52,6 +54,7 @@ class ResultsPage(PageBase):
         )
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        configure_table(self.table)
         self.metadata = QPlainTextEdit()
         self.metadata.setReadOnly(True)
         self.tabs.addTab(self.results_tab, "Gráficos")
@@ -82,15 +85,27 @@ class ResultsPage(PageBase):
         ]:
             card.set_value("—" if value is None else f"{value:.4f}")
 
-    def show_experiment(self, experiment):
+    def set_experiment_title(self, title):
+        self._display_title = title
+        if getattr(self, "_experiment", None) is not None:
+            self._update_details()
+
+    def _update_details(self):
+        experiment = self._experiment
         r, c = experiment.result, experiment.config
-        self.btn_rerun.setText("Reproduzir ZNE" if r.mitigation else "Reexecutar")
-        self.btn_rerun.setToolTip("Recalcula a análise ZNE com método, fatores, shots e seed registrados; preserva as métricas da fonte." if r.mitigation else "Executa novamente a configuração com a semente efetiva registrada.")
         self.details.setText(
-            f"Experimento {experiment.id} · {'Circuito livre' if c.circuit is not None else c.system.hamiltonian} · {c.system.num_qubits} qubits · "
+            f"{self._display_title} · {'Circuito livre' if c.circuit is not None else c.system.hamiltonian} · {c.system.num_qubits} qubits · "
             f"{c.shots} shots · {experiment.duration_s:.3f} s · profundidade {r.circuit_depth}\n"
             f"Semente efetiva: {r.metadata.get('effective_seed', 'não registrada')}"
         )
+
+    def show_experiment(self, experiment):
+        self._experiment = experiment
+        self._display_title = experiment_title(experiment)
+        r, c = experiment.result, experiment.config
+        self.btn_rerun.setText("Reproduzir ZNE" if r.mitigation else "Reexecutar")
+        self.btn_rerun.setToolTip("Recalcula a análise ZNE com método, fatores, shots e seed registrados; preserva as métricas da fonte." if r.mitigation else "Executa novamente a configuração com a semente efetiva registrada.")
+        self._update_details()
         self.update_metrics(r.fidelity, r.purity, r.energy)
         self.results_tab.exibir_histograma(r.counts)
         self.results_tab.exibir_evolucao_temporal(
@@ -118,6 +133,7 @@ class ResultsPage(PageBase):
         self.metadata.setPlainText(
             json.dumps(
                 {
+                    "id": experiment.id,
                     "config": __import__("dataclasses").asdict(c),
                     "metadata": {
                         k: (

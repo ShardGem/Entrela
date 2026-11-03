@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QProgressBar,
     QScrollArea,
+    QLineEdit,QFormLayout,
 )
 
 from gui.pages.base import PageBase
@@ -90,10 +91,22 @@ class SimulationPage(PageBase):
         self._refresh_summary()
 
     def _build(self):
+        identity=QFormLayout()
+        identity.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        self.experiment_name=QLineEdit()
+        self.experiment_name.setMaxLength(160)
+        self.experiment_name.setPlaceholderText("Ex.: Bell — referência ideal, comparação de ruído…")
+        self.experiment_name.setAccessibleName("Nome do experimento")
+        self.experiment_description=QLineEdit()
+        self.experiment_description.setMaxLength(10000)
+        self.experiment_description.setPlaceholderText("Descreva o que deseja investigar; objetivo e hipótese podem ser detalhados no histórico.")
+        identity.addRow("Nome do experimento",self.experiment_name)
+        identity.addRow("Descrição",self.experiment_description)
+        self.body().addLayout(identity)
         splitter = QSplitter(Qt.Horizontal)
         self.splitter = splitter
         splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(20)
+        splitter.setHandleWidth(6)
 
         # Coluna esquerda: configuração
         left = QWidget()
@@ -102,6 +115,8 @@ class SimulationPage(PageBase):
         left_layout.setSpacing(SPACING.lg)
 
         self.config_panel = ConfigPanel()
+        # The page has a persistent primary execution control beside the form.
+        self.config_panel.btn_executar.hide()
         self.config_panel.simulacao_acionada.connect(self._emit_run)
         self.config_panel.parametros_alterados.connect(self._refresh_summary)
         left_layout.addWidget(self.config_panel, 1)
@@ -255,9 +270,10 @@ class SimulationPage(PageBase):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "splitter"):
-            vertical=self.width()<860
+            font_scale = max(1., self.font().pixelSize() / 15)
+            vertical=self.width()<860 * font_scale
             self.splitter.setOrientation(
                 Qt.Vertical if vertical else Qt.Horizontal
             )
-            self.splitter.widget(0).setMinimumHeight(480 if vertical else 420)
+            self.splitter.widget(0).setMinimumHeight(480 if vertical else 360)
             self.summary_scroll.setMinimumHeight(300 if vertical else 0)

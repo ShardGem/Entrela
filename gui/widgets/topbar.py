@@ -19,7 +19,7 @@ class Topbar(QFrame):
         text.addWidget(self.breadcrumb)
         text.addWidget(self.title)
         layout.addLayout(text,1)
-        commands=QPushButton("Buscar · Ctrl+K")
+        commands=QPushButton("Buscar")
         commands._icon_name='search'
         commands._icon_color=lambda:PALETTE.text_muted
         commands.setIcon(get_icon('search',PALETTE.text_muted))

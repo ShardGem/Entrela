@@ -9,8 +9,21 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Histórico com reabertura, comparação de execuções compatíveis e rascunho persistente.
 - ZNE de um observável Z com fatores efetivos 1, 3 e 5.
 - Exportação CSV, JSON completo, pacote ZIP e figuras PNG; importação como cópia independente.
-- Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
+- Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
+
+## Plataforma científica — 0.16
+
+- Nome e descrição na criação; objetivo, hipótese, metodologia, categorias e notas no caderno do experimento.
+- Histórico mestre-detalhe com **Visualizar**, pesquisa, filtros, ordenação e escolha de colunas.
+- Comparações com abas acessíveis e carregamento sob demanda; estados vazios explicam dados ausentes.
+- Biblioteca de circuitos com revisões, multisseleção e copiar/colar; ângulos preservam precisão integral.
+- Foco 3D sincronizado, probabilidades com precisão numérica e linha do tempo que explicita a granularidade dos snapshots.
+- Biblioteca de 15 conceitos com matemática, exercícios, referências e circuitos demonstrativos.
+- PDF A4 uniforme, texto vetorial, imagens a 300 DPI por padrão e seleção de seções.
+- Tema automático, cores de destaque, densidade, contraste, redução de movimento e preferências persistentes; novo ícone Entrela e splash de três segundos.
+
+Consulte a [auditoria anterior às alterações](docs/auditoria-plataforma-0.16.md) e o [guia de uso, validação e escopo](docs/evolucao-0.16.md).
 
 ## Interface e navegação — 0.15
 
@@ -87,7 +100,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.15.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.16.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

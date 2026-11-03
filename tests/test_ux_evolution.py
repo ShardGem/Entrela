@@ -114,3 +114,19 @@ def test_projector_layout_does_not_compress_summary_text(window, qt_app):
         assert label.height() >= label.fontMetrics().height()
     assert page._scroll.horizontalScrollBar().maximum() == 0
     assert page.summary_scroll.horizontalScrollBar().maximum() == 0
+
+
+def test_guided_sections_wrap_without_cutting_buttons(qt_app):
+    panel = ConfigPanel()
+    panel.show()
+    try:
+        for width in (320, 600, 1000):
+            panel.resize(width, 600)
+            qt_app.processEvents()
+            bounds = panel.section_nav.rect()
+            buttons = list(panel.section_buttons.values())
+            assert all(bounds.contains(button.geometry()) for button in buttons)
+            for index, button in enumerate(buttons):
+                assert all(not button.geometry().intersects(other.geometry()) for other in buttons[index + 1:])
+    finally:
+        panel.close()

@@ -17,14 +17,18 @@ assert Path(core.__file__).is_relative_to(sys.argv[1])
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QPixmap
-from gui.splash import SplashScreen,_ASSETS
+from gui.splash import SplashScreen
+from gui.branding import application_icon, configure_application_identity
 from gui.main_window import MainWindow
 from data.repository import ExperimentRepository
 from core.examples import create_example_config
 from core.simulation import run_experiment
 from dataclasses import replace
 app=QApplication([])
-assert not QPixmap(str(_ASSETS/'entrela_logo.png')).isNull()
+configure_application_identity(app)
+assert not application_icon().pixmap(16,16).isNull()
+assert not application_icon().pixmap(256,256).isNull()
+assert (Path(gui.__file__).parent/'assets/icons/entrela.ico').is_file()
 splash=SplashScreen()
 window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
 window.show();app.processEvents()

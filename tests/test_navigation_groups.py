@@ -9,6 +9,8 @@ def test_groups_do_not_navigate_until_page_chosen(window):
     sidebar.group_buttons['research'].click()
     assert window._current_page==before
     assert not sidebar.group_bodies['research'].isHidden()
+    from tests.qt_helpers import wait_until
+    wait_until(lambda: sidebar.group_bodies['start'].isHidden())
     assert sidebar.group_bodies['start'].isHidden()
     sidebar.buttons['comparison'].click()
     assert window._current_page=='comparison'
@@ -17,7 +19,7 @@ def test_groups_do_not_navigate_until_page_chosen(window):
     assert not sidebar.group_bodies['organize'].isHidden()
     assert sidebar.group_bodies['research'].isHidden()
     window._open_commands()
-    window.command_palette.search.setText('estudos')
+    window.command_palette.search.setText('varreduras')
     from PySide6.QtCore import Qt
     assert any(window.command_palette.list.item(i).data(Qt.UserRole)=='page:analysis' for i in range(window.command_palette.list.count()))
     window.command_palette.close()
@@ -27,11 +29,11 @@ def test_compact_navigation_keeps_labels_and_group_selection(window):
     window._show_page('analysis')
     sidebar=window.sidebar
     sidebar.set_compact(True)
-    assert sidebar.buttons['analysis'].accessibleName()=='Estudos científicos'
+    assert sidebar.buttons['analysis'].accessibleName()=='Análises e varreduras'
     assert not sidebar.buttons['analysis'].icon().isNull()
     assert not sidebar.group_bodies['research'].isHidden()
     sidebar.set_compact(False)
-    assert 'Estudos científicos' in sidebar.buttons['analysis'].text()
+    assert 'Análises e varreduras' in sidebar.buttons['analysis'].text()
     assert sidebar.buttons['analysis'].isChecked()
 
 

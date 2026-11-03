@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QTabWidget,
     QSpinBox,
+    QPlainTextEdit,
 )
 from qiskit.quantum_info import DensityMatrix, partial_trace
 from gui.pages.base import PageBase
@@ -85,6 +86,9 @@ class BlochPage(PageBase):
         self.snapshot_probabilities = []
         self.ideal_probabilities = []
         self._probability_plot_key = None
+        self._probability_bars = []
+        self._probability_annotation = None
+        self._experiment = None
         self.current_frame = 0
         self.num_qubits = 2
         self.playing = False
@@ -162,6 +166,8 @@ class BlochPage(PageBase):
         for w in (self.overlay, self.trails, self.axes_check):
             self.camera_panel.options_layout.addWidget(w)
         self.probabilities_canvas = MplCanvas(height=4)
+        self.probabilities_canvas.mpl_connect("motion_notify_event", self._hover_probability)
+        self.probabilities_canvas.mpl_connect("figure_leave_event", self._hover_probability)
         self.visual_tabs = QTabWidget()
         self.visual_tabs.addTab(self.canvas, "Esferas de Bloch")
         self.visual_tabs.addTab(self.probabilities_canvas, "Probabilidades no instante")
@@ -192,6 +198,12 @@ class BlochPage(PageBase):
         )
         frame_row.addWidget(self.snapshot_spin)
         layout.addLayout(frame_row)
+        self.timeline_detail = QPlainTextEdit()
+        self.timeline_detail.setReadOnly(True)
+        self.timeline_detail.setMaximumHeight(115)
+        self.timeline_detail.setAccessibleName("Transformação e estados do snapshot")
+        self.timeline_detail.setPlaceholderText("Carregue um experimento para inspecionar as etapas.")
+        layout.addWidget(self.timeline_detail)
         self._info_container = QWidget()
         QGridLayout(self._info_container)
         self._qubit_panels = []
@@ -226,6 +238,8 @@ class BlochPage(PageBase):
         time_unit="adimensional (ℏ=1)",
     ):
         self._pause()
+        self._experiment = None
+        self.timeline_detail.clear()
         self.time_unit = time_unit
         self.metrics.clear("Índice da porta" if "porta" in time_unit else "Tempo (ℏ=1)")
         self.selection_label.setText("Clique numa esfera para selecionar")
@@ -237,6 +251,8 @@ class BlochPage(PageBase):
         self.snapshot_probabilities = []
         self.ideal_probabilities = []
         self._probability_plot_key = None
+        self._probability_bars = []
+        self._probability_annotation = None
         self.ideal_states = list(ideal_statevectors or [])
         if len(self.ideal_states) != len(self.original_svs):
             self.ideal_states = []
@@ -285,6 +301,8 @@ class BlochPage(PageBase):
         self.slider.blockSignals(False)
         self.snapshot_spin.setRange(1, len(self.precomputed_bloch))
         self.current_frame = 0
+        if self.canvas.focus >= 0:
+            self._select_qubit(self.canvas.focus)
         self._refresh_ui()
 
     def _derived_snapshot(self, state):
@@ -316,8 +334,61 @@ class BlochPage(PageBase):
             if self.focus_combo.currentData() is not None
             else -1
         )
+        if self.canvas.focus >= 0:
+            self._select_qubit(self.canvas.focus)
         self._refresh_ui()
         self.preferences_changed.emit()
+
+    def set_experiment(self, experiment):
+        """Describe actual stored transitions, never interpolate invented states."""
+        self._experiment = experiment
+        self._render_timeline()
+
+    @staticmethod
+    def _state_description(state):
+        data = np.asarray(state.data)
+        if data.ndim == 1:
+            values = np.array2string(data[:8], precision=8, suppress_small=True, max_line_width=100)
+            return "ψ = " + values + (" … (primeiras 8 amplitudes)" if data.size > 8 else "")
+        probabilities = np.real(np.diag(data))
+        return (f"ρ: traço={np.trace(data).real:.12g}; Tr(ρ²)={np.trace(data @ data).real:.12g}; "
+                + "diagonal=" + np.array2string(probabilities[:8], precision=8, suppress_small=True)
+                + (" … (primeiras 8 probabilidades)" if data.shape[0] > 8 else ""))
+
+    def _render_timeline(self):
+        experiment = self._experiment
+        if experiment is None or not self.original_svs:
+            return
+        index = self.current_frame
+        config = experiment.config
+        if index == 0:
+            heading = ("Estado inicial |0…0⟩ com a fase global do circuito."
+                       if config.circuit is not None else "Estado após a preparação, antes da evolução de Trotter.")
+        elif config.circuit is not None and index <= len(config.circuit.gates):
+            from core.circuit_document import GATE_HELP
+            gate = config.circuit.gates[index - 1]
+            heading = (f"Porta lógica {index}: {gate.name.upper()} · qubits "
+                       + ", ".join(f"q{q}" for q in gate.qubits)
+                       + (f" · parâmetros={gate.parameters!r} rad" if gate.parameters else "")
+                       + "\n" + GATE_HELP[gate.name]
+                       + "\nIdeal: |ψ′⟩=U|ψ⟩ ou ρ′=UρU†. Com ruído, canais são aplicados às operações nativas.")
+        else:
+            operations = [op for op in experiment.result.metadata.get("operations", [])
+                          if op.get("stage") == "evolution" and op.get("step") == index]
+            dt = config.protocol.total_time / config.protocol.trotter_steps
+            heading = (f"Camada Suzuki–Trotter {index} · Δt={dt:.12g} (ℏ=1) · "
+                       f"{len(operations)} operações nativas.\n"
+                       "Ideal: |ψ′⟩=U_ST(Δt)|ψ⟩; com ruído, a camada inclui canais. "
+                       "Os snapshots delimitam camadas completas; não há estados intermediários por porta.")
+        rows = [heading]
+        if index > 0:
+            rows.append("Antes: " + self._state_description(self.original_svs[index - 1]))
+        rows.append("Depois: " + self._state_description(self.original_svs[index]))
+        if index > 0:
+            delta = self.snapshot_probabilities[index] - self.snapshot_probabilities[index - 1]
+            rows.append(f"Maior alteração absoluta de probabilidade: {np.max(np.abs(delta)):.12g}. "
+                        "Valores mostrados são numéricos; snapshots completos podem ser exportados.")
+        self.timeline_detail.setPlainText("\n".join(rows))
 
     def _refresh_ui(self, *_):
         if not self.precomputed_bloch or self._refreshing:
@@ -363,21 +434,25 @@ class BlochPage(PageBase):
             ax = self.probabilities_canvas.reset_axes()
             probabilities = self.snapshot_probabilities[idx]
             positions = np.arange(len(probabilities))
-            ax.bar(
+            bars = ax.bar(
                 positions - 0.18,
                 probabilities,
                 width=0.36,
                 color=PALETTE.primary,
                 label="Simulado",
             )
+            self._probability_bars = [(bar, int(i), float(value), "Simulado")
+                                      for bar, i, value in zip(bars, positions, probabilities)]
             if self.overlay.isChecked() and self.ideal_probabilities:
-                ax.bar(
+                bars = ax.bar(
                     positions + 0.18,
                     self.ideal_probabilities[idx],
                     width=0.36,
                     color=PALETTE.q2,
                     label="Circuito ideal",
                 )
+                self._probability_bars.extend((bar, int(i), float(value), "Circuito ideal")
+                                              for bar, i, value in zip(bars, positions, self.ideal_probabilities[idx]))
             ax.set_xticks(
                 positions,
                 [format(i, f"0{self.num_qubits}b") for i in positions],
@@ -387,10 +462,40 @@ class BlochPage(PageBase):
             ax.set_ylabel("Probabilidade")
             ax.set_xlabel("Bitstring (q0 à direita)")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
+            self._probability_annotation = ax.annotate(
+                "", xy=(0, 0), xytext=(10, 12), textcoords="offset points",
+                bbox={"boxstyle": "round,pad=.5", "fc": PALETTE.surface, "ec": PALETTE.border_strong},
+                color=PALETTE.text, zorder=20,
+            )
+            self._probability_annotation.set_visible(False)
             self.probabilities_canvas.draw_idle()
             self._probability_plot_key = plot_key
         self.metrics.select_snapshot(idx)
+        self._render_timeline()
         self.frame_changed.emit(idx)
+
+    def _hover_probability(self, event):
+        annotation = self._probability_annotation
+        if annotation is None:
+            return
+        visible = annotation.get_visible()
+        if getattr(event, "inaxes", None) is annotation.axes:
+            for bar, index, value, series in self._probability_bars:
+                if bar.contains(event)[0]:
+                    bitstring = format(index, f"0{self.num_qubits}b")
+                    time = (f"\nCoordenada: {self.times[self.current_frame]:.17g} ({self.time_unit})"
+                            if self.times is not None else "")
+                    annotation.set_text(
+                        f"{series} · |{bitstring}⟩\nProbabilidade: {value:.17g}\n"
+                        f"Percentual: {100 * value:.17g}%\nSnapshot {self.current_frame + 1}" + time
+                    )
+                    annotation.xy = (bar.get_x() + bar.get_width() / 2, value)
+                    annotation.set_visible(True)
+                    self.probabilities_canvas.draw_idle()
+                    return
+        annotation.set_visible(False)
+        if visible:
+            self.probabilities_canvas.draw_idle()
 
     def _on_tick(self):
         if not self.precomputed_bloch:
@@ -475,6 +580,7 @@ class BlochPage(PageBase):
             self.camera_scroll,
             self.info_scroll,
             self.scene_note,
+            self.timeline_detail,
             self.metrics,
         ):
             widget.setVisible(not enabled)

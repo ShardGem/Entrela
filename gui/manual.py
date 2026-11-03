@@ -2,7 +2,7 @@
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
 <p>Use o modo Guiado para percorrer as etapas ou o Avançado para ver todos os parâmetros.
-Os mesmos controles preservam a configuração ao alternar. Ctrl+K abre comandos, exemplos e conceitos.</p>
+Os mesmos controles preservam a configuração ao alternar. O botão Buscar encontra comandos, exemplos e conceitos.</p>
 <p>No modo Avançado, a navegação por etapas desaparece: cada categoria fica disponível no mesmo formulário.
 Use os botões ? ou a ajuda de cada campo para consultar significado, unidades e limites. A prévia do estado inicial
 é descritiva e ideal; não calcula o efeito do ruído nem substitui uma execução.</p>
@@ -40,7 +40,7 @@ Os erros padrão mostrados descrevem amostragem, não incerteza do modelo de ext
 <h2 id="Reprodutibilidade">Reprodutibilidade</h2><p>O histórico guarda configuração imutável, estados complexos,
 contagens, tempos, versões e semente efetiva. O JSON pode ser importado como cópia independente.
 Pacotes ZIP reúnem os arquivos; extraia o JSON do experimento para importá-lo.
-Editar o formulário não altera execuções anteriores.</p>
+Editar o formulário não altera execuções anteriores. Dê um nome ao criar a execução; em Histórico, use Visualizar para consultar os detalhes e Abrir para reutilizar os resultados. Descrição, objetivos, hipóteses e anotações documentam o estudo sem modificar os dados científicos originais.</p>
 <h2 id="Protocolos">Protocolos e evidências</h2>
 <p>Em Análises, registre pergunta, hipótese, controles e referência no TCC. Salvar nova revisão preserva
 o plano anterior. Carregar protocolo reabre fonte e parâmetros; Calcular análise gera outra evidência.
@@ -52,12 +52,14 @@ variância amostral e RMSE de estimativas de Z. Orçamento equivalente distribui
 por método; isso não iguala profundidade ou tempo. Sementes distintas caracterizam amostragem, não
 incerteza das fidelidades do ensemble. Ajustes linear e quadrático compartilham medições.</p>
 <h2 id="Comparações">Comparações lado a lado</h2>
-<p>Escolha A/B compatíveis e carregue estados e curvas em segundo plano. Bloch oferece câmeras e
+<p>Escolha as execuções A/B e selecione a visualização desejada. Estados e curvas são carregados em segundo plano; mensagens explicam quando os dados ou as configurações são incompatíveis. Bloch oferece câmeras e
 snapshots sincronizados; sem grades temporais compatíveis, exibe estados finais. Observáveis ZNE
 usam o baseline compilado do próprio ajuste. Não há estado mitigado reconstruído por extrapolação.</p>
 <h2 id="Documentação">Documentação científica</h2>
 <p>Exporte uma execução ou a comparação carregada como ZIP, PDF ou GIF. O pacote inclui dados integrais,
 PNG/SVG/PDF, tabelas LaTeX, protocolos, manifesto e hashes. GIF usa snapshots reais, sem interpolação,
 reprodução única e tempo didático. O pacote inclui a sequência PNG selecionada. Na página 3D, exporte
-a vista atual com câmera e snapshot. JSON/CSV mantêm os dados de precisão integral.</p>
+a vista atual com câmera e snapshot. JSON/CSV mantêm os dados de precisão integral. Relatórios PDF usam páginas A4 de 210 × 297 mm, texto vetorial e resolução configurável para imagens rasterizadas (padrão de 300 DPI).</p>
+<h2 id="Conceitos">Conceitos e exemplos executáveis</h2>
+<p>Em Aprender e consultar, pesquise os conceitos e abra seus detalhes. Circuitos demonstrativos abrem no editor e precisam ser executados para gerar dados; as previsões do material são analíticas e ideais. Shor e teletransporte são explicados conceitualmente: a plataforma não apresenta protocolos completos desses algoritmos como executados. Referências bibliográficas identificam as fontes; esta biblioteca não inclui links externos sem verificação.</p>
 """

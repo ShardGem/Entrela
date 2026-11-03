@@ -144,6 +144,7 @@ class GateItem(QGraphicsItem):
 
 class CircuitCanvas(QGraphicsView):
     operation_selected = Signal(int)
+    operations_selected = Signal(list)
     move_requested = Signal(int, int)
     zoom_changed = Signal(int)
 
@@ -179,14 +180,16 @@ class CircuitCanvas(QGraphicsView):
         self.setBackgroundBrush(QBrush(QColor(PALETTE.bg)))
         self.scene_model.setBackgroundBrush(QBrush(QColor(PALETTE.bg)))
         selection = self.scene_model.selectedItems()
-        index = selection[0].data(0) if selection else -1
+        indexes = [item.data(0) for item in selection]
         if self.operations:
             self.set_operations(
                 self.operations, self.num_qubits, self.offset, self.total_operations
             )
+            self.select_operations(indexes)
 
     def _selection(self):
         items = self.scene_model.selectedItems()
+        self.operations_selected.emit(sorted(item.data(0) for item in items))
         if items:
             self.operation_selected.emit(items[0].data(0))
 
@@ -252,10 +255,14 @@ class CircuitCanvas(QGraphicsView):
         self.scene_model.blockSignals(False)
 
     def select_operation(self, index):
+        self.select_operations([index])
+
+    def select_operations(self, indexes):
+        indexes = set(indexes)
         self.scene_model.blockSignals(True)
         for item in self.scene_model.items():
             if isinstance(item, GateItem):
-                chosen = item.index == index
+                chosen = item.index in indexes
                 item.setSelected(chosen)
                 if chosen:
                     self.ensureVisible(item)
