@@ -12,6 +12,18 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Estudos e documentação — 0.14
+
+- **Análises**: protocolos com pergunta, hipótese, controles e referência no TCC; revisões preservadas e reprodução com as opções registradas.
+- Mapas de calor de dois parâmetros, estabilidade ZNE com viés/variância e comparação sob orçamento equivalente de shots.
+- **Comparações**: carregar estados e curvas em segundo plano; gráficos, Bloch A/B, câmeras e snapshots sincronizados, configurações e observáveis ZNE.
+- **Documentação**: pacote ZIP com dados integrais, gráficos PNG/SVG/PDF, tabelas LaTeX, PDF, GIF e sequência PNG de snapshots reais, protocolos, manifesto de origem e hashes.
+- **Evolução 3D**: exportação da vista atual PNG/SVG/PDF com câmera e snapshot registrados.
+
+Para usar: abra uma execução, planeje o estudo em **Análises**, carregue A/B em **Comparações** e exporte em **Documentação**. O GIF usa tempo didático e nunca interpola estados.
+
+Consulte [manual, referências científicas e limites da versão 0.14](docs/evolucao-0.14.md).
+
 ## Pesquisa e experiência de uso — 0.13
 
 - Guiado mostra uma etapa por vez; Avançado reúne as categorias e oculta a navegação de etapas. Ambos preservam os mesmos parâmetros.
@@ -67,7 +79,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.13.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.14.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

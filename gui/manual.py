@@ -38,6 +38,26 @@ mas cada qubit reduzido possui pureza 1/2.</p>
 1,3,5. Não reconstrói um estado mitigado e não garante melhoria. Estimativas não são truncadas ao intervalo físico.
 Os erros padrão mostrados descrevem amostragem, não incerteza do modelo de extrapolação.</p>
 <h2 id="Reprodutibilidade">Reprodutibilidade</h2><p>O histórico guarda configuração imutável, estados complexos,
-contagens, tempos, versões e semente efetiva. Exportações JSON/ZIP podem ser importadas como cópias independentes.
+contagens, tempos, versões e semente efetiva. O JSON pode ser importado como cópia independente.
+Pacotes ZIP reúnem os arquivos; extraia o JSON do experimento para importá-lo.
 Editar o formulário não altera execuções anteriores.</p>
+<h2 id="Protocolos">Protocolos e evidências</h2>
+<p>Em Análises, registre pergunta, hipótese, controles e referência no TCC. Salvar nova revisão preserva
+o plano anterior. Carregar protocolo reabre fonte e parâmetros; Calcular análise gera outra evidência.
+A reprodução de uma análise usa as opções registradas. Documentação mostra os vínculos entre fonte,
+estudos, protocolos e referências no texto.</p>
+<h2 id="Análises">Estudos de ruído e amostragem</h2>
+<p>Mapas de calor variam dois parâmetros em até 64 pontos reais. Estabilidade ZNE investiga viés,
+variância amostral e RMSE de estimativas de Z. Orçamento equivalente distribui o mesmo total de shots
+por método; isso não iguala profundidade ou tempo. Sementes distintas caracterizam amostragem, não
+incerteza das fidelidades do ensemble. Ajustes linear e quadrático compartilham medições.</p>
+<h2 id="Comparações">Comparações lado a lado</h2>
+<p>Escolha A/B compatíveis e carregue estados e curvas em segundo plano. Bloch oferece câmeras e
+snapshots sincronizados; sem grades temporais compatíveis, exibe estados finais. Observáveis ZNE
+usam o baseline compilado do próprio ajuste. Não há estado mitigado reconstruído por extrapolação.</p>
+<h2 id="Documentação">Documentação científica</h2>
+<p>Exporte uma execução ou a comparação carregada como ZIP, PDF ou GIF. O pacote inclui dados integrais,
+PNG/SVG/PDF, tabelas LaTeX, protocolos, manifesto e hashes. GIF usa snapshots reais, sem interpolação,
+reprodução única e tempo didático. O pacote inclui a sequência PNG selecionada. Na página 3D, exporte
+a vista atual com câmera e snapshot. JSON/CSV mantêm os dados de precisão integral.</p>
 """

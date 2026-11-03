@@ -169,6 +169,11 @@ def _analysis_section(analysis):
         kind = analysis.get("kind")
         rows = analysis.get("rows", [])
         section = "<h2>Análise científica adicional</h2>"
+        if kind in ("heatmap","zne_stability","equal_budget"):
+            from core.figures import analysis_figure
+            section += _image(analysis_figure(analysis), "Estudo científico calculado")
+        if analysis.get("protocol"):
+            section += "<h3>Protocolo e referência no TCC</h3>"+_pre(analysis["protocol"])
         groups = {
             "trotter_noise": ("steps", "Passos Trotter", [("ideal_infidelity", "Trotter ideal × exato"), ("noisy_infidelity", "Ruidoso × exato")], "Infidelidade (1 − F)"),
             "convergence": ("steps", "Passos Trotter", [("infidelity", "Circuito ideal × exato")], "Infidelidade (1 − F)"),
@@ -227,6 +232,13 @@ def _analysis_section(analysis):
     return section + _fit_limitation(analysis) + "<h3>Protocolo, custos e dados do benchmark</h3>" + _pre(_report_analysis_data(analysis))
 
 
+def _bloch_image(experiment):
+    if experiment.result.final_state is None and not experiment.result.states:
+        return "<p>Estados não disponíveis neste registro.</p>"
+    from core.figures import bloch_figure
+    return _image(bloch_figure([experiment]),"Esferas de Bloch dos estados locais finais")
+
+
 def report_html(experiment, analysis=None, annotation=None):
     c, r = experiment.config, experiment.result
     if analysis and analysis.get("source_id") not in (None, experiment.id):
@@ -280,6 +292,7 @@ table{{border-collapse:collapse;width:100%;font-size:10pt}}td,th{{border-bottom:
 <p>{escape(result_interpretation(experiment)).replace(chr(10), '<br>')}</p>
 <h2>Distribuição das medições</h2>{_distribution(experiment)}
 <h2>Evolução dos estados registrados</h2>{_temporal_plot(experiment)}
+<h2>Estados locais de Bloch</h2>{_bloch_image(experiment)}
 {mitigation}{_analysis_section(analysis)}
 <h2>Convenções e limitações</h2><p>q0 fica à direita nas bitstrings. O modelo térmico educativo aplica 50 ns por porta, inclusive na preparação, sem calibração de hardware. Fidelidade ao circuito ideal não é fidelidade à evolução exata. Matrizes densidade descrevem o ensemble, enquanto contagens têm flutuação de amostragem. Pureza local baixa também pode decorrer de emaranhamento. ZNE estima um observável; não reconstrói um estado mitigado e não garante melhoria. Erros padrão cobrem amostragem sob o estimador utilizado, não viés do modelo de ruído ou da extrapolação. Repetir uma seed não constitui uma observação independente.</p>
 <h2>Configuração completa para reprodução</h2>{_pre(asdict(c))}

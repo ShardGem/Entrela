@@ -22,7 +22,7 @@ def _run_record(experiment, condition, steps):
 
 
 def trotter_noise_study(
-    experiment, steps=(1, 2, 4, 8, 16), progress=None, is_cancelled=None
+    experiment, steps=(1, 2, 4, 8, 16), progress=None, is_cancelled=None, *, seed=None
 ):
     """Compare ideal and configured-noise circuits against the same exact state.
 
@@ -45,9 +45,12 @@ def trotter_noise_study(
     ):
         raise ValueError("Use de um a dez valores inteiros distintos entre 1 e 200.")
     checkpoint(is_cancelled, progress, 0)
-    seed = experiment.result.metadata.get("effective_seed")
-    if type(seed) is not int or not 0 <= seed < 2**32:
+    if seed is None:
+        seed = experiment.result.metadata.get("effective_seed")
+    if seed is None:
         seed = config.seed if config.seed is not None else randbits(32)
+    if type(seed) is not int or not 0 <= seed < 2**32:
+        raise ValueError("Semente deve ser um inteiro entre 0 e 4294967295.")
     configs = []
     for step in steps:
         noisy = replace(
@@ -97,6 +100,7 @@ def trotter_noise_study(
         kind="trotter_noise",
         source_id=experiment.id,
         config=asdict(config),
+        options=dict(steps=steps,seed=seed),
         rows=rows,
         runs=runs,
         provenance={

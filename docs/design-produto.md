@@ -1,6 +1,6 @@
 # Entrela — especificação de experiência e design
 
-Status: visão de produto, com propostas que não representam um inventário de funcionalidades. Consulte as entregas atuais em [Evolução 0.13](evolucao-0.13.md), [Circuitos 0.12](circuitos-interativos-0.12.md) e [Evolução 0.11](evolucao-0.11.md). Projetos, varreduras e relatórios já estão disponíveis.
+Status: visão de produto, com propostas que não representam um inventário de funcionalidades. Consulte as entregas atuais em [Evolução 0.14](evolucao-0.14.md), [Evolução 0.13](evolucao-0.13.md), [Circuitos 0.12](circuitos-interativos-0.12.md) e [Evolução 0.11](evolucao-0.11.md). Projetos, varreduras e relatórios já estão disponíveis.
 
 ## Princípio de produto
 

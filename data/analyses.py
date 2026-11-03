@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 
 
-KINDS = {"temporal", "convergence", "sweep", "trotter_noise", "mitigation_benchmark"}
+KINDS = {"temporal", "convergence", "sweep", "trotter_noise", "mitigation_benchmark", "heatmap", "zne_stability", "equal_budget"}
 
 
 def validate_analysis(data, source_id=None):

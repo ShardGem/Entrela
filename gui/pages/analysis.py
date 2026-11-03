@@ -18,6 +18,7 @@ from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
+from gui.widgets.research_protocol import ProtocolPanel
 
 
 class AnalysisPage(PageBase):
@@ -34,6 +35,7 @@ class AnalysisPage(PageBase):
         self.data = None
         self.series = []
         self._running = False
+        self.replay_context=None
         self.context = QLabel("Abra uma execução para começar.")
         self.context.setWordWrap(True)
         self.body().addWidget(self.context)
@@ -47,6 +49,9 @@ class AnalysisPage(PageBase):
             ("Varredura de parâmetros", "sweep"),
             ("Trotter × ruído: estudo pareado", "trotter_noise"),
             ("Benchmark de mitigação", "mitigation_benchmark"),
+            ("Mapa de calor de dois parâmetros", "heatmap"),
+            ("Estabilidade da ZNE: viés e variância", "zne_stability"),
+            ("Comparação com orçamento equivalente", "equal_budget"),
         ]:
             self.kind.addItem(name, key)
         self.parameter = QComboBox()
@@ -69,6 +74,23 @@ class AnalysisPage(PageBase):
         self.benchmark_shots.setToolTip("Shots por fator 1, 3 e 5. Os ajustes reutilizam as mesmas medições; o custo total é informado no resultado.")
         self.help = QLabel()
         self.help.setWordWrap(True)
+        self.x_parameter=QComboBox()
+        self.y_parameter=QComboBox()
+        for widget in (self.x_parameter,self.y_parameter):
+            widget.addItems(["trotter_steps","p1","p2","t1_us","t2_us","J","h"])
+        self.y_parameter.setCurrentText("p2")
+        self.x_values=QLineEdit("1, 2, 4, 8")
+        self.y_values=QLineEdit("0, 0.02, 0.05, 0.1")
+        self.factor_sets=QLineEdit("1,3,5; 1,3,7")
+        self.factor_sets.setToolTip("Conjuntos separados por ponto e vírgula; 3 a 5 fatores ímpares entre 1 e 9, incluindo 1.")
+        self.shot_counts=QLineEdit("256, 1024")
+        self.repetitions=QSpinBox()
+        self.repetitions.setRange(2,10)
+        self.repetitions.setValue(5)
+        self.total_shots=QSpinBox()
+        self.total_shots.setRange(5,1_000_000)
+        self.total_shots.setValue(3072)
+        self.research_widgets=[self.x_parameter,self.y_parameter,self.x_values,self.y_values,self.factor_sets,self.shot_counts,self.repetitions,self.total_shots]
         for label, w in [
             ("Análise", self.kind),
             ("Parâmetro da varredura", self.parameter),
@@ -77,10 +99,18 @@ class AnalysisPage(PageBase):
             ("Passos para convergência", self.steps),
             ("Observável do benchmark", self.benchmark_qubit),
             ("Shots por fator", self.benchmark_shots),
+            ("Eixo X",self.x_parameter),("Valores X",self.x_values),
+            ("Eixo Y",self.y_parameter),("Valores Y",self.y_values),
+            ("Conjuntos de fatores ZNE",self.factor_sets),
+            ("Shots por fator a investigar",self.shot_counts),
+            ("Repetições com sementes distintas",self.repetitions),
+            ("Orçamento total de shots por método",self.total_shots),
         ]:
             form.addRow(label, w)
         self.body().addLayout(form)
         self.body().addWidget(self.help)
+        self.protocol=ProtocolPanel()
+        self.body().addWidget(self.protocol)
         self.saved = QComboBox()
         self.saved.addItem("Análises salvas desta execução", None)
         self.saved.currentIndexChanged.connect(self._open_saved)
@@ -112,7 +142,7 @@ class AnalysisPage(PageBase):
         self.table.setMinimumHeight(180)
         self.table.cellClicked.connect(self._select)
         self.body().addWidget(self.table)
-        self.export_button = SecondaryButton("Exportar CSV / JSON")
+        self.export_button = SecondaryButton("Exportar análise / figura")
         self.export_button.clicked.connect(self._export)
         self.export_button.setEnabled(False)
         self.add_action(self.export_button)
@@ -130,13 +160,22 @@ class AnalysisPage(PageBase):
             self.form.setRowVisible(w, kind == "sweep")
         self.form.setRowVisible(self.steps, kind in ("convergence", "trotter_noise"))
         for widget in (self.benchmark_qubit, self.benchmark_shots):
-            self.form.setRowVisible(widget, kind == "mitigation_benchmark")
+            self.form.setRowVisible(widget, kind == "mitigation_benchmark" or (widget is self.benchmark_qubit and kind in ("zne_stability","equal_budget")))
+        for widget in (self.x_parameter,self.y_parameter,self.x_values,self.y_values):
+            self.form.setRowVisible(widget,kind=="heatmap")
+        for widget in (self.factor_sets,self.repetitions):
+            self.form.setRowVisible(widget,kind in ("zne_stability","equal_budget"))
+        self.form.setRowVisible(self.shot_counts,kind=="zne_stability")
+        self.form.setRowVisible(self.total_shots,kind=="equal_budget")
         self.help.setText({
             "temporal": "Inspecione os estados realmente simulados. Clique na curva ou na tabela para selecionar o mesmo snapshot em 3D.",
             "convergence": "Aumentar os passos reduz o erro de aproximação em muitos casos. Esta análise desliga o ruído e compara com exp(−iHt).",
             "sweep": "Altere um parâmetro por vez. p1/p2 são intensidades despolarizadoras; T₁/T₂ são tempos em µs. Sementes afetam contagens, não a incerteza das métricas do ensemble.",
             "trotter_noise": "Compare, nos mesmos passos, a aproximação ideal e a execução com o ruído da fonte contra a evolução exata. O melhor ponto é escolhido apenas entre os valores calculados.",
             "mitigation_benchmark": "Compare sem mitigação, ZNE linear/quadrática (variantes da mesma técnica) e verificação de simetria por paridade, quando aplicável. ZNE estima ⟨Z⟩ e não reconstrói um estado: sua fidelidade fica indisponível. As medições compartilhadas e os custos são registrados.",
+            "heatmap":"Investigue dois parâmetros em até 64 pontos reais. Todos os pontos são validados antes de executar. As células exibem as coordenadas calculadas, sem interpolação física.",
+            "zne_stability":"Varie fatores e shots com repetições amostradas independentes. Viés, variância amostral e RMSE são do estimador de Z contra a referência ideal, não da fidelidade do ensemble.",
+            "equal_budget":"Sem mitigação e ZNE dispõem do mesmo total de shots por repetição. O orçamento da ZNE é dividido entre fatores; os ajustes compartilham amostras. Isso não iguala profundidade nem tempo de execução.",
         }.get(kind, ""))
 
     def load_experiment(self, experiment):
@@ -189,27 +228,54 @@ class AnalysisPage(PageBase):
 
     def _request(self):
         try:
-            kind = self.kind.currentData()
-            options = {}
-            if kind in ("convergence", "trotter_noise"):
-                options = {
-                    "steps": [int(x.strip()) for x in self.steps.text().split(",")]
-                }
-            elif kind == "mitigation_benchmark":
-                options = {"qubit": self.benchmark_qubit.value(), "shots": self.benchmark_shots.value()}
-            elif kind == "sweep":
-                options = {
-                    "parameter": self.parameter.currentText(),
-                    "values": [float(x.strip()) for x in self.values.text().split(",")],
-                    "seeds": [int(x.strip()) for x in self.seeds.text().split(",")]
-                    if self.seeds.text().strip()
-                    else None,
-                }
+            self.replay_context=None
+            kind,options=self.analysis_options()
             self.requested.emit(kind, options)
-        except ValueError:
-            self.message.setText(
-                "Revise os valores: use vírgula entre pontos e ponto como separador decimal."
-            )
+        except ValueError as exc:
+            self.message.setText("Revise os valores: use vírgula entre pontos, ponto decimal e ponto e vírgula entre conjuntos de fatores. "+str(exc))
+
+    def analysis_options(self):
+        kind=self.kind.currentData()
+        options={}
+        if kind in ("convergence", "trotter_noise"):
+            options = {
+                "steps": [int(x.strip()) for x in self.steps.text().split(",")]
+            }
+        elif kind == "mitigation_benchmark":
+            options = {"qubit": self.benchmark_qubit.value(), "shots": self.benchmark_shots.value()}
+        elif kind == "sweep":
+            options = {
+                "parameter": self.parameter.currentText(),
+                "values": [float(x.strip()) for x in self.values.text().split(",")],
+                "seeds": [int(x.strip()) for x in self.seeds.text().split(",")]
+                if self.seeds.text().strip()
+                else None,
+            }
+        elif kind == "heatmap":
+            options={"x_parameter":self.x_parameter.currentText(),"x_values":[float(x.strip()) for x in self.x_values.text().split(",")],
+                     "y_parameter":self.y_parameter.currentText(),"y_values":[float(x.strip()) for x in self.y_values.text().split(",")]}
+        elif kind in ("zne_stability","equal_budget"):
+            options={"factor_sets":[[int(x.strip()) for x in group.split(",")] for group in self.factor_sets.text().split(";")],
+                     "repetitions":self.repetitions.value(),"qubit":self.benchmark_qubit.value()}
+            if kind=="zne_stability":
+                options["shot_counts"]=[int(x.strip()) for x in self.shot_counts.text().split(",")]
+            else:
+                options["total_shots"]=self.total_shots.value()
+        return kind,options
+
+    def apply_options(self,kind,options):
+        self.kind.setCurrentIndex(self.kind.findData(kind))
+        for field,widget in (("steps",self.steps),("values",self.values),("seeds",self.seeds),("x_values",self.x_values),("y_values",self.y_values),("shot_counts",self.shot_counts)):
+            if options.get(field) is not None:
+                widget.setText(", ".join(str(v) for v in options[field]))
+        for field,widget in (("parameter",self.parameter),("x_parameter",self.x_parameter),("y_parameter",self.y_parameter)):
+            if field in options:
+                widget.setCurrentText(options[field])
+        for field,widget in (("qubit",self.benchmark_qubit),("shots",self.benchmark_shots),("repetitions",self.repetitions),("total_shots",self.total_shots)):
+            if field in options:
+                widget.setValue(options[field])
+        if "factor_sets" in options:
+            self.factor_sets.setText("; ".join(",".join(map(str,group)) for group in options["factor_sets"]))
 
     def show_analysis(self, data):
         self.data = data
@@ -244,13 +310,18 @@ class AnalysisPage(PageBase):
         self.series_combo.blockSignals(True)
         self.series_combo.clear()
         self.series = [k for k in rows[0] if any(type(row.get(k)) in (int, float) for row in rows)
-                       and k not in ("snapshot", "time", "steps", "order", "value", "seed")]
+                       and k not in ("snapshot", "time", "steps", "order", "value", "seed", "x", "y")]
         if data["kind"] == "trotter_noise":
             self.series.insert(0, "paired_infidelity")
         for key in self.series:
             self.series_combo.addItem(field_label(key), key)
         if data["kind"] == "mitigation_benchmark":
             self.series_combo.setCurrentIndex(max(0, self.series_combo.findData("absolute_error")))
+        if data["kind"] in ("zne_stability","equal_budget"):
+            self.series_combo.setCurrentIndex(max(0,self.series_combo.findData("rmse")))
+        if data["kind"]=="heatmap":
+            preferred="fidelity_exact" if "fidelity_exact" in self.series else "fidelity"
+            self.series_combo.setCurrentIndex(max(0,self.series_combo.findData(preferred)))
         self.series_combo.blockSignals(False)
         self._plot()
         self.export_button.setEnabled(True)
@@ -263,13 +334,19 @@ class AnalysisPage(PageBase):
             self.message.setText("Abra a execução de origem antes de reproduzir esta análise.")
             return
         data, options = self.data, {}
+        from copy import deepcopy
+        self.replay_context=deepcopy(data.get("protocol",{}))
         kind = data["kind"]
         if kind in ("convergence", "trotter_noise"):
             options = {"steps": [row["steps"] for row in data["rows"]]}
+            if kind=="trotter_noise":
+                options["seed"]=data.get("options",{}).get("seed",data.get("provenance",{}).get("source_effective_seed"))
         elif kind == "sweep":
             options = {"parameter": data["parameter"], "values": list(dict.fromkeys(row["value"] for row in data["rows"])), "seeds": data["seeds"]}
         elif kind == "mitigation_benchmark":
             options = {"shots": data["config"]["shots"], "qubit": data["qubit"], "scale_factors": data["scale_factors"], "seed": data["provenance"]["effective_seed"]}
+        elif kind in ("heatmap","zne_stability","equal_budget"):
+            options=data["options"]
         self.requested.emit(kind, options)
 
     def _plot(self, *_):
@@ -281,6 +358,18 @@ class AnalysisPage(PageBase):
             return
         ax = self.canvas.reset_axes()
         kind = self.data["kind"]
+        if kind in ("heatmap","zne_stability","equal_budget"):
+            from core.figures import analysis_figure
+            analysis_figure(self.data,key,self.canvas.fig)
+            self.canvas.fig.set_facecolor(PALETTE.bg)
+            for axis in self.canvas.fig.axes:
+                axis.set_facecolor(PALETTE.bg)
+                axis.tick_params(colors=PALETTE.text_muted)
+                axis.xaxis.label.set_color(PALETTE.text)
+                axis.yaxis.label.set_color(PALETTE.text)
+                axis.title.set_color(PALETTE.text)
+            self.canvas.draw_idle()
+            return
         if kind == "mitigation_benchmark":
             selected = [r for r in rows if r.get("status") == "available" and type(r.get(key)) in (int, float)]
             xs = list(range(len(selected)))
@@ -344,16 +433,22 @@ class AnalysisPage(PageBase):
         if not self.data:
             return
         path, kind = QFileDialog.getSaveFileName(
-            self, "Exportar análise", "analise.csv", "CSV (*.csv);;JSON (*.json)"
+            self, "Exportar análise", "analise", "CSV (*.csv);;JSON (*.json);;LaTeX (*.tex);;Figura PNG (*.png);;Figura SVG (*.svg);;Figura PDF (*.pdf)"
         )
         if not path:
             return
         from pathlib import Path
         if not Path(path).suffix:
-            path += ".json" if "JSON" in kind else ".csv"
+            path += next((ext for label,ext in [("JSON",".json"),("LaTeX",".tex"),("PNG",".png"),("SVG",".svg"),("PDF",".pdf")] if label in kind),".csv")
         try:
             from core.export import export_analysis
-            export_analysis(self.data, path)
+            if Path(path).suffix.lower()==".tex":
+                from core.documentation import export_latex
+                export_latex(self.data,path)
+            elif Path(path).suffix.lower() in (".png",".svg",".pdf"):
+                self.canvas.fig.savefig(path,dpi=180,bbox_inches="tight")
+            else:
+                export_analysis(self.data, path)
             self.message.setText("Análise exportada. CSV acompanha manifesto .metadata.json com configuração e proveniência." if path.lower().endswith(".csv") else "Análise completa exportada.")
         except (OSError, ValueError, TypeError) as exc:
             self.message.setText(str(exc))
@@ -375,6 +470,9 @@ class AnalysisPage(PageBase):
         self.btn_cancel.setVisible(running)
         self.btn_cancel.setEnabled(running)
         self.saved.setEnabled(not running)
+        for widget in self.research_widgets:
+            widget.setEnabled(self.experiment is not None and not running)
+        self.protocol.setEnabled(not running)
         self.replay_button.setEnabled(self.data is not None and not running)
         self.progress.setVisible(running)
         if running:
@@ -429,4 +527,14 @@ def field_label(key):
         "duration_s": "Tempo equivalente do método (s)",
         "shared_samples": "Amostras compartilhadas",
         "state_metrics_source": "Origem das métricas de estado",
+        "x":"Valor X", "y":"Valor Y", "factors":"Fatores efetivos",
+        "shots_setting":"Shots configurados", "repetitions":"Repetições independentes",
+        "mean_estimate":"Média de ⟨Z⟩", "bias":"Viés empírico", "sample_variance":"Variância amostral",
+        "mse":"Erro quadrático médio empírico", "rmse":"Raiz do erro quadrático médio",
+        "stderr_mean":"Erro padrão da média amostral", "out_of_range":"Estimativas fora de [-1,1]",
+        "mean_reported_stderr":"Erro padrão previsto médio", "mean_absolute_error":"Erro absoluto médio",
+        "shots_per_method":"Shots por método / repetição", "circuits_per_method":"Circuitos por método / repetição",
+        "degrees_of_freedom":"Graus de liberdade residuais", "acquisition_group_s":"Aquisição total do grupo (s)",
+        "mean_acquisition_s":"Aquisição média por método (s)","mean_processing_s":"Tempo médio do ajuste (s)",
+        "mean_duration_s":"Aquisição + ajuste médios (s)",
     }.get(key, key)

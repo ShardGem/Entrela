@@ -47,6 +47,7 @@ class Sidebar(QFrame):
         ("history", "Histórico"),
         ("analysis", "Análises"),
         ("library", "Projetos"),
+        ("documentation", "Documentação"),
         ("docs", "Aprender"),
         ("settings", "Configurações"),
     ]

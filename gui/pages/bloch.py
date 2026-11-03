@@ -35,12 +35,8 @@ def interpolate_statevectors(svs, steps_per_pair=20):
 
 
 def get_bloch_vector(state, qubit_index, num_qubits):
-    rho = DensityMatrix(
-        partial_trace(state, [q for q in range(num_qubits) if q != qubit_index])
-    ).data
-    return np.array(
-        [2 * rho[0, 1].real, -2 * rho[0, 1].imag, (rho[0, 0] - rho[1, 1]).real], float
-    )
+    from core.metrics import bloch_vector
+    return bloch_vector(state, qubit_index)
 
 
 def purity_from_bloch(bvec):
