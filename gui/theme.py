@@ -80,9 +80,17 @@ FONT_MONO = '"JetBrains Mono", "Cascadia Code", "Consolas", monospace'
 
 
 def build_qss() -> str:
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QFontDatabase
+    family = FONT_FAMILY
+    if QApplication.instance() is not None:
+        available = set(QFontDatabase.families())
+        chosen = next((name for name in ("Inter", "Segoe UI", "Noto Sans", "DejaVu Sans") if name in available), None)
+        if chosen:
+            family = '"' + chosen + '"'
     p = PALETTE
     return f"""
-* {{ font-family: {FONT_FAMILY}; font-size: 13px; outline: none; }}
+* {{ font-family: {family}; font-size: 13px; outline: none; }}
 
 QWidget {{ background-color: {p.bg}; color: {p.text}; }}
 QLabel#HeroTitle {{ font-size: 32px; font-weight: 600; padding: 12px 0; }}
@@ -115,7 +123,7 @@ QToolTip {{
     border: 1px solid {p.border_strong};
     border-radius: {RADIUS.sm}px;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 12px;
 }}
 
 /* ============ SIDEBAR ============ */
@@ -126,12 +134,21 @@ QFrame#Sidebar {{
 
 QLabel#SidebarLogo {{
     color: {p.text};
-    font-size: 14px;
+    font-size: 20px;
     font-weight: 600;
     letter-spacing: 0.3px;
 }}
 
+QPushButton#NavGroup {{
+    background: transparent; color: {p.text}; border: none; qproperty-iconSize: 24px 24px;
+    padding: 6px 10px; text-align: left; font-weight: 600; font-size: 13px;
+}}
+QPushButton#NavGroup:hover {{ background: {p.surface}; }}
+QPushButton#NavGroup[activeGroup="true"] {{ color: {p.primary}; background: {p.primary_faint}; }}
+QPushButton#SidebarToggle {{ background: transparent; text-align: left; padding: 6px; color: {p.text_muted}; }}
+QPushButton#NavButton[compact="true"] {{ padding: 7px 4px; text-align: center; }}
 QPushButton#NavButton {{
+    qproperty-iconSize: 22px 22px;
     background: transparent;
     color: {p.text_muted};
     border: none;
@@ -149,8 +166,9 @@ QPushButton#NavButton:hover {{
 }}
 
 QPushButton#NavButton:checked {{
-    background-color: {p.surface_active};
-    color: {p.text};
+    background-color: {p.primary_muted};
+    color: {p.primary};
+    border-left: 3px solid {p.primary};
 }}
 
 /* ============ TOPBAR ============ */
@@ -167,7 +185,7 @@ QLabel#TopbarTitle {{
 
 QLabel#TopbarBreadcrumb {{
     color: {p.text_dim};
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.4px;
 }}
@@ -200,7 +218,7 @@ QLabel#SectionTitle {{
 
 QLabel#SectionSubtitle {{
     color: {p.text_muted};
-    font-size: 11px;
+    font-size: 12px;
 }}
 
 QLabel#MetricValue {{
@@ -213,7 +231,7 @@ QLabel#MetricValue {{
 
 QLabel#MetricLabel {{
     color: {p.text_dim};
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.6px;
 }}
@@ -228,7 +246,7 @@ QPushButton {{
     font-size: 13px;
     font-weight: 500;
     min-height: 20px;
-    qproperty-iconSize: 16px 16px;
+    qproperty-iconSize: 20px 20px;
 }}
 
 QPushButton:hover {{
@@ -384,7 +402,7 @@ QLabel {{ color: {p.text}; background: transparent; }}
 
 QLabel#FieldLabel {{
     color: {p.text_muted};
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
 }}
 
@@ -445,7 +463,7 @@ QStatusBar {{
     background-color: {p.bg};
     color: {p.text_dim};
     border-top: 1px solid {p.border};
-    font-size: 11px;
+    font-size: 12px;
 }}
 
 QTableWidget, QTableView {{
@@ -465,7 +483,7 @@ QHeaderView::section {{
     border: none;
     border-bottom: 1px solid {p.border};
     padding: 10px 14px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.4px;
 }}

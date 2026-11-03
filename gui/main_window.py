@@ -218,6 +218,7 @@ class MainWindow(QMainWindow):
         self.tutorial_dock.visibilityChanged.connect(self._tutorial_visibility)
 
     def _wire_signals(self):
+        self.sidebar.compact_requested.connect(self._toggle_sidebar)
         self.sidebar.navigate.connect(self._show_page)
         self.topbar.help_requested.connect(lambda: self._show_help("Início"))
         self.topbar.commands_requested.connect(self._open_commands)
@@ -300,8 +301,8 @@ class MainWindow(QMainWindow):
             ("mode:advanced", "Usar modo Avançado", "parâmetros"),
         ]
         commands += [
-            ("page:" + key, "Abrir " + title, "navegar")
-            for key, (title, _) in PAGE_META.items()
+            ("page:" + key, "Abrir " + dict(Sidebar.ITEMS).get(key,title), "navegar "+title+" "+description)
+            for key, (title, description) in PAGE_META.items()
         ]
         commands += [
             ("example:" + e.id, "Exemplo: " + e.title, e.description) for e in EXAMPLES
@@ -371,7 +372,8 @@ class MainWindow(QMainWindow):
         self._current_page = key
         self.stack.setCurrentWidget(self.pages[key])
         self.sidebar.set_active(key)
-        self.topbar.set_context(*PAGE_META[key])
+        group=next((title for _,title,_,items in Sidebar.GROUPS if key in items),"Aplicativo")
+        self.topbar.set_context(dict(Sidebar.ITEMS).get(key,PAGE_META[key][0]),group+" · Entrela")
         self._update_tutorial()
 
     def _restore_workspace(self):
@@ -1194,9 +1196,14 @@ class MainWindow(QMainWindow):
         theme = self.settings.value("appearance/theme", "dark")
         page.theme.setCurrentIndex(max(0, page.theme.findData(theme)))
         try:
-            page.font_size.setValue(int(self.settings.value("appearance/font", 13)))
+            font_size=int(self.settings.value("appearance/font",15))
+            if not self.settings.value('appearance/readability_v1',False,type=bool):
+                if font_size==13:
+                    font_size=15
+                self.settings.setValue('appearance/readability_v1',True)
+            page.font_size.setValue(font_size)
         except (ValueError, TypeError):
-            page.font_size.setValue(13)
+            page.font_size.setValue(15)
         page.presentation.setChecked(
             self.settings.value("appearance/presentation", False, type=bool)
         )
@@ -1295,10 +1302,15 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "page_settings"):
             return
         self.sidebar.set_compact(
-            self.width() < 1250
+            (self.width() < 1150 and not getattr(self,'_sidebar_explicitly_expanded',False))
             or self.page_settings.compact.isChecked()
             or self.page_settings.presentation.isChecked()
         )
+
+    def _toggle_sidebar(self,compact):
+        self._sidebar_explicitly_expanded=not compact
+        self.page_settings.compact.setChecked(compact)
+        self._adaptive_sidebar()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

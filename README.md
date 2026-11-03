@@ -12,6 +12,14 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Ctrl+K para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Interface e navegação — 0.15
+
+Navegação em quatro grupos recolhíveis: **Começar**, **Laboratório**, **Pesquisa** e **Organização**. O grupo da página ativa abre automaticamente, inclusive ao navegar por comandos ou tutoriais. Preferências ficam no rodapé. A barra pode ser expandida ou recolhida pelo botão do menu.
+
+Fonte padrão maior, áreas de clique ampliadas e ícones SVG vetoriais adaptados à escala da tela. O antigo padrão de 13 px migra uma vez para 15 px; preferências manuais diferentes são mantidas. O tamanho continua ajustável em Preferências.
+
+Veja [detalhes e capturas da interface 0.15](docs/interface-0.15.md).
+
 ## Estudos e documentação — 0.14
 
 - **Análises**: protocolos com pergunta, hipótese, controles e referência no TCC; revisões preservadas e reprodução com as opções registradas.
@@ -79,7 +87,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.14.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.15.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

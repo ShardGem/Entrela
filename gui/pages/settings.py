@@ -26,7 +26,7 @@ class SettingsPage(PageBase):
         self.theme.addItem("Claro", "light")
         self.font_size = QSpinBox()
         self.font_size.setRange(11, 20)
-        self.font_size.setValue(13)
+        self.font_size.setValue(15)
         self.presentation = QCheckBox(
             "Modo apresentação: fonte maior e navegação compacta (F11)"
         )

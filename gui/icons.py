@@ -4,11 +4,14 @@ from __future__ import annotations
 from functools import lru_cache
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
-from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtGui import QIcon, QIconEngine, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 
 _BODIES = {
+    "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    "search": '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+    "help": '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
     "documentation": '<path d="M6 3h9l4 4v14H6V3zM15 3v5h4M9 12h7M9 16h7"/>',
     "undo": '<path d="M3 7h11a6 6 0 1 1 0 12M3 7l5-5M3 7l5 5"/>',
     "redo": '<path d="M21 7H10a6 6 0 1 0 0 12M21 7l-5-5M21 7l-5 5"/>',
@@ -82,6 +85,43 @@ _BODIES = {
     "close": '<path d="M6 6l12 12M6 18L18 6"/>',
 }
 
+_BODIES.update({
+    "examples": '<path d="M3 4h7a3 3 0 0 1 2 1 3 3 0 0 1 2-1h7v15h-7a3 3 0 0 0-2 1 3 3 0 0 0-2-1H3V4zM12 5v15M6 8h3M15 8h3M6 12h3M15 12h3"/>',
+    "comparison": '<rect x="3" y="4" width="7" height="16" rx="2"/><rect x="14" y="4" width="7" height="16" rx="2"/><path d="M5 15l2-5 1 2M16 14l2-5 1 3"/>',
+    "documentation": '<path d="M7 3h8l4 4v13H7V3zM15 3v5h4M4 7v15h12M10 12h6M10 16h4"/>',
+    "mitigation": '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3zM8 12l3 3 5-6"/>',
+})
+
+
+class _SvgEngine(QIconEngine):
+    """Render vector paths at the destination DPR instead of stretching pixels."""
+    def __init__(self,svg):
+        super().__init__()
+        self.svg=svg
+
+    def clone(self):
+        return _SvgEngine(self.svg)
+
+    def paint(self,painter,rect,mode,state):
+        QSvgRenderer(QByteArray(self.svg.encode('utf-8'))).render(painter,QRectF(rect))
+
+    def pixmap(self,size,mode,state):
+        result=QPixmap(size)
+        result.fill(Qt.transparent)
+        painter=QPainter(result)
+        self.paint(painter,result.rect(),mode,state)
+        painter.end()
+        return result
+
+    def scaledPixmap(self,size,mode,state,scale):
+        result=QPixmap(max(1,round(size.width()*scale)),max(1,round(size.height()*scale)))
+        result.setDevicePixelRatio(scale)
+        result.fill(Qt.transparent)
+        painter=QPainter(result)
+        QSvgRenderer(QByteArray(self.svg.encode('utf-8'))).render(painter,QRectF(0,0,size.width(),size.height()))
+        painter.end()
+        return result
+
 
 @lru_cache(maxsize=256)
 def _build_svg(name: str, color: str) -> str:
@@ -119,4 +159,4 @@ def get_pixmap(name: str, color: str = "#8b8b90", size: int = 20) -> QPixmap:
 def get_icon(name: str, color: str = "#8b8b90", size: int = 20) -> QIcon:
     if name not in _BODIES:
         return QIcon()
-    return QIcon(get_pixmap(name, color, size))
+    return QIcon(_SvgEngine(_build_svg(name,color)))

@@ -255,6 +255,9 @@ class SimulationPage(PageBase):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "splitter"):
+            vertical=self.width()<860
             self.splitter.setOrientation(
-                Qt.Vertical if self.width() < 950 else Qt.Horizontal
+                Qt.Vertical if vertical else Qt.Horizontal
             )
+            self.splitter.widget(0).setMinimumHeight(480 if vertical else 420)
+            self.summary_scroll.setMinimumHeight(300 if vertical else 0)

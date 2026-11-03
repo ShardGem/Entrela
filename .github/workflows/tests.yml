@@ -44,4 +44,4 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           python -m pip wheel --no-deps . -w dist
-          python scripts/package_smoke.py dist/entrela-0.14.0-py3-none-any.whl
+          python scripts/package_smoke.py dist/entrela-0.15.0-py3-none-any.whl

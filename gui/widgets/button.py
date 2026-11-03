@@ -13,10 +13,11 @@ class _BaseButton(QPushButton):
         super().__init__(text, parent)
         self.setCursor(Qt.PointingHandCursor)
         self._icon_name = icon
-        self.setIconSize(QSize(16, 16))
+        self.setMinimumHeight(38)
+        self.setIconSize(QSize(20, 20))
         if icon:
             self.setIcon(get_icon(icon, color=self._icon_color(), size=16))
-            self.setIconSize(QSize(16, 16))
+            self.setIconSize(QSize(20, 20))
 
     def _icon_color(self) -> str:
         return PALETTE.text
