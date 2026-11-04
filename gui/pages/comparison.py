@@ -41,6 +41,12 @@ class ComparisonPage(PageBase):
         row.addWidget(QLabel("B"))
         row.addWidget(self.second_run)
         self.body().addLayout(row)
+        self.comparison_mode = QComboBox()
+        self.comparison_mode.addItem("Comparação controlada · mesmo circuito e protocolo","controlled")
+        self.comparison_mode.addItem("Convergência · variar passos ou ordem de Trotter","trotter")
+        self.comparison_mode.setAccessibleName("Critério científico da comparação")
+        self.body().addWidget(self.comparison_mode)
+        self.comparison_mode.currentIndexChanged.connect(self._compare)
         self.message = QLabel("São necessárias duas execuções.")
         self.message.setWordWrap(True)
         self.body().addWidget(self.message)
@@ -92,6 +98,7 @@ class ComparisonPage(PageBase):
         self.scenes=[BlochCanvas(),BlochCanvas()]
         self.scene_labels=[]
         for i,scene in enumerate(self.scenes):
+            scene.focus_changed.connect(self._scene_focus_changed)
             pane=QWidget()
             pane_layout=QVBoxLayout(pane)
             pane_layout.setContentsMargins(0,0,0,0)
@@ -185,7 +192,7 @@ class ComparisonPage(PageBase):
         error = (
             "São necessárias duas execuções."
             if a is None or b is None
-            else incompatibility(a, b)
+            else incompatibility(a, b, mode=self.comparison_mode.currentData())
         )
         if error:
             self._placeholder(self.observable_canvas, "A comparação precisa de duas execuções compatíveis.")
@@ -197,6 +204,8 @@ class ComparisonPage(PageBase):
             return
         note = "Comparação compatível. Distribuições normalizadas pelo número observado de medições. "
         note += f"A: {a.config.shots} shots / {a.duration_s:.4g} s · B: {b.config.shots} shots / {b.duration_s:.4g} s. "
+        if self.comparison_mode.currentData() == "trotter":
+            note += "As curvas comparam com a evolução exata do Hamiltoniano. Grades temporais diferentes não são interpoladas. "
         if a.result.mitigation or b.result.mitigation:
             note += " Os registros ZNE mantêm as métricas da simulação de origem; não são estados mitigados."
         self.message.setText(note)
@@ -263,7 +272,7 @@ class ComparisonPage(PageBase):
             ax.set_ylabel("Frequência observada")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
         self.canvas.draw()
-        if previous and tuple(e.id for e in previous["experiments"])==(a.id,b.id):
+        if previous and previous.get("mode","controlled") == self.comparison_mode.currentData() and tuple(e.id for e in previous["experiments"])==(a.id,b.id):
             self.full_data=previous
             self.set_full_data(previous)
         elif self.tabs.currentIndex() in (1, 2) and not self._suppress_load:
@@ -271,7 +280,7 @@ class ComparisonPage(PageBase):
 
     def set_full_data(self,data):
         identifiers=tuple(e.id for e in data["experiments"])
-        if identifiers!=(self.first_run.currentData(),self.second_run.currentData()):
+        if identifiers!=(self.first_run.currentData(),self.second_run.currentData()) or data.get("mode","controlled") != self.comparison_mode.currentData():
             return
         self.full_data=data
         self._requested_pair = None
@@ -302,7 +311,8 @@ class ComparisonPage(PageBase):
         self.play.setEnabled(data["synchronous"])
         self.btn_document.setEnabled(not self._running)
         self.curve_canvas.fig.clear()
-        for index,key in enumerate(("fidelity","purity","energy")):
+        fidelity_key = "fidelity_exact" if data.get("mode") == "trotter" else "fidelity"
+        for index,key in enumerate((fidelity_key,"purity","energy")):
             ax=self.curve_canvas.fig.add_subplot(3,1,index+1)
             style_axes(ax)
             for run,rows in enumerate(data["curves"]):
@@ -312,7 +322,7 @@ class ComparisonPage(PageBase):
                 points=[r for r in rows if r[key] is not None]
                 if points:
                     ax.plot([r["time"] for r in points],[r[key] for r in points],label="AB"[run],color=PALETTE.primary if run==0 else PALETTE.q2)
-            ax.set_ylabel({"fidelity":"F ao circuito ideal","purity":"Pureza","energy":"Energia"}[key])
+            ax.set_ylabel({"fidelity_exact":"F à evolução exata","fidelity":"F ao circuito ideal","purity":"Pureza","energy":"Energia"}[key])
             if not ax.lines:
                 ax.text(.5, .5, "Métrica indisponível para estes registros.", ha="center", va="center", transform=ax.transAxes, color=PALETTE.text_muted)
             if ax.lines:
@@ -346,12 +356,13 @@ class ComparisonPage(PageBase):
 
     def _request_prepare(self):
         a, b = self.records.get(self.first_run.currentData()), self.records.get(self.second_run.currentData())
-        if a is None or b is None or incompatibility(a, b):
+        if a is None or b is None or incompatibility(a, b, mode=self.comparison_mode.currentData()):
             return
         pair = (a.id, b.id)
-        if pair == self._requested_pair:
+        request_key = (*pair,self.comparison_mode.currentData())
+        if request_key == self._requested_pair:
             return
-        self._requested_pair = pair
+        self._requested_pair = request_key
         self.frame_label.setText("Carregando os estados selecionados…")
         self._placeholder(self.curve_canvas, "Preparando as curvas dos registros selecionados…")
         self.prepare_requested.emit(*pair)
@@ -378,6 +389,21 @@ class ComparisonPage(PageBase):
         for scene in self.scenes:
             scene.set_focus(self.focus.currentData() if self.focus.currentData() is not None else -1)
 
+    def _scene_focus_changed(self, index):
+        if getattr(self, "_syncing_focus", False):
+            return
+        self._syncing_focus = True
+        try:
+            blocker = QSignalBlocker(self.focus)
+            self.focus.setCurrentIndex(max(0, self.focus.findData(index)))
+            del blocker
+            self._desired_focus = index
+            for scene in self.scenes:
+                if scene.focus != index:
+                    scene.set_focus(index)
+        finally:
+            self._syncing_focus = False
+
     def _play(self):
         if self.timer.isActive():
             self.timer.stop()
@@ -401,12 +427,14 @@ class ComparisonPage(PageBase):
             "tab": self.tabs.currentIndex(),
             "camera_sync": self.camera_sync.isChecked(),
             "focus": self._desired_focus,
+            "comparison_mode": self.comparison_mode.currentData(),
         }
 
     def apply_view_preferences(self, values):
         if not isinstance(values, dict):
             return
-        blockers = [QSignalBlocker(widget) for widget in (self.hist_layout, self.tabs, self.camera_sync, self.focus)]
+        blockers = [QSignalBlocker(widget) for widget in (self.hist_layout, self.tabs, self.camera_sync, self.focus,self.comparison_mode)]
+        self.comparison_mode.setCurrentIndex(max(0,self.comparison_mode.findData(values.get("comparison_mode","controlled"))))
         for key, widget in (("hist_layout", self.hist_layout), ("tab", self.tabs)):
             index = values.get(key, 0)
             if isinstance(index, int) and not isinstance(index, bool) and 0 <= index < widget.count():

@@ -12,6 +12,17 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Consolidação e recuperação — 0.17
+
+- Foco 3D pode ser desfeito com outro clique, pelo botão de foco ou por **Restaurar câmera**; até quatro qubits por linha.
+- Recuperação automática de circuito, formulário, anotações e protocolo; até dez rascunhos anteriores do editor.
+- Importação de estudos ZIP com hashes verificados, vínculos restaurados e cópias independentes dos registros.
+- **Reexecutar** e **Reproduzir ZNE** registram verificação numérica, separada da igualdade de contagens.
+- Durações térmicas configuráveis para portas 1q/2q; arquivos anteriores preservam o padrão de 50 ns.
+- Comparação de passos/ordem Trotter com referência exata, mantida na exportação e importação.
+
+Veja o [guia da versão 0.17, limites e próximos passos](docs/evolucao-0.17.md).
+
 ## Plataforma científica — 0.16
 
 - Nome e descrição na criação; objetivo, hipótese, metodologia, categorias e notas no caderno do experimento.
@@ -100,7 +111,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.16.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.17.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

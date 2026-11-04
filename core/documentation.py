@@ -186,7 +186,13 @@ def _bloch_csv(experiment, filepath):
 
 
 def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=None, is_cancelled=None,
-               *, options=None, raster_dpi=300):
+               *, options=None, raster_dpi=300, comparison_mode="controlled"):
+    if comparison_mode not in ("controlled","trotter"):
+        raise ValueError("Modo de comparação desconhecido")
+    if comparison_mode == "trotter":
+        from core.comparison import incompatibility
+        if len(experiments) != 2 or incompatibility(*experiments,mode="trotter"):
+            raise ValueError("A comparação Trotter exige duas evoluções do mesmo sistema e tempo total")
     if not 1 <= len(experiments) <= 2:
         raise ValueError("Selecione uma ou duas execuções para o PDF.")
     ids={e.id for e in experiments}
@@ -234,7 +240,7 @@ def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=No
                     for i,e in enumerate(experiments):
                         page(temporal_figure([e]),"Evolução · "+"AB"[i]+" · eixos incompatíveis exibidos separadamente")
                 else:
-                    page(temporal_figure(experiments),"Evolução dos snapshots registrados")
+                    page(temporal_figure(experiments,reference="exact" if comparison_mode == "trotter" else "circuit"),"Evolução dos snapshots registrados")
             if any(e.result.mitigation for e in experiments):
                 page(zne_comparison_figure(experiments),"Mitigação de observáveis ZNE")
             if selected.include_bloch and all(e.result.final_state is not None or e.result.states for e in experiments):
@@ -275,7 +281,7 @@ def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=No
 
 def export_documentation(experiments, filepath, analyses=(), annotations=None, protocols=(),
                          include_gif=True, max_frames=40, frame_ms=350, progress=None, is_cancelled=None,
-                         *, report_options=None, raster_dpi=300):
+                         *, report_options=None, raster_dpi=300, comparison_mode="controlled"):
     if not 1 <= len(experiments) <= 2:
         raise ValueError("Escolha uma ou duas execuções.")
     ids={e.id for e in experiments}
@@ -310,7 +316,7 @@ def export_documentation(experiments, filepath, analyses=(), annotations=None, p
         if len(experiments)==2:
             _save_formats(histogram_figure(experiments,side_by_side=True),folder,"comparison_distributions",raster_dpi)
             if len({bool(e.config.circuit) for e in experiments}) == 1:
-                _save_formats(temporal_figure(experiments),folder,"comparison_temporal",raster_dpi)
+                _save_formats(temporal_figure(experiments,reference="exact" if comparison_mode == "trotter" else "circuit"),folder,"comparison_temporal",raster_dpi)
             else:
                 omissions.append("Curvas temporais sobrepostas: índice da porta e tempo de evolução são eixos incompatíveis; consulte as figuras individuais.")
             if all(e.result.states or e.result.final_state is not None for e in experiments):
@@ -332,7 +338,11 @@ Cada run_<id>/experiment.json contém os estados completos; results.csv inclui
 configuração e proveniência. bloch.csv contém coordenadas e pureza local reais.
 As análises incluem JSON integral, CSV + manifesto, LaTeX e figuras PNG/SVG/PDF.
 Use as versões registradas nos metadados; seeds não garantem identidade entre
-versões/plataformas. Importar um experimento no aplicativo cria uma cópia com ID novo.
+versões/plataformas. Em Documentação, use Importar estudo ZIP para verificar hashes
+e recuperar fontes, análises, protocolos e anotações como cópias independentes.
+O pacote original e o mapeamento de identificadores permanecem preservados.
+Reexecutar compara numericamente o estado e as métricas com a execução importada;
+igualdade de contagens é informada separadamente.
 
 Para reproduzir uma simulação por Python, com o Entrela instalado:
 
@@ -354,7 +364,7 @@ GIFs usam somente os snapshots indicados no comentário JSON embutido, reproduç
 única e duração didática. Diagramas são prévias; as operações completas estão no JSON.
 """)
         export_pdf(experiments,folder/"report.pdf",analyses,annotations,is_cancelled=is_cancelled,
-                   options=report_options,raster_dpi=raster_dpi)
+                   options=report_options,raster_dpi=raster_dpi,comparison_mode=comparison_mode)
         checkpoint(is_cancelled,progress,65)
         animation=None
         if include_gif:
@@ -367,6 +377,7 @@ GIFs usam somente os snapshots indicados no comentário JSON embutido, reproduç
                     progress=lambda p: progress(65+int(.3*p)) if progress else None,is_cancelled=is_cancelled,
                     frames_directory=folder/"frames")
         manifest=dict(schema_version=1,kind="documentation",entrela_version=__version__,
+                      comparison_mode=comparison_mode,comparison_reference="exact" if comparison_mode == "trotter" else "circuit",
                       created_at=datetime.now(timezone.utc).isoformat(),source_ids=[e.id for e in experiments],
                       annotations=annotations or {},animation=animation,omissions=omissions,
                       report_options=asdict(__import__("core.pdf_layout",fromlist=["report_options"]).report_options(report_options)),raster_dpi=raster_dpi,

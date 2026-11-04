@@ -184,6 +184,10 @@ class ConfigPanel(QWidget):
         spin("spin_p2", "Despolarização 2q", "noise", 0.0, 1.0, 0.05, step=0.01)
         spin("spin_t1", "T₁", "noise", 0.001, 1000.0, 50.0, suffix=" µs")
         spin("spin_t2", "T₂", "noise", 0.001, 2000.0, 30.0, suffix=" µs")
+        spin("spin_gate1", "Duração de porta 1q", "noise", 0.001, 1e6, 50.0, suffix=" ns")
+        spin("spin_gate2", "Duração de porta 2q", "noise", 0.001, 1e6, 50.0, suffix=" ns")
+        for field in (self.spin_gate1,self.spin_gate2):
+            field.setToolTip("Tempo de exposição ao canal T₁/T₂ por operação nativa. É uma hipótese do modelo, independente do tempo adimensional do Hamiltoniano e de calibração de hardware.")
         self.validation_message = QLabel()
         self.validation_message.setWordWrap(True)
         forms["noise"].addRow(self.validation_message)
@@ -305,6 +309,8 @@ class ConfigPanel(QWidget):
             self.spin_p2.value(),
             self.spin_t1.value(),
             self.spin_t2.value(),
+            self.spin_gate1.value(),
+            self.spin_gate2.value(),
         )
 
     def _changed(self, *_):
@@ -321,7 +327,7 @@ class ConfigPanel(QWidget):
         self.spin_h.setEnabled(self.combo_ham.currentText() in ("Ising", "Custom"))
         noise = self._noise_config()
         thermal = noise.enabled and noise.kind == "Termico"
-        for widget in (self.spin_t1, self.spin_t2):
+        for widget in (self.spin_t1, self.spin_t2, self.spin_gate1, self.spin_gate2):
             widget.setEnabled(thermal)
         for widget in (self.spin_p1, self.spin_p2):
             widget.setEnabled(noise.enabled and not thermal)
@@ -382,6 +388,8 @@ class ConfigPanel(QWidget):
             (self.spin_p2, config.noise.p2),
             (self.spin_t1, config.noise.t1_us),
             (self.spin_t2, config.noise.t2_us),
+            (self.spin_gate1, config.noise.gate_time_1q_ns),
+            (self.spin_gate2, config.noise.gate_time_2q_ns),
         ]:
             widget.setRange(min(widget.minimum(), value), max(widget.maximum(), value))
             widget.setValue(value)
@@ -442,6 +450,8 @@ class ConfigPanel(QWidget):
             "p2": self.spin_p2.value(),
             "t1": self.spin_t1.value(),
             "t2": self.spin_t2.value(),
+            "gate1": self.spin_gate1.value(),
+            "gate2": self.spin_gate2.value(),
             "shots": self.spin_shots.value(),
             "seed": self.input_seed.text(),
         }

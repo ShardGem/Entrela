@@ -160,7 +160,7 @@ CONCEPTS = (
         "Perda de pureza local sempre significa ruído?",
         "Não. Um subsistema de Bell ideal já é misto por emaranhamento; examine também o estado global e a referência ideal.",
         demonstration=_circuit(1, ("h", (0,)), ("id", (0,)), ("id", (0,)), ("id", (0,))),
-        demonstration_note="Ative o ruído no editor para fazer a comparação. O modelo térmico usa 50 ns por porta como duração educativa, sem calibração de hardware.",
+        demonstration_note="Ative o ruído no editor para fazer a comparação. O modelo térmico usa durações assumidas por operação (padrão: 50 ns para portas 1q e 2q), configuráveis e sem calibração de hardware.",
     ),
     LearningConcept(
         "interferencia", "Interferência", "Estados e visualização",

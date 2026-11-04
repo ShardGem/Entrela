@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -13,6 +13,7 @@ from gui.widgets.card import MetricCard
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.tabs.results_tab import ResultsTab
 from core.export import result_interpretation
+from core.reproduction import scientific_context
 from data.workspace import experiment_title
 from gui.widgets.data_table import configure_table
 import json, numpy as np
@@ -34,7 +35,7 @@ class ResultsPage(PageBase):
         self.details.setWordWrap(True)
         self.body().addWidget(self.details)
         grid = QGridLayout()
-        self.card_fid = MetricCard("Fidelidade ao ideal")
+        self.card_fid = MetricCard("Fidelidade ao circuito sem ruído")
         self.card_pur = MetricCard("Pureza global")
         self.card_erg = MetricCard("Energia ⟨H⟩")
         self.card_err = MetricCard("Infidelidade (1−F)")
@@ -42,8 +43,15 @@ class ResultsPage(PageBase):
             [self.card_fid, self.card_pur, self.card_erg, self.card_err]
         ):
             grid.addWidget(card, i // 2, i % 2)
-            grid.setColumnStretch(i, 1)
+            grid.setColumnStretch(i % 2, 1)
         self.body().addLayout(grid)
+        self.science_note = QLabel()
+        self.science_note.setWordWrap(True)
+        self.science_note.setTextFormat(Qt.PlainText)
+        self.body().addWidget(self.science_note)
+        self.reproduction_status = QLabel()
+        self.reproduction_status.setWordWrap(True)
+        self.body().addWidget(self.reproduction_status)
         self.tabs = QTabWidget()
         self.results_tab = ResultsTab()
         self.interpretation = QLabel("A interpretação aparecerá após uma execução.")
@@ -93,6 +101,19 @@ class ResultsPage(PageBase):
     def _update_details(self):
         experiment = self._experiment
         r, c = experiment.result, experiment.config
+        context = scientific_context(experiment)
+        self.science_note.setText("\n".join(line for line in context.splitlines() if line.startswith(("Referência", "Hipóteses", "ZNE"))))
+        self.science_note.setToolTip(context)
+        check = r.metadata.get("reproduction_check")
+        status_text = ""
+        if check:
+            subject = "Reprodução da ZNE" if check.get("kind") == "zne" else "Reprodução"
+            detail = {"matched":"numericamente compatível dentro da tolerância registrada.",
+                      "different":"com diferenças; consulte Reprodutibilidade.",
+                      "unavailable":"sem dados suficientes na origem para verificação."}.get(check.get("status"),"sem verificação disponível.")
+            status_text = subject + " " + detail + (" Contagens idênticas." if check.get("counts_match") else " Contagens não idênticas; a verificação numérica é informada separadamente.")
+        self.reproduction_status.setText(status_text)
+        self.reproduction_status.setVisible(bool(check))
         self.details.setText(
             f"{self._display_title} · {'Circuito livre' if c.circuit is not None else c.system.hamiltonian} · {c.system.num_qubits} qubits · "
             f"{c.shots} shots · {experiment.duration_s:.3f} s · profundidade {r.circuit_depth}\n"
@@ -113,7 +134,7 @@ class ResultsPage(PageBase):
             r.times,
             "Índice da porta" if c.circuit is not None else "Tempo (adimensional, ℏ=1)",
         )
-        self.interpretation.setText(result_interpretation(experiment))
+        self.interpretation.setText(result_interpretation(experiment) + "\n\n" + scientific_context(experiment))
         self.table.setRowCount(2**c.system.num_qubits)
         probabilities = (
             r.final_state.probabilities() if r.final_state is not None else None

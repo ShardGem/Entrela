@@ -55,6 +55,7 @@ class MetricCard(QFrame):
         layout.setSpacing(6)
 
         self._label = QLabel(label.upper())
+        self._label.setWordWrap(True)
         self._label.setObjectName("MetricLabel")
 
         value_row = QHBoxLayout()

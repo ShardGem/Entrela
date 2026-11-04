@@ -44,7 +44,12 @@ assert window.repository.load(custom.id).config.circuit==custom.config.circuit
 window.page_circuit.show_experiment(custom)
 window.page_circuit._copy_to_editor()
 assert window.page_circuit.editor.document==custom.config.circuit
-window.close();splash.close();app.processEvents()
+window.page_circuit.editor.circuit_name.setText('Recovered packaged circuit')
+window.close();app.processEvents()
+reopened=MainWindow(window.repository,window.settings)
+assert reopened.page_circuit.editor.document==custom.config.circuit
+assert reopened.page_circuit.editor.circuit_name.text()=='Recovered packaged circuit'
+reopened.close();splash.close();app.processEvents()
 print('PASS: isolated wheel, packaged assets, Qt window, scientific engine and persistence')
 """
 

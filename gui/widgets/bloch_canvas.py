@@ -13,7 +13,9 @@ from gui.widgets.bloch_projection import BlochAxes3D
 
 class BlochCanvas(StableFigureCanvas):
     camera_changed = Signal()
+    focus_changed = Signal(int)
     qubit_selected = Signal(int)
+    MAX_QUBITS_PER_ROW = 4
     MIN_ZOOM = 0.5
     MAX_ZOOM = 3.0
 
@@ -46,7 +48,8 @@ class BlochCanvas(StableFigureCanvas):
         self.mpl_connect("button_release_event", self._end_drag)
         self.mpl_connect("figure_leave_event", self._end_drag)
         self.setToolTip(
-            "Roda: zoom · arrastar com botão esquerdo: girar · botão central: mover"
+            "Roda: zoom · arrastar com botão esquerdo: girar · botão central: mover. "
+            "Clique na esfera em foco para mostrar todos os qubits; Restaurar câmera também desfoca."
         )
 
     def _configure_axes(self):
@@ -62,7 +65,7 @@ class BlochCanvas(StableFigureCanvas):
         self.selected_qubit = -1
         self.ax.clear()
         self._configure_axes()
-        columns = min(3, num_qubits)
+        columns = min(self.MAX_QUBITS_PER_ROW, num_qubits)
         rows = int(np.ceil(num_qubits / columns))
         self._sphere_centers = [
             (
@@ -280,6 +283,9 @@ class BlochCanvas(StableFigureCanvas):
             if distance <= 6 * self.device_pixel_ratio:
                 qubit = self.pick_qubit(event.x, event.y)
                 if qubit is not None:
+                    if qubit == self.focus:
+                        self.set_focus(-1)
+                        return
                     self.select_qubit(qubit)
                     self.qubit_selected.emit(qubit)
 
@@ -333,9 +339,11 @@ class BlochCanvas(StableFigureCanvas):
 
     def set_focus(self, index):
         self.focus = index if -1 <= index < len(self._sphere_centers) else -1
+        self.select_qubit(self.focus)
         self.zoom = 1.0
         self._pan = np.zeros(3)
         self._apply_camera()
+        self.focus_changed.emit(self.focus)
 
     def pan(self, dx=0, dz=0):
         self._pan += np.array([dx, 0.0, dz])
@@ -366,11 +374,14 @@ class BlochCanvas(StableFigureCanvas):
 
     def reset_camera(self):
         self._end_drag()
+        self.focus = -1
+        self.select_qubit(-1)
         self.zoom = 1.0
         self._pan = np.zeros(3)
         self.projection = "persp"
         self.ax.view_init(elev=22, azim=-60, roll=0)
         self._apply_camera()
+        self.focus_changed.emit(-1)
 
     def clear_trails(self):
         self._trail_data = [[] for _ in self._sphere_centers]

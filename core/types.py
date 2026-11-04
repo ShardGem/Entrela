@@ -79,6 +79,8 @@ class NoiseConfig:
     p2: float = 0.05
     t1_us: float = 50.0
     t2_us: float = 30.0
+    gate_time_1q_ns: float = 50.0
+    gate_time_2q_ns: float = 50.0
 
     def validate(self):
         if type(self.enabled) is not bool or self.kind not in (
@@ -86,7 +88,7 @@ class NoiseConfig:
             "Termico",
         ):
             raise ValueError("Modelo de ruído inválido")
-        for name in ("p1", "p2", "t1_us", "t2_us"):
+        for name in ("p1", "p2", "t1_us", "t2_us", "gate_time_1q_ns", "gate_time_2q_ns"):
             finite(getattr(self, name), name)
         if not self.enabled:
             return
@@ -97,6 +99,8 @@ class NoiseConfig:
                 if not 0 <= value <= 1:
                     raise ValueError(f"{name} deve estar em [0, 1]")
         else:
+            if self.gate_time_1q_ns <= 0 or self.gate_time_2q_ns <= 0:
+                raise ValueError("Durações das portas térmicas devem ser positivas")
             finite(self.t1_us, "T₁")
             finite(self.t2_us, "T₂")
             if self.t1_us <= 0 or self.t2_us <= 0:

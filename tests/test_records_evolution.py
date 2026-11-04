@@ -96,7 +96,7 @@ def test_comparison_preferences_restore_without_preloading_and_retain_focus(qt_a
     page.load([experiment, other])
     requested = []
     page.prepare_requested.connect(lambda *args: requested.append(args))
-    preferences = {"hist_layout": 1, "tab": 2, "camera_sync": False, "focus": 1}
+    preferences = {"hist_layout": 1, "tab": 2, "camera_sync": False, "focus": 1, "comparison_mode":"controlled"}
     page.apply_view_preferences(preferences)
     qt_app.processEvents()
     assert not requested

@@ -6,8 +6,6 @@ from qiskit_aer.noise import NoiseModel, depolarizing_error, thermal_relaxation_
 from core.types import NoiseConfig
 
 
-_GATE_TIME_NS = 50.0
-
 # Gates de 1 qubit que podem aparecer
 _SINGLE_QUBIT_GATES = [
     "u", "u1", "u2", "u3",
@@ -42,10 +40,9 @@ def build_noise_model(cfg: NoiseConfig) -> NoiseModel | None:
     else:  # Termico
         t1_ns = cfg.t1_us * 1000.0
         t2_ns = cfg.t2_us * 1000.0
-        err1 = thermal_relaxation_error(t1_ns, t2_ns, _GATE_TIME_NS)
-        err2 = thermal_relaxation_error(t1_ns, t2_ns, _GATE_TIME_NS).tensor(
-            thermal_relaxation_error(t1_ns, t2_ns, _GATE_TIME_NS)
-        )
+        err1 = thermal_relaxation_error(t1_ns, t2_ns, cfg.gate_time_1q_ns)
+        two_qubit_channel = thermal_relaxation_error(t1_ns, t2_ns, cfg.gate_time_2q_ns)
+        err2 = two_qubit_channel.tensor(two_qubit_channel)
         noise.add_all_qubit_quantum_error(err1, _SINGLE_QUBIT_GATES)
         noise.add_all_qubit_quantum_error(err2, _TWO_QUBIT_GATES)
 

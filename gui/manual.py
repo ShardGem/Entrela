@@ -24,7 +24,7 @@ registrada no resultado. Reprodução entre versões diferentes não é garantid
 produz observações independentes. Fidelidade e pureza calculadas da matriz densidade do ensemble não ganham
 incerteza estatística pela simples troca da semente de amostragem.</p>
 <h2 id="Ruído">Ruído</h2><p>O caso ideal usa vetores de estado. Com ruído, matrizes densidade representam
-o ensemble. O canal incide nas portas, inclusive de preparação. O ruído térmico usa 50 ns por porta
+o ensemble. O canal incide nas portas, inclusive de preparação. O ruído térmico usa durações por porta 1q/2q configuráveis, com padrão de 50 ns,
 como exemplo educativo; não representa calibração atual de hardware.</p>
 <h2 id="T₁">T₁</h2><p>Tempo positivo de relaxamento da população, em µs.</p>
 <h2 id="T₂">T₂</h2><p>Tempo positivo de perda de coerência, em µs. Para o canal térmico, T₂ ≤ 2T₁.

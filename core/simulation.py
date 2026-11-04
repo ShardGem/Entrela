@@ -13,6 +13,7 @@ from core.noise import build_noise_model
 from core.metrics import fidelity, purity, energy_expectation
 from core.types import Experiment, ExperimentResult
 from core import __version__
+from core.reproduction import input_fingerprint
 
 
 class SimulationCancelled(Exception):
@@ -126,6 +127,7 @@ def run_experiment(config, progress=None, is_cancelled=None):
             else "hamiltonian",
             "operations": operations,
             "effective_seed": seed,
+            "input_fingerprint": input_fingerprint(config, seed, operations),
             "requested_seed": config.seed,
             "method": kind,
             "python": platform.python_version(),
@@ -148,7 +150,8 @@ def run_experiment(config, progress=None, is_cancelled=None):
             else "adimensional (ℏ=1)",
             "ising_convention": "+J ΣZZ +h ΣX",
             "bit_order": "q0 à direita",
-            "thermal_gate_time_ns": 50.0,
+            "thermal_gate_time_ns": config.noise.gate_time_1q_ns if config.noise.gate_time_1q_ns == config.noise.gate_time_2q_ns else None,
+            "thermal_gate_durations_ns": {"1q": config.noise.gate_time_1q_ns, "2q": config.noise.gate_time_2q_ns},
             "reproduction": {
                 "schema_version": 1,
                 "config": asdict(replace(config, seed=seed)),

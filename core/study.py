@@ -118,7 +118,7 @@ def trotter_noise_study(
                 "scope": "Somente os passos efetivamente calculados; não é um ótimo global.",
             },
             "time_unit": "adimensional (ℏ=1)",
-            "noise_scope": "Ruído por operação, inclusive preparação; térmico educativo de 50 ns por porta.",
+            "noise_scope": f"Ruído por operação, inclusive preparação; durações térmicas assumidas: 1q={config.noise.gate_time_1q_ns:g} ns e 2q={config.noise.gate_time_2q_ns:g} ns.",
         },
         note=(
             "Fidelidades do ensemble contra a mesma evolução exata. A curva ideal isola a "

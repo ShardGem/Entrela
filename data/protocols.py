@@ -44,7 +44,8 @@ class ProtocolRepository:
         data = json.loads((self.directory / (identifier + ".json")).read_text(encoding="utf-8"))
         if data.get("schema_version") != 1 or data.get("protocol_id") != identifier or data.get("kind") not in KINDS:
             raise ValueError("Protocolo inválido ou versão desconhecida.")
-        config_from_dict(data["config"])
+        # Resolve new optional defaults in memory; preserve the original file.
+        data["config"] = asdict(config_from_dict(data["config"]))
         if not isinstance(data.get("fields"), dict) or not isinstance(data.get("options"), dict):
             raise ValueError("Campos do protocolo inválidos.")
         if not isinstance(data["fields"].get("title"),str) or not data["fields"]["title"].strip():

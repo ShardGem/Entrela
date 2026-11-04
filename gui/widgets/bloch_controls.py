@@ -80,6 +80,7 @@ class BlochCameraPanel(QFrame):
         self.fit_button.clicked.connect(canvas.fit_scene)
         body.addWidget(self.fit_button)
         reset = SecondaryButton("Restaurar câmera")
+        reset.setToolTip("Mostrar todos os qubits e restaurar zoom, posição, orientação e perspectiva.")
         reset.clicked.connect(canvas.reset_camera)
         body.addWidget(reset)
         form = QFormLayout()

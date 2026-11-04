@@ -1,12 +1,14 @@
 """ZNE of Z using local unitary folding on u/cx, without post-fold optimization."""
 
 from secrets import randbits
+from importlib.metadata import version
 import numpy as np
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 from qiskit.quantum_info import Statevector, SparsePauliOp
 from core.types import integer
 from core.simulation import SimulationCancelled
+from core import __version__
 
 
 def _insert_identity_pairs(circuit, extra_pairs):
@@ -188,4 +190,6 @@ def run_zne(
         native_basis=["u", "cx"],
         shots=shots,
         seed=seed,
+        provenance=dict(entrela_version=__version__,versions={name:version(name) for name in ("qiskit","qiskit-aer","numpy")},
+                        simulator="AerSimulator",simulation_method="density_matrix",max_parallel_threads=2),
     )

@@ -45,6 +45,7 @@ from gui.pages.analysis import AnalysisPage
 from gui.pages.library import LibraryPage
 from gui.pages.documentation import DocumentationPage
 from gui.controllers.appearance import apply_appearance, DARK
+from gui.controllers.drafts import DraftController
 from gui.theme import PALETTE
 from gui.workers.analysis_worker import AnalysisWorker
 from gui.workers.storage_worker import StorageWorker
@@ -52,6 +53,7 @@ from gui.workers.report_worker import ReportWorker
 from gui.workers.comparison_worker import ComparisonWorker
 from gui.workers.documentation_worker import DocumentationWorker
 from gui.workers.detail_worker import DetailWorker
+from gui.workers.study_import_worker import StudyImportWorker
 from gui.widgets.data_table import configure_table
 from data.workspace import WorkspaceLibrary, experiment_title
 from data.protocols import ProtocolRepository
@@ -123,6 +125,7 @@ class MainWindow(QMainWindow):
         self._draft_baseline = None
         self._pending_example_id = None
         self._pending_parent_id = None
+        self._reproduction_source = None
         self._current_page = "dashboard"
         self._history = []
         self._pending_detail_id = None
@@ -153,6 +156,7 @@ class MainWindow(QMainWindow):
         self._restore_preferences()
         QApplication.instance().styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self._refresh_library()
+        self.drafts = DraftController(self)
         self._show_page("dashboard")
         if self._storage_error:
             self.statusBar().showMessage(
@@ -281,6 +285,7 @@ class MainWindow(QMainWindow):
         self.page_comparison.prepare_requested.connect(self._prepare_comparison)
         self.page_comparison.documentation_requested.connect(self._document_comparison)
         self.page_documentation.export_requested.connect(self._export_documentation)
+        self.page_documentation.import_requested.connect(self._import_study)
         self.page_documentation.cancel_requested.connect(self._cancel_simulation)
         self.page_documentation.comparison_changed.connect(self._refresh_documentation)
         self.page_documentation.analysis_selected.connect(self._open_evidence)
@@ -313,7 +318,7 @@ class MainWindow(QMainWindow):
     def _open_commands(self):
         commands = [
             ("new", "Criar experimento", "novo"),
-            ("import", "Importar experimento JSON", "abrir arquivo"),
+            ("import", "Importar experimento ou estudo", "abrir arquivo JSON ZIP reprodução"),
             ("tutorial", "Aprender: tutorial de Bell", "primeiro experimento"),
             ("mode:guided", "Usar modo Guiado", "ajuda etapas"),
             ("mode:advanced", "Usar modo Avançado", "parâmetros"),
@@ -374,6 +379,8 @@ class MainWindow(QMainWindow):
             "Despolarização 1q": "Ruído",
             "Despolarização 2q": "Ruído",
             "Modelo de ruído": "Ruído",
+            "Duração de porta 1q": "Ruído",
+            "Duração de porta 2q": "Ruído",
         }
         topic = aliases.get(topic, topic)
         if self.width() < 1250:
@@ -426,6 +433,8 @@ class MainWindow(QMainWindow):
             title, "Cópia editável · resultados anteriores permanecem preservados."
         )
         self.settings.setValue("workspace/draft", json.dumps(asdict(config)))
+        if hasattr(self,"drafts"):
+            self.drafts.mark_identity_baseline()
 
     def _draft_changed(self):
         if not self._loading_draft:
@@ -448,12 +457,12 @@ class MainWindow(QMainWindow):
             current = self.page_simulation.config_panel.get_config()
         except ValueError:
             pass
-        if self._draft_dirty and current != config:
+        if (self._draft_dirty and current != config) or (hasattr(self,"drafts") and self.drafts.identity_dirty):
             return (
                 QMessageBox.question(
                     self,
                     "Substituir configuração?",
-                    "O rascunho foi editado. Deseja substituí-lo? Os resultados salvos serão preservados.",
+                    "O rascunho, nome ou descrição foi editado. Deseja substituí-lo? Os resultados salvos serão preservados.",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
@@ -633,11 +642,16 @@ class MainWindow(QMainWindow):
         if self._pending_parent_id:
             experiment.result.metadata["reproduced_from_id"]=self._pending_parent_id
             self._pending_parent_id=None
+        if self._reproduction_source is not None:
+            from core.reproduction import compare_reproduction
+            experiment.result.metadata["reproduction_check"] = compare_reproduction(self._reproduction_source, experiment)
+            self._reproduction_source = None
         self._current_experiment = experiment
         self._name_new_experiment(experiment)
         self._unsaved_result = True
-        self._draft_baseline = experiment.config
-        self._draft_dirty = False
+        if experiment.config.circuit is None:
+            self._draft_baseline = experiment.config
+            self._draft_dirty = False
         self.tutorial.record_run(experiment)
         self._display_experiment(experiment)
         self._autosave_current()
@@ -655,7 +669,14 @@ class MainWindow(QMainWindow):
         metadata.setdefault("reproduction", {}).update(
             mitigation_method="zne",
             mitigation_parameters={key: analysis[key] for key in ("method", "scale_factors", "qubit", "shots", "seed")},
+            mitigation_environment=analysis.get("provenance",{}),
         )
+        if self._reproduction_source is not None:
+            from core.reproduction import compare_mitigation_reproduction
+            metadata["reproduction_check"] = compare_mitigation_reproduction(self._reproduction_source,analysis)
+            self._reproduction_source = None
+        else:
+            metadata.pop("reproduction_check", None)
         self._current_experiment = Experiment(
             source.config,
             replace(source.result, mitigation=analysis, metadata=metadata),
@@ -679,6 +700,8 @@ class MainWindow(QMainWindow):
         self.page_bloch.set_experiment(experiment)
         self.page_circuit.show_experiment(experiment)
         self.page_analysis.load_experiment(experiment)
+        if hasattr(self, "drafts"):
+            self.drafts.set_source(experiment.id)
         self.page_mitigation.load_experiment(experiment)
         self._refresh_library()
         if self._current_worker:
@@ -760,6 +783,8 @@ class MainWindow(QMainWindow):
             self._apply_draft(experiment.config, self._experiment_name(experiment))
             self.page_simulation.experiment_name.setText(self._experiment_name(experiment))
             self._current_experiment = experiment
+            self.page_simulation.experiment_description.setText((self._current_annotation() or {}).get("description",""))
+            self.drafts.mark_identity_baseline()
             self._unsaved_result = False
             self._display_experiment(experiment)
             self._pending_example_id = experiment.result.metadata.get("example_id")
@@ -781,6 +806,8 @@ class MainWindow(QMainWindow):
         self.page_analysis.message.setText("Tarefa cancelada; resultados anteriores preservados.")
         if isinstance(self._current_worker,DocumentationWorker):
             self.page_documentation.message.setText("Exportação cancelada; arquivo de destino anterior e dados de origem preservados.")
+        elif isinstance(self._current_worker,StudyImportWorker):
+            self.page_documentation.message.setText("Importação cancelada; nenhuma cópia foi instalada e os registros anteriores foram preservados.")
         elif isinstance(self._current_worker,ComparisonWorker):
             self.page_comparison.message.setText("Carregamento cancelado; registros de origem preservados.")
         self.page_simulation.status.set_idle(
@@ -788,7 +815,9 @@ class MainWindow(QMainWindow):
         )
 
     def _on_error(self, message):
-        if isinstance(self._current_worker, DetailWorker):
+        if isinstance(self._current_worker, (DetailWorker, StudyImportWorker)):
+            if isinstance(self._current_worker,StudyImportWorker):
+                self.page_documentation.message.setText(message)
             self.statusBar().showMessage(message)
             return
         if isinstance(self._current_worker,(ComparisonWorker,DocumentationWorker)):
@@ -837,6 +866,7 @@ class MainWindow(QMainWindow):
         self.page_documentation.set_running(False)
         self._pending_parent_id=None
         self._pending_circuit_context = None
+        self._reproduction_source = None
         if worker:
             worker.deleteLater()
         if self._close_pending:
@@ -846,9 +876,12 @@ class MainWindow(QMainWindow):
 
     def _import_experiment(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Importar experimento", "", "JSON (*.json)"
+            self, "Importar experimento ou estudo", "", "Experimento JSON ou estudo ZIP (*.json *.zip);;JSON (*.json);;Pacote completo ZIP (*.zip)"
         )
         if not path:
+            return
+        if Path(path).suffix.lower() == ".zip":
+            self._start_study_import(path)
             return
         try:
             source = import_experiment_json(path)
@@ -874,6 +907,44 @@ class MainWindow(QMainWindow):
             self._show_page("results")
         except (OSError, ValueError, TypeError, KeyError) as exc:
             self.statusBar().showMessage("Não foi possível importar: " + str(exc))
+
+    def _import_study(self):
+        path, _ = QFileDialog.getOpenFileName(self,"Importar estudo verificável","","Pacote completo Entrela (*.zip)")
+        if path:
+            self._start_study_import(path)
+
+    def _start_study_import(self, path):
+        if self._current_worker is not None or self._storage_worker is not None or not self._confirm_unsaved():
+            return
+        if self.repository is None:
+            self.page_documentation.message.setText("Escolha um armazenamento disponível para importar o estudo.")
+            return
+        self._start_worker(StudyImportWorker(path,self.repository,self),self._on_study_imported)
+        self.page_documentation.message.setText("Verificando integridade e preparando cópias independentes do estudo…")
+
+    def _on_study_imported(self, prepared):
+        if self._current_worker and self._current_worker.isInterruptionRequested():
+            prepared.abort()
+            self._on_cancelled()
+            return
+        try:
+            experiments = prepared.commit()
+            self._refresh_history()
+            self._current_experiment = experiments[0]
+            self._unsaved_result = False
+            self._display_experiment(experiments[0])
+            if len(experiments) == 2:
+                self.page_comparison.comparison_mode.setCurrentIndex(max(0,self.page_comparison.comparison_mode.findData(prepared.comparison_mode)))
+                self.page_comparison.set_runs(experiments[0].id,experiments[1].id)
+            self.page_history.selected_identifier = experiments[0].id
+            self.page_history.set_detail(experiments[0])
+            self._show_page("history")
+            self.page_documentation.message.setText(f"Estudo importado: {len(experiments)} execução(ões), análises e protocolos. Hashes verificados; originais preservados no pacote de origem.")
+            self.statusBar().showMessage("Estudo importado e verificado. Use Reexecutar para conferir a reprodução numérica.")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            message = "Não foi possível concluir a importação: " + str(exc)
+            self.page_documentation.message.setText(message)
+            self.statusBar().showMessage(message)
 
     def _export_counts(self):
         if (
@@ -963,6 +1034,12 @@ class MainWindow(QMainWindow):
         if not self._confirm_unsaved():
             event.ignore()
             return
+        if hasattr(self, "drafts") and not self.drafts.flush():
+            choice = QMessageBox.warning(self, "Rascunho não protegido", self.drafts.error +
+                "\nFechar sem recuperar as últimas alterações?", QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
+            if choice != QMessageBox.Discard:
+                event.ignore()
+                return
         self._close_pending = False
         self._persist_tutorial()
         self.page_bloch.timer.stop()
@@ -1085,6 +1162,7 @@ class MainWindow(QMainWindow):
             if not self._confirm_unsaved():
                 return
             self._zne_source = source
+            self._reproduction_source = source
             self._start_worker(
                 MitigationWorker(replace(source.config, seed=zne_seed), m["qubit"], m["method"], m["shots"], self, scale_factors=m["scale_factors"]),
                 self._on_mitigation,
@@ -1097,13 +1175,20 @@ class MainWindow(QMainWindow):
                 "Registro sem semente efetiva; escolha uma no formulário para criar uma nova execução."
             )
             return
-        if not self._confirm_unsaved():
+        if not self._can_replace(source.config):
             return
         self._pending_example_id = source.result.metadata.get("example_id")
         self._pending_parent_id=source.id
+        self._reproduction_source=source
         config = replace(source.config, seed=seed)
-        self._apply_draft(config, "Reprodução de " + self._experiment_name(source))
-        self.page_simulation.experiment_name.setText((self._experiment_name(source) + " · reprodução")[:160])
+        if config.circuit is None:
+            self._apply_draft(config, "Reprodução de " + self._experiment_name(source))
+            self.page_simulation.experiment_name.setText((self._experiment_name(source) + " · reprodução")[:160])
+            self.page_simulation.experiment_description.setText((self._current_annotation() or {}).get("description",""))
+        else:
+            self._pending_circuit_context = deepcopy(source.result.metadata.get("circuit_library",{}))
+            self._pending_circuit_context.update(name=(self._experiment_name(source) + " · reprodução")[:160],
+                description=(self._current_annotation() or {}).get("description",""))
         self._start_worker(SimulationWorker(config, self), self._on_experiment)
 
     def _export_report(self):
@@ -1169,7 +1254,8 @@ class MainWindow(QMainWindow):
     def _name_new_experiment(self, experiment):
         """Keep the human notebook separate from immutable scientific records."""
         try:
-            title = self.page_simulation.experiment_name.text().strip()
+            context = experiment.result.metadata.get("circuit_library",{}) if experiment.config.circuit else None
+            title = (context.get("name","") if context is not None else self.page_simulation.experiment_name.text()).strip()
             if not title:
                 try:
                     sequence = int(self.settings.value("workspace/experiment_sequence", 0)) + 1
@@ -1181,8 +1267,10 @@ class MainWindow(QMainWindow):
                 title = f"Experimento {sequence:03d} · {system_label(experiment.config)} · {label}"
             self._workspace_library().annotate(
                 experiment.id, "", "", [], title=title[:160],
-                description=self.page_simulation.experiment_description.text().strip(),
+                description=(context.get("description","") if context is not None else self.page_simulation.experiment_description.text()).strip(),
             )
+            if context is None:
+                self.drafts.mark_identity_baseline()
         except (OSError, ValueError, TypeError) as exc:
             self.statusBar().showMessage("Resultado disponível; não foi possível salvar o nome: " + str(exc))
 
@@ -1307,6 +1395,7 @@ class MainWindow(QMainWindow):
                 self._current_experiment.id, project, notes, tags,
                 **self.page_library.annotation_payload(),
             )
+            self.drafts.annotation_committed(self._current_experiment.id)
             self._refresh_library()
             self.page_library.message.setText(
                 "Projeto e anotações salvos; dados científicos preservados."
@@ -1494,10 +1583,9 @@ class MainWindow(QMainWindow):
             self.tutorial.pause()
         self._pending_example_id = None
         editor = self.page_circuit.editor
-        self.page_simulation.experiment_name.setText(editor.circuit_name.text().strip())
-        self.page_simulation.experiment_description.setText(editor.circuit_description.text().strip())
         self._pending_circuit_context = {
             **editor.revision_context(),
+            "description":editor.circuit_description.text().strip(),
             "note": "O circuito executado completo está registrado em config.circuit; o rascunho pode diferir da revisão de origem.",
         }
         self._start_worker(SimulationWorker(config, self), self._on_experiment)
@@ -1518,6 +1606,7 @@ class MainWindow(QMainWindow):
             kind,options=self.page_analysis.analysis_options()
             data=self._protocol_repository().save(self._current_experiment,kind,options,self.page_analysis.protocol.context()["fields"])
             self.page_analysis.protocol.set_protocol(data)
+            self.drafts.protocol_edited()
             self._refresh_protocols()
             self.page_analysis.message.setText("Nova revisão do protocolo salva.")
         except (OSError,ValueError,TypeError) as exc:
@@ -1539,6 +1628,7 @@ class MainWindow(QMainWindow):
                 raise ValueError("A configuração da fonte mudou; protocolo preservado. Crie uma nova revisão.")
             self.page_analysis.apply_options(data["kind"],data["options"])
             self.page_analysis.protocol.set_protocol(data)
+            self.drafts.protocol_edited()
             self.page_analysis.message.setText("Protocolo carregado. Calcular análise cria outra evidência sem modificar o plano salvo.")
             self._show_page("analysis")
         except (OSError,ValueError,KeyError,TypeError) as exc:
@@ -1554,10 +1644,11 @@ class MainWindow(QMainWindow):
         try:
             from core.comparison import incompatibility
             records=self.page_comparison.records
-            error=incompatibility(records[a],records[b])
+            mode=self.page_comparison.comparison_mode.currentData()
+            error=incompatibility(records[a],records[b],mode=mode)
             if error:
                 raise ValueError(error)
-            self._start_worker(ComparisonWorker(self.repository,(a,b),records[a].config,self),self._on_comparison)
+            self._start_worker(ComparisonWorker(self.repository,(a,b),records[a].config,self,mode=mode),self._on_comparison)
             self.page_comparison.message.setText("Carregando estados e calculando curvas em segundo plano…")
         except (KeyError,ValueError) as exc:
             self.page_comparison.message.setText(str(exc))
@@ -1644,7 +1735,8 @@ class MainWindow(QMainWindow):
             worker=DocumentationWorker(sources,path,kind,self.repository,annotations,protocols,
                 page.include_analyses.isChecked(),page.include_gif.isChecked(),page.max_frames.value(),page.frame_ms.value(),self,
                 live_analyses=(deepcopy(self.page_analysis.data),) if self.page_analysis.data else (),
-                report_options=page.report_options(), export_dpi=self.page_settings.export_dpi.value())
+                report_options=page.report_options(), export_dpi=self.page_settings.export_dpi.value(),
+                comparison_mode=self.page_comparison.comparison_mode.currentData() if len(sources)==2 and page.use_comparison.isChecked() else "controlled")
             self._start_worker(worker,self._on_documented)
             page.message.setText("Preparando documentação em segundo plano; arquivos de origem preservados.")
             self.statusBar().showMessage("Preparando documentação em segundo plano…")

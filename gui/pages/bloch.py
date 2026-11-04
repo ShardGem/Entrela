@@ -152,11 +152,8 @@ class BlochPage(PageBase):
         self.focus_combo.currentIndexChanged.connect(self._focus)
         self.focus_selected = GhostButton("Focar selecionado")
         self.focus_selected.setEnabled(False)
-        self.focus_selected.clicked.connect(
-            lambda: self.focus_combo.setCurrentIndex(
-                self.focus_combo.findData(self.canvas.selected_qubit)
-            )
-        )
+        self.focus_selected.clicked.connect(self._toggle_focus)
+        self.canvas.focus_changed.connect(self._sync_focus)
         self.camera_panel.options_layout.addWidget(self.focus_selected)
         self.zoom_slider = self.camera_panel.zoom_slider
         self.zoom_label = self.camera_panel.zoom_label
@@ -275,6 +272,7 @@ class BlochPage(PageBase):
             self.ideal_bloch.append(vectors)
             self.ideal_probabilities.append(probabilities)
         old_focus = self.focus_combo.currentData()
+        canvas_blocker = QSignalBlocker(self.canvas)
         self.canvas.setup(self.num_qubits)
         self.focus_combo.blockSignals(True)
         self.focus_combo.clear()
@@ -293,7 +291,7 @@ class BlochPage(PageBase):
         self._qubit_panels = []
         for q in range(self.num_qubits):
             panel = QubitInfoPanel(q)
-            layout.addWidget(panel, q // 3, q % 3)
+            layout.addWidget(panel, q // self.canvas.MAX_QUBITS_PER_ROW, q % self.canvas.MAX_QUBITS_PER_ROW)
             self._qubit_panels.append(panel)
         self.slider.blockSignals(True)
         self.slider.setMaximum(len(self.precomputed_bloch) - 1)
@@ -301,9 +299,9 @@ class BlochPage(PageBase):
         self.slider.blockSignals(False)
         self.snapshot_spin.setRange(1, len(self.precomputed_bloch))
         self.current_frame = 0
-        if self.canvas.focus >= 0:
-            self._select_qubit(self.canvas.focus)
-        self._refresh_ui()
+        del canvas_blocker
+        self.camera_panel.sync_from_camera()
+        self._sync_focus(self.canvas.focus, persist=False)
 
     def _derived_snapshot(self, state):
         data = np.asarray(state.data)
@@ -334,10 +332,18 @@ class BlochPage(PageBase):
             if self.focus_combo.currentData() is not None
             else -1
         )
-        if self.canvas.focus >= 0:
-            self._select_qubit(self.canvas.focus)
+
+    def _toggle_focus(self):
+        self.canvas.set_focus(-1 if self.canvas.focus >= 0 else self.canvas.selected_qubit)
+
+    def _sync_focus(self, index, persist=True):
+        blocker = QSignalBlocker(self.focus_combo)
+        self.focus_combo.setCurrentIndex(max(0, self.focus_combo.findData(index)))
+        del blocker
+        self._select_qubit(index)
         self._refresh_ui()
-        self.preferences_changed.emit()
+        if persist:
+            self.preferences_changed.emit()
 
     def set_experiment(self, experiment):
         """Describe actual stored transitions, never interpolate invented states."""
@@ -586,8 +592,10 @@ class BlochPage(PageBase):
             widget.setVisible(not enabled)
 
     def _select_qubit(self, index):
-        self.selection_label.setText(f"Qubit q{index} selecionado")
-        self.focus_selected.setEnabled(True)
+        valid = 0 <= index < len(self._qubit_panels)
+        self.selection_label.setText(f"Qubit q{index} selecionado" if valid else "Clique numa esfera para selecionar")
+        self.focus_selected.setText("Mostrar todos os qubits" if self.canvas.focus >= 0 else "Focar selecionado")
+        self.focus_selected.setEnabled(valid or self.canvas.focus >= 0)
         self.canvas.select_qubit(index)
         for q, panel in enumerate(self._qubit_panels):
             panel.setStyleSheet(
@@ -595,5 +603,5 @@ class BlochPage(PageBase):
                 if q == index
                 else ""
             )
-        if index < len(self._qubit_panels):
+        if valid:
             self.info_scroll.ensureWidgetVisible(self._qubit_panels[index])

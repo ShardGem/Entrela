@@ -9,11 +9,12 @@ class ComparisonWorker(QThread):
     progress=Signal(int)
     cancelled=Signal()
 
-    def __init__(self,repository,identifiers,config,parent=None):
+    def __init__(self,repository,identifiers,config,parent=None, *, mode="controlled"):
         super().__init__(parent)
         self.repository=repository
         self.identifiers=identifiers
         self.config=config
+        self.mode=mode
 
     def run(self):
         try:
@@ -22,7 +23,7 @@ class ComparisonWorker(QThread):
                 if self.isInterruptionRequested():
                     raise SimulationCancelled()
                 experiments.append(self.repository.load(identifier))
-            result=prepare_comparison(experiments,self.progress.emit,self.isInterruptionRequested)
+            result=prepare_comparison(experiments,self.progress.emit,self.isInterruptionRequested,mode=self.mode)
             if self.isInterruptionRequested():
                 raise SimulationCancelled()
             self.completed.emit(result)

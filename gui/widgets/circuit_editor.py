@@ -70,6 +70,9 @@ def operation_records(document):
 
 class CircuitEditor(QWidget):
     run_requested = Signal(object)
+    draft_changed = Signal()
+    document_replacing = Signal(object)
+    recovery_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -158,6 +161,7 @@ class CircuitEditor(QWidget):
         library_toggle.setCheckable(True)
         library_row.addWidget(library_toggle)
         self.revision_label = QLabel("Rascunho independente")
+        self.revision_label.setWordWrap(True)
         library_row.addWidget(self.revision_label)
         root.addLayout(library_row)
         self.library_panel = QWidget()
@@ -181,6 +185,11 @@ class CircuitEditor(QWidget):
         duplicate.clicked.connect(self._duplicate)
         picker.addWidget(duplicate)
         library_body.addRow("Biblioteca", picker)
+        self.recover_draft = SecondaryButton("Recuperar rascunho anterior…")
+        self.recover_draft.setToolTip("Recupere até dez estados anteriores do editor, inclusive após fechar e reabrir o aplicativo.")
+        self.recover_draft.setEnabled(False)
+        self.recover_draft.clicked.connect(self.recovery_requested.emit)
+        library_body.addRow("Recuperação local",self.recover_draft)
         root.addWidget(self.library_panel)
         self.library_panel.hide()
         library_toggle.toggled.connect(self.library_panel.setVisible)
@@ -288,6 +297,14 @@ class CircuitEditor(QWidget):
         advanced_form.addRow("Modelo", self.noise_kind)
         advanced_form.addRow("T₁ (µs)", self.t1)
         advanced_form.addRow("T₂ (µs)", self.t2)
+        self.gate1 = ScientificSpinBox()
+        self.gate2 = ScientificSpinBox()
+        for field in (self.gate1,self.gate2):
+            field.setRange(0.001,1e6)
+            field.setValue(50.0)
+            field.setToolTip("Hipótese de exposição ao canal térmico por porta nativa; não é duração física total do algoritmo.")
+        advanced_form.addRow("Porta 1q (ns)",self.gate1)
+        advanced_form.addRow("Porta 2q (ns)",self.gate2)
         form_body.addWidget(noise_toggle)
         form_body.addWidget(advanced)
         advanced.hide()
@@ -352,6 +369,50 @@ class CircuitEditor(QWidget):
             action.triggered.connect(callback)
             self.canvas.addAction(action)
         self._set_document(self.document)
+        for widget in (self.circuit_name, self.circuit_description, self.phase, self.seed, *self.param_fields):
+            widget.textChanged.connect(lambda *_: self.draft_changed.emit())
+        for widget in (self.shots, self.p1, self.p2, self.t1, self.t2, self.gate1,self.gate2, *self.qubit_fields):
+            widget.valueChanged.connect(lambda *_: self.draft_changed.emit())
+        self.noise.toggled.connect(lambda *_: self.draft_changed.emit())
+        self.noise_kind.currentIndexChanged.connect(lambda *_: self.draft_changed.emit())
+        self.gate_type.currentIndexChanged.connect(lambda *_: self.draft_changed.emit())
+
+    def draft_state(self):
+        return dict(document=self.document.to_dict(), name=self.circuit_name.text(),
+                    description=self.circuit_description.text(), phase=self.phase.text(),
+                    library_id=self._library_id, revision=self._loaded_revision,
+                    selected=self.selected, gate_type=self.gate_type.currentText(),
+                    parameters=[field.text() for field in self.param_fields],
+                    connections=[field.value() for field in self.qubit_fields],
+                    seed=self.seed.text(), shots=self.shots.value(), noise=self.noise.isChecked(),
+                    noise_kind=self.noise_kind.currentData(),
+                    **{key:getattr(self,key).value() for key in ("p1", "p2", "t1", "t2", "gate1", "gate2")})
+
+    def restore_draft(self, state):
+        document = CircuitDocument.from_dict(state["document"])
+        self._set_document(document)
+        self.undo_stack.clear()
+        self._library_id = state.get("library_id")
+        self._loaded_revision = state.get("revision")
+        self.circuit_name.setText(state.get("name", ""))
+        self.circuit_description.setText(state.get("description", ""))
+        self._select(state.get("selected", -1))
+        self.gate_type.setCurrentText(state.get("gate_type", "h"))
+        for field, value in zip(self.param_fields, state.get("parameters", [])):
+            field.setText(value)
+        for field, value in zip(self.qubit_fields, state.get("connections", [])):
+            field.setValue(value)
+        self.phase.setText(state.get("phase", repr(document.global_phase)))
+        self.seed.setText(state.get("seed", "42"))
+        self.shots.setValue(state.get("shots", 1024))
+        self.noise.setChecked(state.get("noise", False))
+        self.noise_kind.setCurrentIndex(max(0,self.noise_kind.findData(state.get("noise_kind", "Despolarizador"))))
+        for key in ("p1", "p2", "t1", "t2", "gate1", "gate2"):
+            if key in state:
+                getattr(self,key).setValue(state[key])
+        self.revision_label.setText("Rascunho recuperado")
+        self.revision_label.setToolTip("Recuperação automática. Salve uma revisão para preservar esta versão na biblioteca.")
+        self.draft_changed.emit()
         QTimer.singleShot(0, self._resize_gate_palette)
 
     def _resize_gate_palette(self):
@@ -441,6 +502,7 @@ class CircuitEditor(QWidget):
             self.revision_label.setText(f"Revisão {revision.version} salva")
             self._refresh_circuit_library()
             self.message.setText("Circuito salvo. As revisões anteriores permanecem disponíveis.")
+            self.draft_changed.emit()
         except (OSError, ValueError, TypeError, KeyError) as exc:
             self.message.setText("Não foi possível salvar: " + str(exc))
 
@@ -457,22 +519,27 @@ class CircuitEditor(QWidget):
             self.circuit_description.setText(revision.description)
             self.revision_label.setText(f"Revisão {version} aberta")
             self.message.setText("Revisão recuperada. Salvar cria uma nova revisão, sem substituir a anterior.")
+            self.draft_changed.emit()
         except (OSError, ValueError, TypeError, KeyError, StopIteration) as exc:
             self.message.setText("Não foi possível abrir a revisão: " + str(exc))
 
     def _new(self):
+        self.document_replacing.emit(self.draft_state())
         self.replace_document(CircuitDocument(self.document.num_qubits), "Novo circuito")
         self._library_id = self._loaded_revision = None
         self.circuit_name.clear()
         self.circuit_description.clear()
         self.revision_label.setText("Rascunho independente")
+        self.draft_changed.emit()
 
     def _duplicate(self):
+        self.document_replacing.emit(self.draft_state())
         self._library_id = self._loaded_revision = None
         name = self.circuit_name.text().strip()
         self.circuit_name.setText((name + " · cópia")[:120] if name else "Cópia do circuito")
         self.revision_label.setText("Cópia independente · ainda não salva")
         self.message.setText("O próximo salvamento cria um circuito independente.")
+        self.draft_changed.emit()
 
     def revision_context(self):
         """Optional provenance for a run; the circuit itself remains in config."""
@@ -490,6 +557,7 @@ class CircuitEditor(QWidget):
         try:
             document.validate()
             if document != self.document:
+                self.document_replacing.emit(self.draft_state())
                 self.undo_stack.push(
                     DocumentChange(self, self.document, document, title)
                 )
@@ -517,6 +585,7 @@ class CircuitEditor(QWidget):
         self.summary.setText(f"{document.num_qubits} qubits · {len(document.gates)} portas · profundidade lógica {circuit.depth()}"
                              + (" · " + counts if counts else " · estado inicial |0…0⟩"))
         self._select(self.selected)
+        self.draft_changed.emit()
 
     def _select_many(self, indexes):
         self.selected_indices = sorted(i for i in indexes if 0 <= i < len(self.document.gates))
@@ -717,6 +786,8 @@ class CircuitEditor(QWidget):
                 self.p2.value(),
                 self.t1.value(),
                 self.t2.value(),
+                self.gate1.value(),
+                self.gate2.value(),
             ),
             self.shots.value(),
             int(seed) if seed else None,
@@ -805,10 +876,10 @@ class CircuitEditor(QWidget):
         thermal = self.noise_kind.currentData() == "Termico"
         for field in (self.p1, self.p2):
             field.setEnabled(self.noise.isChecked() and not thermal)
-        for field in (self.t1, self.t2):
+        for field in (self.t1, self.t2, self.gate1,self.gate2):
             field.setEnabled(self.noise.isChecked() and thermal)
         self.noise.setToolTip(
-            "Térmico: duração educativa de 50 ns por porta; T₂ ≤ 2T₁."
+            "Térmico: durações por porta configuráveis em Mais opções de ruído; T₂ ≤ 2T₁. Valores assumidos, sem calibração de hardware."
             if thermal
             else "Probabilidades de despolarização por operação de 1 ou 2 qubits."
         )

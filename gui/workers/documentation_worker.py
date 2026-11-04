@@ -12,7 +12,7 @@ class DocumentationWorker(QThread):
 
     def __init__(self,experiments,path,kind,repository=None,annotations=None,protocols=(),
                  include_analyses=True,include_gif=True,max_frames=30,frame_ms=350,parent=None,*,live_analyses=(),
-                 report_options=None,export_dpi=300):
+                 report_options=None,export_dpi=300,comparison_mode="controlled"):
         super().__init__(parent)
         self.experiments=experiments
         self.config=experiments[0].config
@@ -28,6 +28,7 @@ class DocumentationWorker(QThread):
         self.live_analyses=live_analyses
         self.report_options=report_options
         self.export_dpi=export_dpi
+        self.comparison_mode=comparison_mode
 
     def run(self):
         try:
@@ -53,11 +54,11 @@ class DocumentationWorker(QThread):
                 export_animation(self.experiments,self.path,self.max_frames,self.frame_ms,**callbacks)
             elif self.kind=="pdf":
                 export_pdf(self.experiments,self.path,analyses,self.annotations,
-                           options=self.report_options,raster_dpi=self.export_dpi,**callbacks)
+                           options=self.report_options,raster_dpi=self.export_dpi,comparison_mode=self.comparison_mode,**callbacks)
             else:
                 export_documentation(self.experiments,self.path,analyses,self.annotations,self.protocols,
                                      self.include_gif,self.max_frames,self.frame_ms,
-                                     report_options=self.report_options,raster_dpi=self.export_dpi,**callbacks)
+                                     report_options=self.report_options,raster_dpi=self.export_dpi,comparison_mode=self.comparison_mode,**callbacks)
             self.completed.emit(str(self.path))
         except SimulationCancelled:
             self.cancelled.emit()

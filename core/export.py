@@ -1,6 +1,7 @@
 """Portable scientific data exports; JSON never executes user code."""
 
 import csv, io, json, tempfile, zipfile
+from hashlib import sha256
 from pathlib import Path
 from data.repository import ExperimentRepository
 
@@ -161,9 +162,16 @@ def export_run_bundle(experiment, filepath, annotation=None, analysis=None):
     writer.writerow(["Bitstring", "Counts"])
     writer.writerows(sorted((experiment.result.counts or {}).items()))
     # Optional additions preserve the original three-member bundle contract.
+    contents = {"experimento.json":payload,"contagens.csv":table.getvalue(),"circuito.txt":experiment.result.circuit_text}
     manifest = None
     if annotation is not None or analysis is not None:
+        if analysis is not None:
+            contents["analyses.json"] = _json_text(analysis)
+        contents["resultados.csv"] = _experiment_csv(experiment,annotation)
         manifest = _json_text({
+            "schema_version":1,"kind":"run_bundle","source_ids":[experiment.id],
+            "annotations":{experiment.id:annotation or {}},
+            "files":[dict(path=name,bytes=len(value.encode("utf-8")),sha256=sha256(value.encode("utf-8")).hexdigest()) for name,value in contents.items()],
             "experiment_id": experiment.id,
             "created_at": experiment.created_at.isoformat(),
             "title": (annotation or {}).get("title") or experiment.id,
@@ -173,16 +181,11 @@ def export_run_bundle(experiment, filepath, annotation=None, analysis=None):
             "analysis_file": "analyses.json" if analysis is not None else None,
             "note": "O JSON do experimento preserva o esquema e os estados completos. Anotações não alteram os resultados científicos.",
         })
-    analysis_payload = _json_text(analysis) if analysis is not None else None
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("experimento.json", payload)
-        archive.writestr("contagens.csv", table.getvalue())
-        archive.writestr("circuito.txt", experiment.result.circuit_text)
+        for name,content in contents.items():
+            archive.writestr(name,content)
         if manifest is not None:
             archive.writestr("manifest.json", manifest)
-            archive.writestr("resultados.csv", _experiment_csv(experiment, annotation))
-        if analysis_payload is not None:
-            archive.writestr("analyses.json", analysis_payload)
     return path
 
 

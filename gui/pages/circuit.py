@@ -267,6 +267,8 @@ class CircuitPage(PageBase):
                 (self.editor.p2, noise.p2),
                 (self.editor.t1, noise.t1_us),
                 (self.editor.t2, noise.t2_us),
+                (self.editor.gate1, noise.gate_time_1q_ns),
+                (self.editor.gate2, noise.gate_time_2q_ns),
             ):
                 widget.setValue(value)
             self.tabs.setCurrentWidget(self.editor)

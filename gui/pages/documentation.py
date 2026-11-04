@@ -5,6 +5,7 @@ from gui.widgets.button import PrimaryButton,SecondaryButton
 
 
 class DocumentationPage(PageBase):
+    import_requested=Signal()
     export_requested=Signal(str)
     cancel_requested=Signal()
     comparison_changed=Signal()
@@ -13,6 +14,10 @@ class DocumentationPage(PageBase):
     def __init__(self,parent=None):
         super().__init__("Documentação e evidências","Exporte dados, figuras, animações e a origem de cada resultado.",parent)
         self.context=QLabel("Abra uma execução para documentar.")
+        self.import_button=SecondaryButton("Importar estudo ZIP")
+        self.import_button.setToolTip("Verifica os hashes do pacote completo e importa execuções, análises, protocolos e anotações como cópias independentes.")
+        self.import_button.clicked.connect(self.import_requested.emit)
+        self.add_action(self.import_button)
         self.context.setWordWrap(True)
         self.body().addWidget(self.context)
         self.use_comparison=QCheckBox("Documentar as duas execuções da página Comparações")
@@ -131,6 +136,7 @@ class DocumentationPage(PageBase):
                 self.table.setItem(row,col,item)
 
     def set_running(self,running):
+        self.import_button.setEnabled(not running)
         for widget in (*self.buttons,self.use_comparison,self.include_analyses,self.include_gif,self.max_frames,self.frame_ms,self.report_template,*self.report_sections.values()):
             widget.setEnabled(not running)
         self.cancel.setVisible(running)

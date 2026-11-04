@@ -38,7 +38,7 @@ def bloch_figure(experiments, indices=None, *, qubits=None):
     selected=list(range(max_qubits)) if qubits is None else list(qubits)
     if not selected or any(type(q) is not int or q<0 or q>=max_qubits for q in selected) or len(set(selected))!=len(selected):
         raise ValueError("Selecione qubits existentes para a figura de Bloch.")
-    cols = min(3, len(selected))
+    cols = min(4, len(selected))
     per_run_rows = int(np.ceil(len(selected) / cols))
     fig = figure(7, 3.0 * per_run_rows * len(experiments))
     u, v = np.meshgrid(np.linspace(0, 2*np.pi, 20), np.linspace(0, np.pi, 13))
@@ -87,13 +87,22 @@ def histogram_figure(experiments, side_by_side=False):
     return fig
 
 
-def temporal_figure(experiments, series=None):
+def temporal_figure(experiments, series=None, *, reference="circuit"):
     from core.circuits import _build_hamiltonian
+    if reference not in ("circuit","exact"):
+        raise ValueError("Referência temporal desconhecida")
+    if reference == "exact" and any(exp.config.circuit is not None for exp in experiments):
+        raise ValueError("A referência exata exige evolução por Hamiltoniano")
     if len({bool(exp.config.circuit) for exp in experiments}) > 1:
         raise ValueError("Curvas temporais exigem o mesmo tipo de eixo: tempo de evolução ou índice da porta.")
     keys = [series] if series else ["fidelity", "purity", "energy"]
     fig = figure(7, 2.6 * len(keys))
     labels = {"fidelity": "Fidelidade ao circuito ideal", "purity": "Pureza global", "energy": "Energia ⟨H⟩"}
+    exact = {}
+    if reference == "exact":
+        from core.analysis import exact_states
+        labels["fidelity"] = "Fidelidade à evolução exata"
+        exact = {i:exact_states(exp.config,exp.result.times) for i,exp in enumerate(experiments) if exp.result.states}
     for j, key in enumerate(keys):
         ax = fig.add_subplot(len(keys), 1, j+1)
         for i, exp in enumerate(experiments):
@@ -107,7 +116,7 @@ def temporal_figure(experiments, series=None):
             values = []
             for k in indices:
                 if key == "fidelity":
-                    ideal = r.ideal_statevectors[k] if r.ideal_statevectors else (r.states[k] if not c.noise.enabled else None)
+                    ideal = exact[i][k] if reference == "exact" else r.ideal_statevectors[k] if r.ideal_statevectors else (r.states[k] if not c.noise.enabled else None)
                     value = None if ideal is None else fidelity(r.states[k], ideal)
                 elif key == "purity":
                     value = purity(r.states[k])

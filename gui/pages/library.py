@@ -8,6 +8,8 @@ from gui.widgets.button import SecondaryButton
 
 
 class LibraryPage(PageBase):
+    draft_changed = Signal()
+    loaded = Signal(str)
     template_save_requested = Signal(str)
     template_load_requested = Signal(str)
     annotation_requested = Signal(str, str, list)
@@ -115,6 +117,32 @@ class LibraryPage(PageBase):
         self.message.setWordWrap(True)
         self.body().addWidget(self.message)
         self.body().addStretch()
+        self.identifier = None
+        self._loading = False
+        for widget in (self.run_title,self.project,self.tags,self.categories,self.description,
+                       self.notes,self.objective,self.hypothesis,self.methodology):
+            widget.textChanged.connect(self._edited)
+
+    def _edited(self, *_):
+        if not self._loading:
+            self.draft_changed.emit()
+
+    def draft_payload(self):
+        return dict(self.annotation_payload(), project=self.project.text(), notes=self.notes.toPlainText(),
+                    tags=[value.strip() for value in self.tags.text().split(",") if value.strip()])
+
+    def restore_draft(self, state):
+        self._loading = True
+        try:
+            for key,name in (("title","run_title"),("project","project")):
+                getattr(self,name).setText(state.get(key,""))
+            for key in ("description","notes","objective","hypothesis","methodology"):
+                getattr(self,key).setPlainText(state.get(key,""))
+            for key in ("tags","categories"):
+                getattr(self,key).setText(", ".join(state.get(key,[])))
+        finally:
+            self._loading = False
+        self.message.setText("Anotações em edição recuperadas. Salve para incorporá-las ao caderno do experimento.")
 
     def annotation_payload(self):
         """Additional annotation fields; the legacy three-argument signal is stable."""
@@ -128,6 +156,8 @@ class LibraryPage(PageBase):
         }
 
     def load(self, data, identifier=None, title=None):
+        self._loading = True
+        self.identifier = identifier
         selected = self.templates.currentText()
         self.templates.clear()
         self.templates.addItems(sorted(data["templates"]))
@@ -149,3 +179,5 @@ class LibraryPage(PageBase):
             if identifier
             else "Modelos usam o formulário atual. Abra uma execução para nomear e anotar resultados."
         )
+        self._loading = False
+        self.loaded.emit(identifier or "")

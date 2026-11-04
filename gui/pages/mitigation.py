@@ -14,6 +14,7 @@ from gui.widgets.button import PrimaryButton
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
 import numpy as np
+from data.workspace import experiment_title
 
 
 class MitigationPage(PageBase):
@@ -70,7 +71,7 @@ class MitigationPage(PageBase):
 
     def load_experiment(self, experiment):
         self.has_experiment = not bool(experiment.result.error)
-        self.context.setText("Experimento " + experiment.id)
+        self.context.setText(experiment_title(experiment))
         self.qubit.setRange(0, experiment.config.system.num_qubits - 1)
         self.shots.setValue(experiment.config.shots)
         self.table.setRowCount(0)
@@ -89,7 +90,7 @@ class MitigationPage(PageBase):
             self.summary.setText(
                 f"Z do qubit {m['qubit']}: {m['extrapolated']:.6f} ± "
                 f"{m['extrapolated_stderr']:.6f} (erro padrão de amostragem). "
-                f"Fonte das métricas: {m['source_experiment_id']}."
+                "Métricas de estado pertencem à execução de origem preservada."
             )
             xs = np.array(m["scale_factors"])
             ys = np.array(m["measured"])
