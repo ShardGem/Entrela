@@ -31,6 +31,7 @@ def table_row_height(table, density=None, font_size=None):
 
 def configure_table(table, sortable=False, numeric_columns=()):
     """Apply consistent read-only table ergonomics without changing row semantics."""
+    first_configuration = not bool(table.property("dataTable"))
     table.setProperty("dataTable", True)
     table.setAlternatingRowColors(True)
     table.setShowGrid(False)
@@ -45,7 +46,10 @@ def configure_table(table, sortable=False, numeric_columns=()):
     table.verticalHeader().setMinimumSectionSize(28)
     header = table.horizontalHeader()
     header.setMinimumSectionSize(72)
-    header.setStretchLastSection(True)
+    # Reaplicar aparência não deve desfazer a distribuição definida pela página:
+    # no histórico, o nome usa o espaço livre e Visualizar mantém sua largura.
+    if first_configuration:
+        header.setStretchLastSection(True)
     header.setHighlightSections(False)
     table.setSortingEnabled(sortable)
     for row in range(table.rowCount()):

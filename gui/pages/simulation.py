@@ -318,6 +318,17 @@ class SimulationPage(PageBase):
         super().resizeEvent(event)
         self._arrange_workbench()
 
+    def _arrange_header(self):
+        super()._arrange_header()
+        # O menu estreito mantém os nomes; use o espaço real antes de empilhar
+        # o único botão desta página e criar outra rolagem com fonte ampliada.
+        if self._actions_slot.count() != 1:
+            return
+        action = self._actions_slot.itemAt(0)
+        text_width = max(self._title.minimumSizeHint().width(), self._subtitle.minimumSizeHint().width())
+        if text_width + action.sizeHint().width() + 72 <= self.width():
+            self._header.layout().setDirection(QHBoxLayout.LeftToRight)
+
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange):

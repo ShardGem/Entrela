@@ -149,10 +149,12 @@ QPushButton#NavGroup {{
     padding: 6px 10px; text-align: left; font-weight: 600; font-size: 13px;
 }}
 QPushButton#NavGroup:hover {{ background: {p.surface}; }}
-QPushButton#NavGroup[compact="true"] {{ padding: 6px 1px; text-align: center; font-size: 10px; letter-spacing: 0.1px; qproperty-iconSize: 10px 10px; }}
+QPushButton#NavGroup[compact="true"] {{ padding: 6px; text-align: left; }}
 QPushButton#NavGroup[activeGroup="true"] {{ color: {p.primary}; background: {p.primary_faint}; }}
-QPushButton#SidebarToggle {{ background: transparent; text-align: left; padding: 6px; color: {p.text_muted}; }}
-QPushButton#NavButton[compact="true"] {{ padding: 7px 4px; text-align: center; }}
+QToolButton#SidebarToggle {{ background: transparent; border: none; border-radius: 4px; padding: 4px; color: {p.text_muted}; font-size: 12px; }}
+QToolButton#SidebarToggle:hover {{ background: {p.surface_hover}; color: {p.text}; }}
+QToolButton#SidebarToggle:focus {{ border: 1px solid {p.primary}; }}
+QPushButton#NavButton[compact="true"] {{ padding: 7px 6px; text-align: left; }}
 QPushButton#NavButton {{
     qproperty-iconSize: 22px 22px;
     background: transparent;

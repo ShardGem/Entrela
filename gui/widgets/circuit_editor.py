@@ -4,7 +4,8 @@ from dataclasses import replace
 from pathlib import Path
 import json
 import math
-from PySide6.QtCore import Qt, Signal, QSignalBlocker, QMimeData, QEvent, QTimer
+from textwrap import fill
+from PySide6.QtCore import Qt, Signal, QSignalBlocker, QMimeData, QEvent, QTimer, QSize
 from PySide6.QtGui import QUndoStack, QUndoCommand, QKeySequence, QAction
 from PySide6.QtWidgets import (
     QWidget,
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QApplication,
     QPlainTextEdit,
+    QMessageBox,
 )
 from core.circuit_document import (
     CircuitDocument,
@@ -35,11 +37,26 @@ from gui.widgets.circuit_canvas import CircuitCanvas
 from gui.widgets.button import PrimaryButton, SecondaryButton, GhostButton
 from gui.widgets.scientific_input import ScientificSpinBox
 from gui.widgets.flow_layout import FlowLayout
+from gui.widgets.collapsible import CollapsibleSection
+from gui.widgets.circuit_guidance import GATE_NAMES, ANGLE_HELP, PHASE_HELP, TEMPLATES, QUICK_START
 from gui.icons import get_icon
 from gui.theme import PALETTE
 from data.circuit_library import CircuitLibrary
 
 CIRCUIT_CLIPBOARD = "application/x-entrela-circuit-gates"
+
+
+class GatePaletteButton(SecondaryButton):
+    """Reserve enough space for the symbol and its readable name."""
+    def sizeHint(self):
+        self.ensurePolished()
+        metrics = self.fontMetrics()
+        lines = self.text().splitlines() or [""]
+        return QSize(max(metrics.horizontalAdvance(line) for line in lines)+32,
+                     len(lines)*metrics.lineSpacing()+16)
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
 
 
 class DocumentChange(QUndoCommand):
@@ -88,18 +105,61 @@ class CircuitEditor(QWidget):
         self._history_actions = []
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
+        introduction = QLabel("Adicione portas ou carregue um modelo para começar.")
+        introduction.setWordWrap(True)
+        introduction.setObjectName("FieldHint")
+        root.addWidget(introduction)
+        self.creation_help = CollapsibleSection("Como criar um circuito")
+        self.creation_help.set_summary("")
+        self.creation_help.layout().removeWidget(self.creation_help.header)
+        self.creation_help.header.setParent(self)
+        self.creation_help.header.setText("Como criar")
+        self.creation_help.header.setToolTip("Como criar um circuito: passo a passo, controle e alvo, ângulos e leitura dos resultados.")
+        help_text = QLabel(QUICK_START)
+        help_text.setWordWrap(True)
+        help_text.setTextFormat(Qt.PlainText)
+        self.creation_help.content_layout.addWidget(help_text)
+        templates = FlowLayout()
+        self.template_selector = QComboBox()
+        self.template_selector.setAccessibleName("Modelo pronto de circuito")
+        self.template_selector.setMinimumContentsLength(18)
+        self.template_selector.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.template_selector.addItem("Escolha um modelo…", None)
+        for template in TEMPLATES:
+            self.template_selector.addItem(template.title, template.key)
+        templates.add_group(QLabel("Modelos prontos"), self.template_selector)
+        self.use_template = SecondaryButton("Carregar modelo")
+        self.use_template.setEnabled(False)
+        self.use_template.setToolTip("Abre uma cópia editável. Você decide quando executar; a opção Desfazer recupera o circuito anterior.")
+        self.use_template.clicked.connect(self._load_template)
+        templates.addWidget(self.use_template)
+        templates.addWidget(self.creation_help.header)
+        root.addLayout(templates)
+        root.addWidget(self.creation_help)
+        self.creation_help.hide()
+        self.creation_help.expanded_changed.connect(self.creation_help.setVisible)
+        self.template_hint = QLabel()
+        self.template_hint.setWordWrap(True)
+        self.template_hint.setObjectName("FieldHint")
+        self.template_hint.hide()
+        root.addWidget(self.template_hint)
+        self.template_selector.currentIndexChanged.connect(self._describe_template)
         toolbar = FlowLayout()
         self.qubits = QSpinBox()
         self.qubits.setRange(1, 6)
         self.qubits.setValue(2)
         self.qubits.setAccessibleName("Quantidade de qubits do editor")
+        self.qubits.setToolTip("Quantidade de linhas do circuito. q0 é o primeiro qubit; a numeração começa em zero. Use de 1 a 6.")
         toolbar.add_group(QLabel("Qubits"), self.qubits)
         self.phase = QLineEdit("0")
         self.phase.setMaximumWidth(125)
         self.phase.setAccessibleName("Fase global em radianos")
+        self.phase.setToolTip(PHASE_HELP)
         phase_button = SecondaryButton("Aplicar")
         phase_button.clicked.connect(self._apply_phase)
-        toolbar.add_group(QLabel("Fase global"), self.phase, phase_button)
+        phase_label = QLabel("Fase global (rad)")
+        phase_label.setToolTip(PHASE_HELP)
+        toolbar.add_group(phase_label, self.phase, phase_button)
         for title, key in [
             ("Desfazer", QKeySequence.Undo),
             ("Refazer", QKeySequence.Redo),
@@ -133,14 +193,17 @@ class CircuitEditor(QWidget):
                 "Novo",
                 self._new,
             ),
-            ("Bell", self._bell),
-            ("Abrir JSON / QASM", self._import),
-            ("Salvar JSON / QASM", self._export),
-            ("SVG do trecho", self._export_svg),
+            ("Abrir circuito…", self._import),
+            ("Salvar circuito…", self._export),
+            ("Exportar desenho…", self._export_svg),
             ("Ajustar visão", lambda: self.canvas.fit_circuit()),
         ]:
             button = GhostButton(text)
             button.clicked.connect(callback)
+            if callback in (self._import, self._export):
+                button.setToolTip("JSON guarda portas e parâmetros. OpenQASM é um formato de código para circuitos quânticos.")
+            elif callback == self._export_svg:
+                button.setToolTip("Exporta o trecho visível como imagem vetorial SVG, que pode ser ampliada sem perder nitidez.")
             files.addWidget(button)
         files.addWidget(self.zoom)
         root.addLayout(files)
@@ -202,7 +265,9 @@ class CircuitEditor(QWidget):
         self.palette_grid = palette_body
         self.palette_buttons = {}
         for i, name in enumerate(GATES):
-            button = SecondaryButton(name.upper())
+            symbol, title = GATE_NAMES[name]
+            button = GatePaletteButton(symbol + "\n" + fill(title, width=12))
+            button.setAccessibleName(f"Adicionar {symbol}: {title}")
             button.setToolTip(GATE_HELP[name] + "\nAdicionar após a seleção.")
             button.clicked.connect(lambda _, n=name: self._add(n))
             palette_body.addWidget(button, i // 2, i % 2)
@@ -215,6 +280,7 @@ class CircuitEditor(QWidget):
         self._palette_columns = 2
         row.addWidget(palette_scroll)
         self.canvas = CircuitCanvas(editable=True)
+        self.canvas.setMinimumWidth(220)
         self.canvas.zoom_changed.connect(self._sync_zoom)
         row.addWidget(self.canvas, 1)
         self.canvas.operations_selected.connect(self._select_many)
@@ -232,34 +298,46 @@ class CircuitEditor(QWidget):
         self.gate_dependencies.setWordWrap(True)
         self.gate_dependencies.setObjectName("SectionSubtitle")
         form_body.addWidget(self.gate_dependencies)
+        matrix_section = CollapsibleSection("Matriz da porta")
+        matrix_section.set_summary("")
+        matrix_section.header.setToolTip("Inspeção matemática opcional da porta selecionada.")
+        matrix_note = QLabel("A matriz descreve matematicamente a operação. Você não precisa preenchê-la para criar o circuito.")
+        matrix_note.setWordWrap(True)
+        matrix_note.setObjectName("FieldHint")
+        matrix_section.content_layout.addWidget(matrix_note)
         self.gate_matrix = QPlainTextEdit()
         self.gate_matrix.setReadOnly(True)
         self.gate_matrix.setMaximumHeight(145)
         self.gate_matrix.setAccessibleName("Matriz unitária da porta selecionada")
         self.gate_matrix.setToolTip("Matriz numérica do Qiskit. A base local é |q[k−1]…q[0]⟩, pela ordem das conexões da porta.")
-        form_body.addWidget(self.gate_matrix)
+        matrix_section.content_layout.addWidget(self.gate_matrix)
+        form_body.addWidget(matrix_section)
         form = QFormLayout()
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.gate_type = QComboBox()
         self.gate_type.addItems(list(GATES))
-        form.addRow("Porta", self.gate_type)
+        self.gate_type.setToolTip("Código da porta usada no desenho. A explicação acima mostra seu nome e efeito.")
+        form.addRow("Porta no desenho", self.gate_type)
         self.qubit_fields = []
         self.param_fields = []
         for i in range(3):
             spin = QSpinBox()
             spin.setRange(0, 1)
+            spin.setPrefix("q")
             spin.setAccessibleName(f"Conexão {i + 1} da porta")
             self.qubit_fields.append(spin)
             form.addRow(f"Qubit {i + 1}", spin)
-        for name in ("θ / ângulo", "φ", "λ"):
+        for name in ("Ângulo θ (rad)", "Fase φ (rad)", "Fase λ (rad)"):
             field = QLineEdit("0")
             field.setPlaceholderText("pi/2")
             field.setAccessibleName(name)
+            field.setToolTip(ANGLE_HELP)
             self.param_fields.append(field)
             form.addRow(name, field)
         self.gate_form = form
         form_body.addLayout(form)
-        apply = PrimaryButton("Aplicar à porta")
+        apply = PrimaryButton("Aplicar alterações")
+        apply.setToolTip("Atualiza a porta selecionada com os qubits e ângulos dos campos.")
         apply.clicked.connect(self._apply_gate)
         form_body.addWidget(apply)
         for text, callback in [
@@ -272,17 +350,21 @@ class CircuitEditor(QWidget):
             button = SecondaryButton(text)
             button.clicked.connect(callback)
             form_body.addWidget(button)
-        note = QLabel(
-            "Ângulos em radianos. Aceita pi/2, −pi/4 ou decimais. As medições em Z são adicionadas ao final."
-        )
+        note = QLabel("q0 é o primeiro qubit. Use qubits diferentes em portas controladas.\n" + ANGLE_HELP)
         note.setWordWrap(True)
         form_body.addWidget(note)
         noise_toggle = QToolButton()
         noise_toggle.setText("Mais opções de ruído")
         noise_toggle.setCheckable(True)
         advanced = QWidget()
-        advanced_form = QFormLayout(advanced)
+        advanced_layout = QVBoxLayout(advanced)
+        thermal_help = QLabel("T₁ descreve o relaxamento das populações; T₂, a perda de coerência. Ambos são medidos em microssegundos (µs), com T₂ ≤ 2T₁. Durações de porta usam nanossegundos (ns).")
+        thermal_help.setWordWrap(True)
+        thermal_help.setObjectName("FieldHint")
+        advanced_layout.addWidget(thermal_help)
+        advanced_form = QFormLayout()
         advanced_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        advanced_layout.addLayout(advanced_form)
         self.noise_kind = QComboBox()
         self.noise_kind.addItem("Despolarizador", "Despolarizador")
         self.noise_kind.addItem("Térmico (T₁/T₂)", "Termico")
@@ -314,13 +396,16 @@ class CircuitEditor(QWidget):
         inspector_scroll.setMaximumWidth(280)
         row.addWidget(inspector_scroll)
         root.addLayout(row, 1)
-        settings = QGridLayout()
+        settings = FlowLayout()
         self.shots = QSpinBox()
         self.shots.setRange(1, 1_000_000)
         self.shots.setValue(1024)
+        self.shots.setAccessibleName("Número de medições do circuito (shots)")
+        self.shots.setToolTip("Quantidade de repetições: preparar e medir o circuito. Mais medições reduzem flutuações de contagem, mas não removem o ruído.")
         self.seed = QLineEdit("42")
         self.seed.setMaximumWidth(110)
         self.seed.setPlaceholderText("Automática")
+        self.seed.setToolTip("Número inteiro que controla a amostragem. Exemplo: 42. Deixe vazio para gerar e registrar uma semente automaticamente.")
         self.noise = QCheckBox("Ativar ruído")
         self.p1 = ScientificSpinBox()
         self.p2 = ScientificSpinBox()
@@ -328,19 +413,22 @@ class CircuitEditor(QWidget):
             w.setRange(0, 1)
             w.setValue(value)
             w.setMaximumWidth(100)
-        for text, widget, row, column in [
-            ("Shots", self.shots, 0, 0),
-            ("Semente", self.seed, 0, 2),
-            ("p1", self.p1, 1, 0),
-            ("p2", self.p2, 1, 2),
+        self.p1.setToolTip("Parâmetro p₁ de despolarização aplicado por porta de um qubit, entre 0 e 1. Zero desativa esse canal.")
+        self.p2.setToolTip("Parâmetro p₂ de despolarização aplicado por porta de dois qubits, entre 0 e 1. Zero desativa esse canal.")
+        for text, widget in [
+            ("Medições (shots)", self.shots),
+            ("Semente", self.seed),
+            ("Ruído em 1 qubit (p₁)", self.p1),
+            ("Ruído em 2 qubits (p₂)", self.p2),
         ]:
-            settings.addWidget(QLabel(text), row, column)
-            settings.addWidget(widget, row, column + 1)
-        settings.addWidget(self.noise, 0, 4, 1, 2)
+            label = QLabel(text)
+            label.setToolTip(widget.toolTip())
+            label.setBuddy(widget)
+            settings.add_group(label, widget)
+        settings.addWidget(self.noise)
         self.run = PrimaryButton("Executar circuito", icon="play")
         self.run.clicked.connect(self._run)
-        settings.addWidget(self.run, 1, 4, 1, 2)
-        settings.setColumnStretch(5, 1)
+        settings.addWidget(self.run)
         root.addLayout(settings)
         self.message = QLabel(
             "Até 200 portas · Ctrl+clique seleciona várias · Ctrl+C/V copia e cola · arraste para reordenar."
@@ -385,6 +473,34 @@ class CircuitEditor(QWidget):
                     noise_kind=self.noise_kind.currentData(),
                     **{key:getattr(self,key).value() for key in ("p1", "p2", "t1", "t2", "gate1", "gate2")})
 
+    def _describe_template(self):
+        key = self.template_selector.currentData()
+        template = next((item for item in TEMPLATES if item.key == key), None)
+        self.use_template.setEnabled(template is not None and not self._running)
+        self.template_hint.setVisible(template is not None)
+        if template:
+            self.template_hint.setText(template.instruction + " " + template.prediction +
+                                       " Previsão analítica sem ruído; contagens finitas podem variar. Carregar não executa.")
+
+    def _load_template(self):
+        if self._running:
+            return
+        template = next((item for item in TEMPLATES if item.key == self.template_selector.currentData()), None)
+        if template is None:
+            return
+        if self.document.gates and self.document != template.document:
+            answer = QMessageBox.question(self, "Carregar modelo de circuito?",
+                "O modelo substituirá as portas em edição. Você pode recuperar o circuito anterior com Desfazer. Deseja continuar?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                return
+        self.replace_document(template.document, "Carregar modelo: " + template.title)
+        if not self.circuit_name.text().strip():
+            self.circuit_name.setText(template.title)
+        if not self.circuit_description.text().strip():
+            self.circuit_description.setText(template.instruction + " Previsão analítica ideal: " + template.prediction)
+        self.message.setText("Modelo carregado para edição. Escolha as medições e o ruído e clique em Executar circuito para gerar resultados.")
+
     def restore_draft(self, state):
         document = CircuitDocument.from_dict(state["document"])
         self._set_document(document)
@@ -416,7 +532,7 @@ class CircuitEditor(QWidget):
         """Reserve actual styled button widths instead of clipping two columns."""
         if not hasattr(self, "palette_scroll"):
             return
-        columns = 1 if self.width() < 720 else 2
+        columns = 1 if self.width() < 1000 * max(1, self.font().pixelSize()/15) else 2
         if columns != self._palette_columns:
             for button in self.palette_buttons.values():
                 self.palette_grid.removeWidget(button)
@@ -426,6 +542,7 @@ class CircuitEditor(QWidget):
         widths = [0] * columns
         for index, button in enumerate(self.palette_buttons.values()):
             button.ensurePolished()
+            button.setMinimumHeight(button.sizeHint().height())
             widths[index % columns] = max(widths[index % columns], button.minimumSizeHint().width())
         margins = self.palette_grid.contentsMargins()
         width = (sum(widths) + max(0, columns - 1) * self.palette_grid.horizontalSpacing()
@@ -569,7 +686,7 @@ class CircuitEditor(QWidget):
         self.qubits.setValue(document.num_qubits)
         self.phase.setText(repr(float(document.global_phase)))
         self.phase.setCursorPosition(0)
-        self.phase.setToolTip(repr(float(document.global_phase)) + " rad")
+        self.phase.setToolTip(PHASE_HELP + " Valor atual: " + repr(float(document.global_phase)) + " rad.")
         del blockers
         for field in self.qubit_fields:
             field.setRange(0, document.num_qubits - 1)
@@ -633,15 +750,20 @@ class CircuitEditor(QWidget):
     def _show_fields(self, *_):
         name = self.gate_type.currentText()
         _, arity, nparams = GATES[name]
-        self.gate_help.setText(GATE_HELP[name])
+        symbol, title = GATE_NAMES[name]
+        explanation = GATE_HELP[name]
+        self.gate_help.setText(f"{symbol} — " + (explanation if explanation.startswith(title) else title + ". " + explanation))
         for i, w in enumerate(self.qubit_fields):
             self.gate_form.setRowVisible(w, i < arity)
             label = (
-                ("Alvo" if i == arity - 1 else "Controle " + str(i + 1))
+                ("Qubit alvo" if i == arity - 1 else "Qubit de controle " + str(i + 1))
                 if name in ("cx", "cy", "cz", "ch", "ccx")
                 else "Qubit " + str(i + 1)
             )
             self.gate_form.labelForField(w).setText(label)
+            w.setAccessibleName(label)
+            w.setToolTip("Escolha a linha do circuito, de q0 a q" + str(self.document.num_qubits-1) +
+                         ". Em portas controladas, controle e alvo devem ser qubits diferentes.")
         for i, w in enumerate(self.param_fields):
             self.gate_form.setRowVisible(w, i < nparams)
 
@@ -806,6 +928,7 @@ class CircuitEditor(QWidget):
         self._running = running
         self.run.setEnabled(not running)
         self.run.setText("Executando…" if running else "Executar circuito")
+        self._describe_template()
 
     def _import(self):
         path, _ = QFileDialog.getOpenFileName(

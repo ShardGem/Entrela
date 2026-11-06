@@ -83,8 +83,8 @@ def test_ctrl_click_multiselection_and_clipboard_shortcut_respects_text_fields(e
     assert QApplication.clipboard().text() == "Texto para copiar"
 
 
-@pytest.mark.parametrize("width", [680, 880, 1280])
-def test_gate_palette_columns_fit_viewport_at_different_widths(editor, qt_app, width):
+@pytest.mark.parametrize("width,columns", [(680, 1), (880, 1), (1280, 2)])
+def test_gate_palette_columns_fit_viewport_at_different_widths(editor, qt_app, width, columns):
     from gui.theme import build_qss
     editor.setStyleSheet(build_qss())
     editor.resize(width, 850)
@@ -97,7 +97,9 @@ def test_gate_palette_columns_fit_viewport_at_different_widths(editor, qt_app, w
         position = button.mapTo(viewport, button.rect().topLeft())
         assert position.x() >= 0
         assert position.x() + button.width() <= viewport.width()
-    assert editor._palette_columns == (1 if editor.width() < 720 else 2)
+    # Readable gate names need more room than symbols alone. Narrow editors
+    # keep one column so the drawing and inspector retain usable space.
+    assert editor._palette_columns == columns
 
 
 def test_named_revisions_restore_without_overwriting_and_duplicate(editor, tmp_path):

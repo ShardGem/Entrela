@@ -29,7 +29,7 @@ class SettingsPage(PageBase):
         self.theme.setToolTip('O modo automático acompanha a preferência de cores informada pelo sistema operacional.')
         self.density.setToolTip('Ajusta os espaços de botões, formulários e tabelas. Não altera a escala dos dados.')
         self.presentation = QCheckBox('Fonte maior e navegação compacta · F11 para tela cheia')
-        self.compact = QCheckBox('Usar navegação compacta com nomes dos grupos')
+        self.compact = QCheckBox('Usar menu mais estreito, mantendo os nomes dos itens')
         self._card('Aparência', [
             ('Tema', self.theme), ('Cor de destaque', self.accent),
             ('Tamanho do texto', self.font_size), ('Densidade', self.density),

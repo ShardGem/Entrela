@@ -1,7 +1,7 @@
-"""Grouped navigation with an accessible accordion and a compact rail."""
+"""Navegação com grupos independentes e nomes visíveis nas duas larguras."""
 from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation, QEasingCurve, QEvent, QTimer
-from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QLabel,QScrollArea
-from gui.icons import get_icon,get_pixmap
+from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QToolButton,QLabel,QScrollArea
+from gui.icons import get_icon
 from gui.theme import PALETTE
 from gui.branding import application_icon
 
@@ -42,7 +42,6 @@ class Sidebar(QFrame):
             ('lab','Laboratório','group-lab',('simulation','circuit','results','bloch')),
             ('research','Pesquisa','group-research',('analysis','mitigation','comparison')),
             ('organize','Acervo','group-organize',('history','library','documentation'))]
-    COMPACT_LABELS={'start':'INÍCIO','lab':'LAB','research':'PESQ.','organize':'ACERVO'}
     DESCRIPTIONS={
         'analysis':'Varreduras de parâmetros e benchmark de mitigação.',
         'simulation':'Defina o sistema, a evolução temporal e o modelo de ruído.',
@@ -59,7 +58,7 @@ class Sidebar(QFrame):
         self._animations={}
         self._compact=False
         self._active='dashboard'
-        self._expanded='start'
+        self._expanded_groups={key for key,_,_,_ in self.GROUPS}
         self._build()
         self.set_compact(False)
         self.set_active('dashboard')
@@ -78,12 +77,20 @@ class Sidebar(QFrame):
         self.logo_title.setObjectName('SidebarLogo')
         brand.addWidget(self.logo_title,1)
         outer.addLayout(brand)
-        self.toggle=QPushButton()
+        navigation = QHBoxLayout()
+        caption = QLabel('Navegação')
+        self.navigation_caption = caption
+        caption.setObjectName('SectionSubtitle')
+        navigation.addWidget(caption,1)
+        self.toggle=QToolButton()
         self.toggle.setObjectName('SidebarToggle')
+        self.toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.toggle.setCursor(Qt.PointingHandCursor)
         self.toggle.setMinimumHeight(38)
         self.toggle.setIconSize(QSize(22,22))
         self.toggle.clicked.connect(lambda:self.compact_requested.emit(not self._compact))
-        outer.addWidget(self.toggle)
+        navigation.addWidget(self.toggle)
+        outer.addLayout(navigation)
         self.scroll=QScrollArea()
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setWidgetResizable(True)
@@ -128,12 +135,15 @@ class Sidebar(QFrame):
         outer.addWidget(self.buttons['settings'])
 
     def _expand(self,key):
-        self._expanded=None if self._expanded==key else key
+        if key in self._expanded_groups:
+            self._expanded_groups.remove(key)
+        else:
+            self._expanded_groups.add(key)
         self._refresh_groups(animate=True)
 
     def _finish_animation(self,key):
         body=self.group_bodies[key]
-        expanded=key==self._expanded
+        expanded=key in self._expanded_groups
         body.setVisible(expanded)
         body.setMaximumHeight(16777215 if expanded else 0)
 
@@ -141,7 +151,7 @@ class Sidebar(QFrame):
         app=QApplication.instance()
         motion=self.isVisible() and not bool(app.property('entrelaReduceMotion') if app else False)
         for key,title,icon,items in self.GROUPS:
-            expanded=key==self._expanded
+            expanded=key in self._expanded_groups
             body=self.group_bodies[key]
             animation=self._animations[key]
             current=body.height() if body.isVisible() else 0
@@ -157,7 +167,9 @@ class Sidebar(QFrame):
             else:
                 self._finish_animation(key)
             button=self.group_buttons[key]
-            button.setText(self.COMPACT_LABELS[key] if self._compact else title+'   '+('−' if expanded else '+'))
+            button.setText(title+(' ' if self._compact else '   ')+('−' if expanded else '+'))
+            button.setCheckable(True)
+            button.setChecked(expanded)
             button.setToolTip(title+(' — recolher grupo' if expanded else ' — expandir grupo')+'\n'+' · '.join(dict(self.ITEMS)[page] for page in items))
             button.setAccessibleName(title+(' — grupo expandido' if expanded else ' — grupo recolhido'))
             button.setProperty('activeGroup',self._active in items)
@@ -165,8 +177,8 @@ class Sidebar(QFrame):
             button.setProperty('expanded',expanded)
             button.style().unpolish(button)
             button.style().polish(button)
-            button.setIcon(get_icon('chevron-up' if expanded else 'chevron-down',PALETTE.text_muted) if self._compact else get_icon(icon,PALETTE.primary if self._active in items else PALETTE.text_muted))
-            button.setIconSize(QSize(12,12) if self._compact else QSize(24,24))
+            button.setIcon(get_icon(icon,PALETTE.primary if self._active in items else PALETTE.text_muted))
+            button.setIconSize(QSize(24,24))
 
     def _on_click(self,key):
         self.set_active(key)
@@ -178,21 +190,22 @@ class Sidebar(QFrame):
             button.setChecked(page==key)
         group=next((name for name,_,_,items in self.GROUPS if key in items),None)
         if group:
-            self._expanded=group
+            self._expanded_groups.add(group)
         self._refresh_groups()
         if key in self.buttons:
             self.scroll.ensureWidgetVisible(self.buttons[key]) if key!='settings' else None
 
     def set_compact(self,compact):
         self._compact=bool(compact)
-        self.logo_title.setVisible(not compact)
-        self.toggle.setText('' if compact else '  Recolher navegação')
+        self.logo_title.show()
+        self.navigation_caption.setVisible(not compact)
+        self.toggle.setText('Expandir menu' if compact else 'Recolher')
         self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.text_muted))
         self.toggle.setToolTip('Expandir navegação' if compact else 'Recolher navegação')
         self.toggle.setAccessibleName(self.toggle.toolTip())
         for key,label in self.ITEMS:
             button=self.buttons[key]
-            button.setText('' if compact else '  '+label)
+            button.setText(label)
             button.setProperty('compact',bool(compact))
             button.style().unpolish(button)
             button.style().polish(button)
@@ -203,9 +216,25 @@ class Sidebar(QFrame):
 
     def _fit_width(self):
         if self._compact:
-            text_width = max(button.fontMetrics().horizontalAdvance(button.text()) for button in self.group_buttons.values())
-            self.setFixedWidth(max(96, text_width+52))
+            word_width = max(button.fontMetrics().horizontalAdvance(word)
+                             for button in self.buttons.values() for word in button.label.split())
+            heading_width = max(button.sizeHint().width() for button in self.group_buttons.values())
+            width = max(184, word_width+92, heading_width+40)
+            self.setFixedWidth(width)
+            for button in self.buttons.values():
+                lines = ['']
+                for word in button.label.split():
+                    candidate = (lines[-1]+' '+word).strip()
+                    if lines[-1] and button.fontMetrics().horizontalAdvance(candidate) > width-92:
+                        lines.append(word)
+                    else:
+                        lines[-1] = candidate
+                button.setText('\n'.join(lines))
+                button.setMinimumHeight(max(44, len(lines)*button.fontMetrics().height()+16))
         else:
+            for button in self.buttons.values():
+                button.setText(button.label)
+                button.setMinimumHeight(44)
             text_width = max(button.sizeHint().width() for button in self.buttons.values())
             self.setFixedWidth(max(280, text_width+32))
 

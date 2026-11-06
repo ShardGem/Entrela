@@ -66,15 +66,17 @@ def test_compact_group_hierarchy_and_motion_preference(window, qt_app):
     from tests.qt_helpers import wait_until
     sidebar = window.sidebar
     sidebar.set_compact(True)
-    assert sidebar.group_buttons['research'].text() == 'PESQ.'
+    assert 'Pesquisa' in sidebar.group_buttons['research'].text()
+    assert all(not body.isHidden() for body in sidebar.group_bodies.values())
     assert 'Comparar execuções' in sidebar.buttons['comparison'].toolTip()
     sidebar.group_buttons['research'].click()
-    sidebar.group_buttons['lab'].click()
     wait_until(lambda: sidebar.group_bodies['research'].isHidden())
     assert not sidebar.group_bodies['lab'].isHidden()
     qt_app.setProperty('entrelaReduceMotion', True)
     sidebar.group_buttons['organize'].click()
-    assert sidebar.group_bodies['lab'].isHidden()
+    assert not sidebar.group_bodies['lab'].isHidden()
+    assert sidebar.group_bodies['organize'].isHidden()
+    sidebar.group_buttons['organize'].click()
     assert not sidebar.group_bodies['organize'].isHidden()
     qt_app.setProperty('entrelaReduceMotion', False)
 

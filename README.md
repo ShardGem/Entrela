@@ -12,6 +12,16 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Revisão da interface — 0.18.1
+
+- Splash original restaurada, preservando o orçamento de três segundos.
+- Grupos do menu abertos por padrão e recolhimento independente.
+- Menu estreito com nomes dos itens visíveis e controle de largura identificado.
+- Criação de circuitos com nomes explicados, orientação de preenchimento e modelos editáveis.
+- Novas mensagens de commit e descrições de atualizações em português brasileiro.
+
+Veja o [guia da revisão e sua validação](docs/revisao-interface-0.18.1.md).
+
 ## Interface do laboratório — 0.18
 
 - Configuração, preparação ideal e revisão organizadas no mesmo fluxo; execução e validação sempre acessíveis.
@@ -122,7 +132,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.18.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.18.1-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.
