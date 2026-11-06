@@ -34,6 +34,7 @@ from core.types import ExperimentConfig, SystemConfig, SimulationProtocol, Noise
 from gui.widgets.circuit_canvas import CircuitCanvas
 from gui.widgets.button import PrimaryButton, SecondaryButton, GhostButton
 from gui.widgets.scientific_input import ScientificSpinBox
+from gui.widgets.flow_layout import FlowLayout
 from gui.icons import get_icon
 from gui.theme import PALETTE
 from data.circuit_library import CircuitLibrary
@@ -87,21 +88,18 @@ class CircuitEditor(QWidget):
         self._history_actions = []
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        toolbar = QHBoxLayout()
+        toolbar = FlowLayout()
         self.qubits = QSpinBox()
         self.qubits.setRange(1, 6)
         self.qubits.setValue(2)
         self.qubits.setAccessibleName("Quantidade de qubits do editor")
-        toolbar.addWidget(QLabel("Qubits"))
-        toolbar.addWidget(self.qubits)
+        toolbar.add_group(QLabel("Qubits"), self.qubits)
         self.phase = QLineEdit("0")
         self.phase.setMaximumWidth(125)
         self.phase.setAccessibleName("Fase global em radianos")
-        toolbar.addWidget(QLabel("Fase global"))
-        toolbar.addWidget(self.phase)
         phase_button = SecondaryButton("Aplicar")
         phase_button.clicked.connect(self._apply_phase)
-        toolbar.addWidget(phase_button)
+        toolbar.add_group(QLabel("Fase global"), self.phase, phase_button)
         for title, key in [
             ("Desfazer", QKeySequence.Undo),
             ("Refazer", QKeySequence.Redo),
@@ -122,9 +120,8 @@ class CircuitEditor(QWidget):
             button.setToolButtonStyle(Qt.ToolButtonIconOnly)
             button.setAccessibleName(title)
             toolbar.addWidget(button)
-        toolbar.addStretch()
         root.addLayout(toolbar)
-        files = QHBoxLayout()
+        files = FlowLayout()
         self.zoom = QSpinBox()
         self.zoom.setRange(35, 250)
         self.zoom.setValue(100)

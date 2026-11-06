@@ -36,8 +36,13 @@ class DraftController(QObject):
         page = window.page_simulation
         page.experiment_name.textChanged.connect(self.schedule)
         page.experiment_description.textChanged.connect(self.schedule)
+        page.description_toggle.toggled.connect(self.schedule)
+        page.science.expanded_changed.connect(self.schedule)
         page.config_panel.parametros_alterados.connect(self.schedule)
         page.config_panel.mode_changed.connect(self.schedule)
+        page.config_panel.section_changed.connect(self.schedule)
+        for section in page.config_panel.sections.values():
+            section.expanded_changed.connect(self.schedule)
         window.page_circuit.editor.draft_changed.connect(self.schedule)
         window.page_circuit.editor.document_replacing.connect(self.remember_editor)
         window.page_circuit.editor.recovery_requested.connect(self.choose_editor_recovery)
@@ -82,8 +87,15 @@ class DraftController(QObject):
                 panel.input_seed.setText(controls["seed"])
             if "mode" in saved:
                 panel.set_mode(saved["mode"])
+            if saved.get("section") in panel.sections:
+                panel.set_section(saved["section"])
+            if isinstance(saved.get("expanded_sections"),list):
+                for key,section in panel.sections.items():
+                    section.set_expanded(key in saved["expanded_sections"] or (panel.current_mode=="guided" and key==panel.current_section),animate=False)
             page.experiment_name.setText(saved.get("name", ""))
             page.experiment_description.setText(saved.get("description", ""))
+            page.description_toggle.setChecked(saved.get("description_expanded", bool(page.experiment_description.text())))
+            page.science.set_expanded(saved.get("review_expanded", False), animate=False)
             self.window.page_library.name.setText(self.state.get("template_name",""))
             protocol = self.protocols.get("draft",{})
             self.window.page_analysis.protocol.loaded = protocol.get("loaded")
@@ -153,7 +165,10 @@ class DraftController(QObject):
         state = dict(editor=self.window.page_circuit.editor.draft_state(),
                      simulation=dict(name=page.experiment_name.text(), description=page.experiment_description.text(),
                                      controls=panel.coletar_tudo(), mode=panel.current_mode,
+                                     section=panel.current_section,
                                      initial=panel.combo_initial.currentData(), order=panel.combo_order.currentData(),
+                                     expanded_sections=[key for key,section in panel.sections.items() if section.is_expanded],
+                                     description_expanded=page.description_toggle.isChecked(), review_expanded=page.science.is_expanded,
                                      committed_name=self.identity_baseline[0],committed_description=self.identity_baseline[1]),
                      annotations=self.annotations, protocols=self.protocols,template_name=self.window.page_library.name.text(),
                      editor_history=self.history[-10:])

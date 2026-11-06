@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -12,12 +12,14 @@ from PySide6.QtWidgets import (
     QFrame,
 )
 
-from gui.theme import PALETTE, SPACING
+from gui.theme import SPACING
+from gui.widgets.flow_layout import FlowLayout
 
 
 class PageBase(QWidget):
     def __init__(self, title: str, subtitle: str = "", parent=None):
         super().__init__(parent)
+        self.setObjectName("PageSurface")
         self._root = QVBoxLayout(self)
         self._root.setContentsMargins(0, 0, 0, 0)
         self._root.setSpacing(0)
@@ -41,7 +43,7 @@ class PageBase(QWidget):
         text_col.addWidget(self._subtitle)
 
         header_layout.addLayout(text_col, 1)
-        self._actions_slot = QHBoxLayout()
+        self._actions_slot = FlowLayout()
         self._actions_slot.setSpacing(SPACING.sm)
         header_layout.addLayout(self._actions_slot)
 
@@ -74,7 +76,22 @@ class PageBase(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        narrow = self.width() < 950
+        self._arrange_header()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._arrange_header()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, "_actions_slot"):
+            self._arrange_header()
+
+    def _arrange_header(self):
+        actions = [item for item in self._actions_slot.items if not item.isEmpty()]
+        action_width = sum(item.sizeHint().width() for item in actions)
+        action_width += max(0, len(actions)-1) * self._actions_slot.spacing()
+        narrow = self.width() < 360 * max(1,self.font().pixelSize()/15) + action_width + 72
         self._header.layout().setDirection(
             QHBoxLayout.TopToBottom if narrow else QHBoxLayout.LeftToRight
         )

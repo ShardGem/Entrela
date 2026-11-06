@@ -10,15 +10,15 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Palette:
     # Superfícies
-    bg: str = "#080c12"
-    bg_elevated: str = "#121214"
-    surface: str = "#111923"
-    surface_hover: str = "#18181b"
-    surface_active: str = "#1f1f23"
+    bg: str = "#0c1420"
+    bg_elevated: str = "#101b29"
+    surface: str = "#142131"
+    surface_hover: str = "#1c2d40"
+    surface_active: str = "#243a50"
 
     # Bordas
-    border: str = "#1e1e22"
-    border_strong: str = "#566170"
+    border: str = "#293b50"
+    border_strong: str = "#61758c"
 
     # Acento
     primary: str = "#58d6ff"
@@ -30,16 +30,16 @@ class Palette:
     text_on_primary: str = "#0a0a0b"
 
     # Texto
-    text: str = "#e8e8ea"
-    text_muted: str = "#8b8b90"
-    text_dim: str = "#8995a6"
+    text: str = "#e7eef7"
+    text_muted: str = "#a0afc2"
+    text_dim: str = "#91a3ba"
 
     # Semânticas
-    success: str = "#22c55e"
+    success: str = "#4ade80"
     success_bg: str = "#0d2818"
     warning: str = "#f59e0b"
     warning_bg: str = "#2a1e05"
-    danger: str = "#ef4444"
+    danger: str = "#fb7185"
     danger_bg: str = "#2a0e0c"
     info: str = "#58d6ff"
     info_bg: str = "#0d2933"
@@ -95,12 +95,14 @@ def build_qss(*, density="comfortable") -> str:
     return f"""
 * {{ font-family: {family}; font-size: 13px; outline: none; }}
 
-QWidget {{ background-color: {p.bg}; color: {p.text}; }}
+QWidget {{ background-color: transparent; color: {p.text}; }}
+QWidget#PageSurface, QDialog, QDockWidget, QStackedWidget {{ background-color: {p.bg}; }}
 QLabel#HeroTitle {{ font-size: 32px; font-weight: 600; padding: 12px 0; }}
 QLabel#LeadText {{ color: {p.text_muted}; font-size: 14px; padding: 6px 0; }}
 QPushButton#HelpButton {{ padding: 0; min-width: 20px; min-height: 20px; }}
 QPushButton:focus, QPushButton#NavButton:focus, QPushButton#PrimaryButton:focus {{ border: 2px solid {p.text}; }}
 QTabWidget::pane {{ border: 1px solid {p.border}; }}
+QTabWidget#WorkbenchTabs::pane {{ border: none; }}
 QTabBar::tab {{ background: {p.surface}; padding: 10px 16px; color: {p.text_muted}; }}
 QTabBar::tab:selected {{ color: {p.primary}; border-bottom: 2px solid {p.primary}; }}
 QListWidget {{ background: {p.surface}; border: 1px solid {p.border}; padding: 8px; }}
@@ -214,6 +216,27 @@ QFrame#Card {{
     border-radius: {RADIUS.lg}px;
 }}
 
+QFrame#IdentityCard, QFrame#SectionCard {{
+    background-color: {p.surface}; border: 1px solid {p.border}; border-radius: {RADIUS.md}px;
+}}
+QToolButton#SectionToggle {{
+    background: transparent; border: none; text-align: left; font-weight: 600; font-size: 14px;
+    padding: 4px 0; min-height: 24px;
+}}
+QToolButton#SectionToggle:hover {{ color: {p.primary}; }}
+QToolButton#SectionToggle:focus {{ border: 1px solid {p.primary}; }}
+QPushButton#ConfigStep {{ background: {p.bg_elevated}; color: {p.text_muted}; border: 1px solid {p.border}; padding: 6px 10px; }}
+QPushButton#ConfigStep:checked {{ color: {p.primary}; border-color: {p.primary}; background: {p.primary_faint}; }}
+QPushButton#ConfigStep:hover {{ color: {p.text}; background: {p.surface_hover}; }}
+QLabel#FieldHint {{ color: {p.text_muted}; font-size: 12px; }}
+QLabel#SummaryValue {{ color: {p.text}; font-size: 13px; font-weight: 500; }}
+QLabel#StateFormula {{ color: {p.primary}; font-size: 14px; font-weight: 500; padding: 2px 0; }}
+QLabel#ValidationMessage {{ color: {p.text_muted}; font-size: 12px; }}
+QLabel#ValidationMessage[state="error"] {{ color: {p.danger}; }}
+QFrame#ExecutionBar {{ background: {p.bg_elevated}; border-top: 1px solid {p.border}; }}
+QFrame#ExecutionStatus {{ background: transparent; border: none; }}
+QFrame#ExecutionStatus QProgressBar {{ max-height: 6px; border: none; background: {p.border}; }}
+
 QLabel#SectionTitle {{
     color: {p.text};
     font-size: 14px;
@@ -313,13 +336,16 @@ QPushButton#DangerButton:hover {{
 
 /* ============ INPUTS ============ */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{
-    background-color: {p.bg};
+    background-color: {p.bg_elevated};
     color: {p.text};
     border: 1px solid {p.border_strong};
     border-radius: {RADIUS.sm}px;
     padding: {max(4, pad - 2)}px 10px;
     font-size: 13px;
     selection-background-color: {p.primary_faint};
+}}
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {{
+    background-color: {p.surface}; color: {p.text_dim}; border-color: {p.border};
 }}
 
 QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus,

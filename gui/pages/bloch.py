@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from hashlib import blake2b
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal, QSignalBlocker
+from PySide6.QtCore import Qt, QTimer, Signal, QSignalBlocker, QEvent
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QSpinBox,
     QPlainTextEdit,
+    QSizePolicy,
 )
 from qiskit.quantum_info import DensityMatrix, partial_trace
 from gui.pages.base import PageBase
@@ -28,6 +29,7 @@ from gui.widgets.plot_canvas import MplCanvas
 from gui.widgets.bloch_canvas import BlochCanvas
 from gui.widgets.bloch_controls import BlochCameraPanel
 from gui.widgets.snapshot_metrics import SnapshotMetrics
+from gui.widgets.flow_layout import FlowLayout
 from PySide6.QtGui import QShortcut, QKeySequence
 
 
@@ -108,7 +110,7 @@ class BlochPage(PageBase):
         self.body().addWidget(self._empty)
         self._content = QWidget()
         layout = QVBoxLayout(self._content)
-        controls = QHBoxLayout()
+        controls = FlowLayout()
         self.btn_play = PrimaryButton("Iniciar")
         self.btn_play.clicked.connect(self._toggle_play)
         self.btn_stop = GhostButton("Parar")
@@ -136,15 +138,15 @@ class BlochPage(PageBase):
             controls.addWidget(w)
         self.selection_label = QLabel("Clique numa esfera para selecionar")
         self.selection_label.setWordWrap(True)
-        controls.addWidget(self.selection_label, 1)
+        self.selection_label.setObjectName("FieldHint")
         self.maximize_button = GhostButton("Ampliar área 3D")
         self.maximize_button.setCheckable(True)
         self.maximize_button.toggled.connect(self.set_maximized)
         controls.addWidget(self.maximize_button)
-        controls.addWidget(QLabel("Velocidade"))
-        controls.addWidget(self.speed_combo)
+        controls.add_group(QLabel("Velocidade"), self.speed_combo)
         controls.addWidget(self.loop)
         layout.addLayout(controls)
+        layout.addWidget(self.selection_label)
         self.canvas = BlochCanvas()
         self.canvas.qubit_selected.connect(self._select_qubit)
         self.camera_panel = BlochCameraPanel(self.canvas)
@@ -166,6 +168,9 @@ class BlochPage(PageBase):
         self.probabilities_canvas.mpl_connect("motion_notify_event", self._hover_probability)
         self.probabilities_canvas.mpl_connect("figure_leave_event", self._hover_probability)
         self.visual_tabs = QTabWidget()
+        self.visual_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.visual_tabs.setUsesScrollButtons(True)
+        self.visual_tabs.setElideMode(Qt.ElideRight)
         self.visual_tabs.addTab(self.canvas, "Esferas de Bloch")
         self.visual_tabs.addTab(self.probabilities_canvas, "Probabilidades no instante")
         self.visual_tabs.currentChanged.connect(self._refresh_ui)
@@ -183,6 +188,7 @@ class BlochPage(PageBase):
         self.slider.valueChanged.connect(self._on_slider)
         layout.addWidget(self.slider)
         self.frame_label = QLabel()
+        self.frame_label.setWordWrap(True)
         frame_row = QHBoxLayout()
         frame_row.addWidget(self.frame_label, 1)
         frame_row.addWidget(QLabel("Ir ao snapshot"))
@@ -226,6 +232,21 @@ class BlochPage(PageBase):
         self._escape = escape
         self.body().addWidget(self._content, 1)
         self._content.hide()
+
+    def refresh_theme(self):
+        if hasattr(self, "camera_scroll"):
+            QTimer.singleShot(0, self._fit_camera)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self.refresh_theme()
+
+    def _fit_camera(self):
+        self.camera_panel.ensurePolished()
+        width = max(235, self.camera_panel.minimumSizeHint().width()+24)
+        self.camera_scroll.setMinimumWidth(width)
+        self.camera_scroll.setMaximumWidth(width)
 
     def load_statevectors(
         self,

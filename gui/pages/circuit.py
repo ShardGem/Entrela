@@ -14,10 +14,12 @@ from PySide6.QtWidgets import (
 )
 from core.circuits import build_circuit
 from core.circuit_document import CircuitDocument, GATE_HELP
+from data.workspace import experiment_title
 from gui.pages.base import PageBase
 from gui.widgets.circuit_canvas import CircuitCanvas, angle_label
 from gui.widgets.circuit_editor import CircuitEditor
 from gui.widgets.button import SecondaryButton, PrimaryButton, GhostButton
+from gui.widgets.flow_layout import FlowLayout
 
 
 class CircuitPage(PageBase):
@@ -42,7 +44,7 @@ class CircuitPage(PageBase):
         self.context = QLabel("Execute um experimento para explorar seu circuito.")
         self.context.setWordWrap(True)
         layout.addWidget(self.context)
-        tools = QHBoxLayout()
+        tools = FlowLayout()
         self.phase_label = QLabel("Fase global: —")
         tools.addWidget(self.phase_label)
         self.jump = QSpinBox()
@@ -70,7 +72,6 @@ class CircuitPage(PageBase):
         self.zoom.setPrefix("Zoom ")
         self.zoom.valueChanged.connect(lambda value: self.canvas.set_zoom(value))
         tools.addWidget(self.zoom)
-        tools.addStretch()
         layout.addLayout(tools)
         row = QHBoxLayout()
         self.canvas = CircuitCanvas()
@@ -115,7 +116,7 @@ class CircuitPage(PageBase):
         self.snapshot_button.setEnabled(False)
         self.copy_button.setEnabled(False)
 
-    def show_experiment(self, experiment):
+    def show_experiment(self, experiment, title=None):
         self.experiment = experiment
         self.snapshots = bool(experiment.result.states)
         self.selected = -1
@@ -142,9 +143,10 @@ class CircuitPage(PageBase):
                 reconstructed = True
         label = "Circuito livre" if c.circuit is not None else c.system.hamiltonian
         self.context.setText(
-            f"{experiment.id} · {label} · {c.system.num_qubits} qubits · {len(self.operations)} portas · profundidade {r.circuit_depth}"
+            f"{title or experiment_title(experiment)} · {label} · {c.system.num_qubits} qubits · {len(self.operations)} portas · profundidade {r.circuit_depth}"
             + (" · reconstruído da configuração" if reconstructed else "")
         )
+        self.context.setToolTip("Identificador técnico: " + experiment.id)
         self.phase_label.setText(f"Fase global: {float(phase):.6g} rad")
         self.phase_label.setToolTip(
             repr(float(phase))

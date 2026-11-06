@@ -1,11 +1,13 @@
 """Scientific help, shared by the learning page and contextual dock."""
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
-<p>Use o modo Guiado para percorrer as etapas ou o Avançado para ver todos os parâmetros.
+<p>Use Configuração guiada para percorrer as etapas ou Todos os parâmetros (modo Avançado) para abrir as seções que precisar.
 Os mesmos controles preservam a configuração ao alternar. O botão Buscar encontra comandos, exemplos e conceitos.</p>
-<p>No modo Avançado, a navegação por etapas desaparece: cada categoria fica disponível no mesmo formulário.
+<p>No modo Avançado, cada categoria pode ser expandida ou recolhida; seu cabeçalho resume os valores.
 Use os botões ? ou a ajuda de cada campo para consultar significado, unidades e limites. A prévia do estado inicial
 é descritiva e ideal; não calcula o efeito do ruído nem substitui uma execução.</p>
+<p>Em janelas menores, alterne entre Parâmetros e Prévia e revisão. A barra de execução permanece acessível.
+Configurações inválidas indicam o campo a revisar. O menu Exemplos carrega configurações da galeria sem executá-las.</p>
 <h2 id="Qubits">Qubits e estado inicial</h2>
 <p>São suportados de 1 a 6 qubits. |0…0⟩ é o estado zero; |+…+⟩ prepara superposição.
 Bell usa H(q0) e CX(q0,q1), requer dois qubits e possui vetores locais nulos, mesmo sendo globalmente puro.

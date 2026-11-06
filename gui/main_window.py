@@ -244,6 +244,8 @@ class MainWindow(QMainWindow):
         self.topbar.commands_requested.connect(self._open_commands)
         p = self.page_simulation
         p.run_requested.connect(self._run_simulation)
+        p.example_requested.connect(self._load_example)
+        p.navigation_requested.connect(self._show_page)
         p.cancel_requested.connect(self._cancel_simulation)
         p.config_panel.ajuda_acionada.connect(self._show_help)
         p.config_panel.parametros_alterados.connect(self._draft_changed)
@@ -614,6 +616,11 @@ class MainWindow(QMainWindow):
         self.page_bloch.metrics.set_busy(True)
         self.page_comparison.set_running(True)
         self.page_documentation.set_running(True)
+        task = {SimulationWorker:"Simulando circuito…",MitigationWorker:"Calculando mitigação…",
+                AnalysisWorker:"Calculando análise…",ComparisonWorker:"Preparando comparação…",
+                DocumentationWorker:"Exportando documentação…",ReportWorker:"Preparando relatório…",
+                StudyImportWorker:"Importando estudo…",DetailWorker:"Carregando experimento…"}.get(type(worker),"Processando…")
+        self.page_simulation.status.set_running(task)
         worker.start()
 
     def _run_mitigation(self, qubit, method, shots):
@@ -698,12 +705,13 @@ class MainWindow(QMainWindow):
             time_unit=experiment.result.metadata.get("time_unit", "adimensional (ℏ=1)"),
         )
         self.page_bloch.set_experiment(experiment)
-        self.page_circuit.show_experiment(experiment)
+        self.page_circuit.show_experiment(experiment, self._experiment_name(experiment))
         self.page_analysis.load_experiment(experiment)
         if hasattr(self, "drafts"):
             self.drafts.set_source(experiment.id)
         self.page_mitigation.load_experiment(experiment)
         self._refresh_library()
+        self.page_simulation.set_experiment(experiment,self._experiment_name(experiment))
         if self._current_worker:
             self.page_mitigation.set_running(True)
         self.page_analysis.set_running(self._current_worker is not None)

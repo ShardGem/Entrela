@@ -23,10 +23,12 @@ class Card(QFrame):
             header = QVBoxLayout()
             header.setSpacing(2)
             t = QLabel(title)
+            t.setWordWrap(True)
             t.setObjectName("SectionTitle")
             header.addWidget(t)
             if subtitle:
                 s = QLabel(subtitle)
+                s.setWordWrap(True)
                 s.setObjectName("SectionSubtitle")
                 header.addWidget(s)
             self._layout.addLayout(header)

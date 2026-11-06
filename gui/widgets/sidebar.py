@@ -1,5 +1,5 @@
 """Grouped navigation with an accessible accordion and a compact rail."""
-from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation, QEasingCurve
+from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation, QEasingCurve, QEvent, QTimer
 from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QLabel,QScrollArea
 from gui.icons import get_icon,get_pixmap
 from gui.theme import PALETTE
@@ -38,11 +38,11 @@ class Sidebar(QFrame):
            ('mitigation','Mitigação de ruído'),('comparison','Comparar execuções'),('history','Histórico'),
            ('analysis','Análises e varreduras'),('library','Projetos e modelos'),('documentation','Exportar e documentar'),
            ('docs','Conceitos e tutoriais'),('settings','Preferências')]
-    GROUPS=[('start','Aprender','group-start',('dashboard','examples','docs')),
-            ('lab','Experimentar','group-lab',('simulation','circuit','results','bloch')),
-            ('research','Analisar','group-research',('analysis','mitigation','comparison')),
-            ('organize','Organizar','group-organize',('history','library','documentation'))]
-    COMPACT_LABELS={'start':'GUIAS','lab':'LAB','research':'ANÁLISE','organize':'ACERVO'}
+    GROUPS=[('start','Começar','group-start',('dashboard','examples','docs')),
+            ('lab','Laboratório','group-lab',('simulation','circuit','results','bloch')),
+            ('research','Pesquisa','group-research',('analysis','mitigation','comparison')),
+            ('organize','Acervo','group-organize',('history','library','documentation'))]
+    COMPACT_LABELS={'start':'INÍCIO','lab':'LAB','research':'PESQ.','organize':'ACERVO'}
     DESCRIPTIONS={
         'analysis':'Varreduras de parâmetros e benchmark de mitigação.',
         'simulation':'Defina o sistema, a evolução temporal e o modelo de ruído.',
@@ -185,7 +185,6 @@ class Sidebar(QFrame):
 
     def set_compact(self,compact):
         self._compact=bool(compact)
-        self.setFixedWidth(96 if compact else 280)
         self.logo_title.setVisible(not compact)
         self.toggle.setText('' if compact else '  Recolher navegação')
         self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.text_muted))
@@ -200,6 +199,20 @@ class Sidebar(QFrame):
         for body in self.group_bodies.values():
             body.layout().setContentsMargins(0 if compact else 8,0,0,6)
         self._refresh_groups()
+        self._fit_width()
+
+    def _fit_width(self):
+        if self._compact:
+            text_width = max(button.fontMetrics().horizontalAdvance(button.text()) for button in self.group_buttons.values())
+            self.setFixedWidth(max(96, text_width+52))
+        else:
+            text_width = max(button.sizeHint().width() for button in self.buttons.values())
+            self.setFixedWidth(max(280, text_width+32))
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and getattr(self, 'group_buttons', None):
+            QTimer.singleShot(0, self._fit_width)
 
     def refresh_theme(self):
         if hasattr(self,'toggle'):

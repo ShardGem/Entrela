@@ -40,7 +40,13 @@ class DraftStore:
         simulation = state.get("simulation",{})
         if not isinstance(simulation,dict) or not isinstance(simulation.get("controls",{}),dict):
             raise ValueError("Formulário de rascunho inválido")
-        self._text_fields(simulation,("name","description","mode","initial","committed_name","committed_description"))
+        self._text_fields(simulation,("name","description","mode","initial","section","committed_name","committed_description"))
+        if "expanded_sections" in simulation and (not isinstance(simulation["expanded_sections"], list) or
+                any(not isinstance(key, str) for key in simulation["expanded_sections"])):
+            raise ValueError("Seções do formulário inválidas")
+        for key in ("description_expanded", "review_expanded"):
+            if key in simulation and type(simulation[key]) is not bool:
+                raise ValueError("Preferência de seção inválida")
         controls = simulation.get("controls",{})
         self._text_fields(controls,("seed","hamiltoniano","modelo_ruido"))
         for key in ("qubits","J","h","tempo","passos","p1","p2","t1","t2","shots","gate1","gate2"):

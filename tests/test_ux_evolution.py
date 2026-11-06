@@ -12,6 +12,7 @@ def test_advanced_has_no_inactive_steps_and_preserves_guided_position(qt_app):
     panel.spin_J.setValue(0.123456789012345)
     panel.set_section("noise")
     expected = panel.get_config()
+    panel.resize(1000, 600)
     panel.show()
     try:
         assert panel.section_nav.isVisible()
@@ -123,6 +124,13 @@ def test_guided_sections_wrap_without_cutting_buttons(qt_app):
         for width in (320, 600, 1000):
             panel.resize(width, 600)
             qt_app.processEvents()
+            if panel.section_selector.isVisible():
+                assert not panel.section_nav.isVisible()
+                assert panel.section_selector.count() == len(panel.sections)
+                panel.section_selector.setCurrentIndex(4)
+                assert panel.current_section == "execution"
+                assert panel.sections["execution"].isVisible()
+                continue
             bounds = panel.section_nav.rect()
             buttons = list(panel.section_buttons.values())
             assert all(bounds.contains(button.geometry()) for button in buttons)

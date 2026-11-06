@@ -66,7 +66,7 @@ def test_compact_group_hierarchy_and_motion_preference(window, qt_app):
     from tests.qt_helpers import wait_until
     sidebar = window.sidebar
     sidebar.set_compact(True)
-    assert sidebar.group_buttons['research'].text() == 'ANÁLISE'
+    assert sidebar.group_buttons['research'].text() == 'PESQ.'
     assert 'Comparar execuções' in sidebar.buttons['comparison'].toolTip()
     sidebar.group_buttons['research'].click()
     sidebar.group_buttons['lab'].click()
