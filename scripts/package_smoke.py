@@ -34,6 +34,11 @@ assert not splash.logo.pixmap.isNull()
 assert not splash.text.pixmap().isNull()
 window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
 window.show();app.processEvents()
+for key in window.page_workspace.KEYS:
+    window._show_page(key)
+    assert window.stack.currentWidget() is window.page_workspace
+    assert window.page_workspace.tabs.currentWidget() is window.pages[key]
+    assert window.is_page_active(key)
 exp=run_experiment(replace(create_example_config('bell'),shots=64))
 window.repository.save(exp)
 assert window.repository.load(exp.id).result.counts==exp.result.counts

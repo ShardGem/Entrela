@@ -3,7 +3,7 @@
 from pathlib import Path
 import json, os, tempfile
 from dataclasses import asdict
-from core.types import config_from_dict
+from core.types import ExperimentConfig, config_from_dict
 
 
 class WorkspaceLibrary:
@@ -13,19 +13,53 @@ class WorkspaceLibrary:
     def read(self):
         if not self.path.exists():
             return {"version": 1, "templates": {}, "projects": {}, "annotations": {}}
-        raw = json.loads(self.path.read_text(encoding="utf-8"))
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("Biblioteca pessoal ilegível; arquivo preservado.") from exc
+        self._validate(raw)
+        return raw
+
+    @staticmethod
+    def _validate(raw):
         if (
             not isinstance(raw, dict)
-            or raw.get("version") != 1
+            or type(raw.get("version")) is not int or raw.get("version") != 1
             or any(
                 not isinstance(raw.get(k), dict)
                 for k in ("templates", "projects", "annotations")
             )
         ):
             raise ValueError("Biblioteca pessoal inválida; arquivo preservado.")
-        return raw
+        for name, value in raw["templates"].items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("Configuração salva sem nome válido; arquivo preservado.")
+            try:
+                config = config_from_dict(value)
+            except (ValueError, OverflowError) as exc:
+                raise ValueError(f"Configuração salva '{name}' inválida: {exc}. Arquivo preservado.") from exc
+            if config.circuit is not None:
+                raise ValueError(
+                    f"Configuração salva '{name}' contém um circuito de portas. "
+                    "Use a biblioteca do editor para guardar circuitos; arquivo preservado."
+                )
+        for name, project in raw["projects"].items():
+            if (not isinstance(name, str) or not name.strip() or not isinstance(project, dict)
+                    or ("description" in project and not isinstance(project["description"], str))):
+                raise ValueError("Agrupamento de projeto inválido; arquivo preservado.")
+        for identifier, annotation in raw["annotations"].items():
+            if not isinstance(identifier, str) or not identifier.strip() or not isinstance(annotation, dict):
+                raise ValueError("Caderno de execução inválido; arquivo preservado.")
+            for field in ("title", "project", "notes", "description", "objective", "hypothesis", "methodology"):
+                if field in annotation and not isinstance(annotation[field], str):
+                    raise ValueError(f"Campo '{field}' do caderno deve ser texto; arquivo preservado.")
+            for field in ("tags", "categories"):
+                if field in annotation and (not isinstance(annotation[field], list) or
+                        any(not isinstance(value, str) for value in annotation[field])):
+                    raise ValueError(f"Campo '{field}' do caderno deve ser uma lista de textos; arquivo preservado.")
 
     def _write(self, raw):
+        self._validate(raw)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
         try:
@@ -42,9 +76,16 @@ class WorkspaceLibrary:
                 temporary.unlink(missing_ok=True)
 
     def save_template(self, name, config):
-        if not name.strip():
-            raise ValueError("Informe um nome para o modelo.")
-        config.validate()
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Informe um nome para a configuração.")
+        if not isinstance(config, ExperimentConfig):
+            raise ValueError("Configuração inválida para o formulário de simulação.")
+        if config.circuit is not None:
+            raise ValueError("Circuitos de portas devem ser salvos na biblioteca do editor, não como parâmetros do formulário.")
+        try:
+            config.validate()
+        except OverflowError as exc:
+            raise ValueError("Os parâmetros da configuração excedem o intervalo numérico suportado.") from exc
         raw = self.read()
         raw["templates"][name.strip()] = asdict(config)
         self._write(raw)

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QTextBrowser, QPlainTextEdit, QToolButton, QMenu,
 )
 from gui.pages.base import PageBase
+from gui.widgets.button import SecondaryButton
 from gui.widgets.data_table import configure_table, DataTableItem
 from gui.widgets.plot_canvas import MplCanvas, style_axes
 
@@ -193,8 +194,12 @@ class HistoryPage(PageBase):
                 if col in (3, 5):
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.table.setItem(row, col, item)
-            button = QPushButton("Visualizar")
-            button.setAccessibleName(f"Visualizar {values[1]}")
+            button = SecondaryButton(icon="eye")
+            button.setToolTip("Visualizar")
+            button.setAccessibleName("Visualizar")
+            button.setAccessibleDescription(f"Abrir detalhes do experimento {values[1]}")
+            button.setFocusPolicy(Qt.StrongFocus)
+            button.setMinimumSize(40, 38)
             button.clicked.connect(lambda checked=False, identifier=exp.id: self._view(identifier))
             self.table.setCellWidget(row, 9, button)
         self.table.setSortingEnabled(True)

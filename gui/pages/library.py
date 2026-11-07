@@ -1,10 +1,11 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QLabel, QLineEdit, QComboBox, QPlainTextEdit, QFormLayout,
-    QGroupBox, QVBoxLayout, QTabWidget, QWidget,
+    QGroupBox, QVBoxLayout, QTabWidget, QWidget, QMessageBox,
 )
 from gui.pages.base import PageBase
 from gui.widgets.button import SecondaryButton
+from gui.widgets.flow_layout import FlowLayout
 
 
 class LibraryPage(PageBase):
@@ -14,19 +15,31 @@ class LibraryPage(PageBase):
     template_load_requested = Signal(str)
     annotation_requested = Signal(str, str, list)
     template_delete_requested = Signal(str)
+    navigation_requested = Signal(str)
+    project_history_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(
-            "Projetos e modelos",
-            "Dê nomes às execuções, registre hipóteses e reutilize configurações.",
+            "Caderno e configurações",
+            "Anote os resultados de uma execução ou reutilize os parâmetros do formulário de simulação.",
             parent,
         )
         self.context = QLabel("Abra uma execução para organizar seus resultados.")
         self.context.setWordWrap(True)
         self.body().addWidget(self.context)
+        self.select_execution = SecondaryButton("Selecionar uma execução", icon="history")
+        self.select_execution.setToolTip("Abra uma execução do histórico para nomear seus resultados e registrar sua interpretação.")
+        self.select_execution.clicked.connect(lambda: self.navigation_requested.emit("history"))
+        self.add_action(self.select_execution)
+        self.tabs = QTabWidget()
+        self.body().addWidget(self.tabs, 1)
 
-        self.annotation_group = QGroupBox("Execução selecionada")
+        self.annotation_group = QGroupBox("Caderno da execução selecionada")
         group_layout = QVBoxLayout(self.annotation_group)
+        annotation_help = QLabel("Este caderno acompanha uma execução. Salvar registra identificação e interpretação; os valores científicos da execução são preservados.")
+        annotation_help.setWordWrap(True)
+        annotation_help.setObjectName("FieldHint")
+        group_layout.addWidget(annotation_help)
         tabs = QTabWidget()
         identification = QWidget()
         form = QFormLayout(identification)
@@ -37,8 +50,10 @@ class LibraryPage(PageBase):
         self.run_title.setToolTip("Nome de apresentação. O identificador técnico e os resultados permanecem preservados.")
         self.project = QLineEdit()
         self.project.setPlaceholderText("Ex.: TCC — estudo de ruído")
+        self.project.setToolTip("Use o mesmo nome para agrupar execuções de um estudo. Projeto é um agrupamento do histórico, não um circuito nem uma configuração executável.")
         self.tags = QLineEdit()
         self.tags.setPlaceholderText("Bell, referência, capítulo 4")
+        self.tags.setToolTip("Separe por vírgulas. Etiquetas ajudam a encontrar execuções pela busca do histórico.")
         self.categories = QLineEdit()
         self.categories.setPlaceholderText("Ex.: decoerência, mitigação")
         self.categories.setToolTip("Categorias organizam linhas de pesquisa; etiquetas descrevem detalhes da execução.")
@@ -81,47 +96,145 @@ class LibraryPage(PageBase):
         notes_layout.addWidget(self.notes)
         tabs.addTab(notes_page, "Anotações")
         group_layout.addWidget(tabs)
-        self.save_annotation = SecondaryButton("Salvar identificação e observações")
+        self.save_annotation = SecondaryButton("Salvar caderno")
+        self.save_annotation.setToolTip("Salva nome, plano científico e anotações da execução selecionada.")
         self.save_annotation.clicked.connect(
             lambda: self.annotation_requested.emit(
                 self.project.text(), self.notes.toPlainText(),
                 [x.strip() for x in self.tags.text().split(",") if x.strip()],
             )
         )
-        group_layout.addWidget(self.save_annotation)
-        self.body().addWidget(self.annotation_group)
+        annotation_actions = FlowLayout()
+        annotation_actions.addWidget(self.save_annotation)
+        self.project_history = SecondaryButton("Ver execuções deste projeto")
+        self.project_history.setToolTip("Busca no histórico as execuções já salvas com o nome deste projeto.")
+        self.project_history.clicked.connect(self._request_project_history)
+        annotation_actions.addWidget(self.project_history)
+        group_layout.addLayout(annotation_actions)
+        self.tabs.addTab(self.annotation_group, "Caderno da execução")
 
-        templates_group = QGroupBox("Modelos pessoais de configuração")
+        templates_group = QGroupBox("Parâmetros do formulário Hamiltoniano")
+        self.templates_group = templates_group
         templates_layout = QVBoxLayout(templates_group)
-        help_label = QLabel("Modelos guardam os parâmetros do formulário atual para novos experimentos. Resultados e estados não são copiados.")
+        help_label = QLabel("Salve os parâmetros do formulário de simulação para usá-los em outra execução: sistema, evolução, ruído, medições e semente. Abrir um resultado ou editar um circuito de portas não muda essa fonte.")
         help_label.setWordWrap(True)
+        help_label.setObjectName("FieldHint")
         templates_layout.addWidget(help_label)
+        self.configuration_source = QLabel("Fonte: formulário de parâmetros da simulação.")
+        self.configuration_source.setWordWrap(True)
+        templates_layout.addWidget(self.configuration_source)
         template_form = QFormLayout()
         template_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.name = QLineEdit()
-        self.name.setPlaceholderText("Nome do modelo a salvar")
+        self.name.setPlaceholderText("Ex.: Ising — referência ideal")
+        self.name.setAccessibleName("Nome da configuração a salvar")
+        self.name.setToolTip("Dê um nome aos parâmetros do formulário. Salvar com um nome existente pede confirmação para atualizá-lo.")
         self.templates = QComboBox()
-        template_form.addRow("Nome do modelo", self.name)
-        template_form.addRow("Modelos salvos", self.templates)
+        self.templates.setAccessibleName("Configurações salvas do formulário")
+        self.templates.setToolTip("Escolha os parâmetros que deseja usar em uma nova simulação.")
+        template_form.addRow("Nome da configuração", self.name)
+        template_form.addRow("Configurações salvas", self.templates)
         templates_layout.addLayout(template_form)
-        for text, callback in [
-            ("Salvar configuração atual como modelo", lambda: self.template_save_requested.emit(self.name.text())),
-            ("Carregar modelo no formulário", lambda: self.template_load_requested.emit(self.templates.currentText())),
-            ("Excluir modelo selecionado", lambda: self.template_delete_requested.emit(self.templates.currentText())),
+        template_actions = FlowLayout()
+        for attribute, text, callback in [
+            ("save_template", "Salvar parâmetros", self._request_template_save),
+            ("load_template", "Usar na simulação", lambda: self.template_load_requested.emit(self.templates.currentText())),
+            ("delete_template", "Excluir configuração", lambda: self.template_delete_requested.emit(self.templates.currentText())),
         ]:
             button = SecondaryButton(text)
+            setattr(self, attribute, button)
             button.clicked.connect(callback)
-            templates_layout.addWidget(button)
-        self.body().addWidget(templates_group)
+            template_actions.addWidget(button)
+        self.save_template.setToolTip("Guarda os parâmetros que estão no formulário de simulação. Não salva resultados nem as portas em edição.")
+        self.load_template.setToolTip("Preenche o formulário para edição. A simulação só começa quando você clicar em Executar.")
+        self.delete_template.setToolTip("Remove a configuração pessoal selecionada. As execuções já salvas são preservadas.")
+        templates_layout.addLayout(template_actions)
+        circuit_help = QLabel("Circuitos com portas e suas revisões ficam na biblioteca do editor. Exemplos prontos são demonstrações da galeria; configurações salvas são seus parâmetros pessoais.")
+        circuit_help.setWordWrap(True)
+        circuit_help.setObjectName("FieldHint")
+        templates_layout.addWidget(circuit_help)
+        self.open_circuits = SecondaryButton("Abrir editor de circuitos")
+        self.open_circuits.clicked.connect(lambda: self.navigation_requested.emit("circuit"))
+        templates_layout.addWidget(self.open_circuits)
+        templates_layout.addStretch()
+        self.tabs.addTab(templates_group, "Configurações salvas")
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.body().addWidget(self.message)
-        self.body().addStretch()
         self.identifier = None
+        self._notebook_title = ""
         self._loading = False
+        self._template_names = set()
+        self.name.textChanged.connect(self._update_actions)
+        self.templates.currentIndexChanged.connect(self._update_actions)
+        self.project.textChanged.connect(self._update_actions)
+        self.tabs.currentChanged.connect(self._refresh_context)
         for widget in (self.run_title,self.project,self.tags,self.categories,self.description,
                        self.notes,self.objective,self.hypothesis,self.methodology):
             widget.textChanged.connect(self._edited)
+        self.annotation_group.setEnabled(False)
+        self._update_actions()
+
+    def show_notebook(self):
+        self.tabs.setCurrentWidget(self.annotation_group)
+
+    def show_configurations(self):
+        self.tabs.setCurrentWidget(self.templates_group)
+
+    def set_configuration_context(self, text):
+        """Describe the SAME simulation form used by the existing save signal."""
+        self.configuration_source.setText("Fonte: formulário de parâmetros da simulação. " + text)
+
+    def set_unavailable(self, message):
+        """Do not leave an old notebook editable after its source cannot be read."""
+        self.identifier = None
+        self.annotation_group.setEnabled(False)
+        self.templates_group.setEnabled(False)
+        self.context.setText("Caderno e configurações indisponíveis. O arquivo foi preservado.")
+        self.message.setText(message)
+
+    def _refresh_context(self, *_):
+        if not self.templates_group.isEnabled():
+            self.context.setText("Caderno e configurações indisponíveis. O arquivo foi preservado.")
+        elif self.tabs.currentWidget() is self.templates_group:
+            self.context.setText("Configurações salvas: parâmetros do formulário de simulação. Usar uma configuração não executa o experimento.")
+        elif self.identifier:
+            self.context.setText("Caderno: " + self._notebook_title)
+        else:
+            self.context.setText("Selecione uma execução para abrir seu caderno. As configurações salvas ficam na outra aba.")
+
+    def _update_actions(self, *_):
+        self.save_template.setEnabled(bool(self.name.text().strip()))
+        selected = self.templates.currentText() in self._template_names
+        self.load_template.setEnabled(selected)
+        self.delete_template.setEnabled(selected)
+        self.project_history.setEnabled(bool(self.identifier and self.project.text().strip()))
+
+    def _request_project_history(self):
+        project = self.project.text().strip()
+        if self.identifier and project:
+            self.project_history_requested.emit(project)
+
+    def _request_template_save(self):
+        name = self.name.text().strip()
+        if not name:
+            self.message.setText("Informe um nome para guardar os parâmetros do formulário.")
+            return
+        if name in self._template_names:
+            answer = QMessageBox.question(
+                self, "Atualizar configuração salva?",
+                f"A configuração '{name}' já existe. Deseja substituí-la pelos parâmetros atuais do formulário? As execuções salvas serão preservadas.",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
+        self.template_save_requested.emit(name)
+
+    def request_template_save(self, name=None):
+        """Reuse overwrite protection from an integrated configuration toolbar."""
+        if name is not None:
+            self.name.setText(name)
+        self._request_template_save()
 
     def _edited(self, *_):
         if not self._loading:
@@ -159,6 +272,7 @@ class LibraryPage(PageBase):
         self._loading = True
         self.identifier = identifier
         selected = self.templates.currentText()
+        self._template_names = set(data["templates"])
         self.templates.clear()
         self.templates.addItems(sorted(data["templates"]))
         if self.templates.findText(selected) >= 0:
@@ -174,10 +288,9 @@ class LibraryPage(PageBase):
         self.categories.setText(", ".join(annotation.get("categories", [])))
         self.tags.setText(", ".join(annotation.get("tags", [])))
         self.annotation_group.setEnabled(bool(identifier))
-        self.context.setText(
-            "Organizando: " + (annotation.get("title") or title or "execução selecionada")
-            if identifier
-            else "Modelos usam o formulário atual. Abra uma execução para nomear e anotar resultados."
-        )
+        self.templates_group.setEnabled(True)
+        self._notebook_title = annotation.get("title") or title or "execução selecionada"
+        self._refresh_context()
         self._loading = False
+        self._update_actions()
         self.loaded.emit(identifier or "")

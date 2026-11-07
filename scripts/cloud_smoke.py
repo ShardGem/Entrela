@@ -35,7 +35,7 @@ def main():
         capture(window,"inicio")
         for key,page in window.pages.items():
             window._show_page(key)
-            assert window.stack.currentWidget() is page
+            assert window.is_page_active(key)
         print("PASS: navigation across",len(window.pages),"pages")
         window._show_page("examples")
         window.page_examples.select_example("bell")

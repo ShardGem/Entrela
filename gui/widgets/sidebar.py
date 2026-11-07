@@ -33,18 +33,19 @@ class NavButton(QPushButton):
 class Sidebar(QFrame):
     navigate=Signal(str)
     compact_requested=Signal(bool)
-    ITEMS=[('dashboard','Visão geral'),('examples','Exemplos prontos'),('simulation','Configurar experimento'),
+    ITEMS=[('dashboard','Visão geral'),('examples','Exemplos prontos'),('simulation','Laboratório de simulação'),
            ('circuit','Editor de circuitos'),('results','Resultados'),('bloch','Estados em 3D'),
            ('mitigation','Mitigação de ruído'),('comparison','Comparar execuções'),('history','Histórico'),
-           ('analysis','Análises e varreduras'),('library','Projetos e modelos'),('documentation','Exportar e documentar'),
+           ('analysis','Estudos e varreduras'),('library','Caderno e configurações'),('documentation','Exportar e documentar'),
            ('docs','Conceitos e tutoriais'),('settings','Preferências')]
     GROUPS=[('start','Começar','group-start',('dashboard','examples','docs')),
             ('lab','Laboratório','group-lab',('simulation','circuit','results','bloch')),
             ('research','Pesquisa','group-research',('analysis','mitigation','comparison')),
             ('organize','Acervo','group-organize',('history','library','documentation'))]
     DESCRIPTIONS={
-        'analysis':'Varreduras de parâmetros e benchmark de mitigação.',
-        'simulation':'Defina o sistema, a evolução temporal e o modelo de ruído.',
+        'analysis':'Use uma execução como referência para estudar ruído, precisão de Trotter e mitigação. Requer uma fonte selecionada.',
+        'simulation':'Configure a evolução, edite circuitos e consulte resultados nas abas do mesmo laboratório.',
+        'library':'Anote a execução e agrupe resultados por projeto. Salve parâmetros do formulário Hamiltoniano para reutilizar; circuitos são salvos no editor.',
         'comparison':'Compare métricas, curvas temporais e estados de duas execuções.',
         'documentation':'Exporte dados, figuras, animações e relatórios científicos.',
     }

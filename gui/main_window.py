@@ -44,6 +44,7 @@ from gui.pages.comparison import ComparisonPage
 from gui.pages.analysis import AnalysisPage
 from gui.pages.library import LibraryPage
 from gui.pages.documentation import DocumentationPage
+from gui.pages.experiment_workspace import ExperimentWorkspace
 from gui.controllers.appearance import apply_appearance, DARK
 from gui.controllers.drafts import DraftController
 from gui.theme import PALETTE
@@ -81,8 +82,8 @@ from data.repository import ExperimentRepository
 
 PAGE_META = {
     "documentation": ("Documentação", "Figuras, animações e rastreabilidade"),
-    "analysis": ("Análises", "Referência exata, correlações e varreduras"),
-    "library": ("Projetos", "Modelos e notas pessoais"),
+    "analysis": ("Estudos e varreduras", "Análises de ruído, precisão de Trotter e mitigação a partir de uma execução"),
+    "library": ("Caderno e configurações", "Anotações da execução, agrupamento por projeto e modelos de parâmetros do formulário"),
     "dashboard": ("Início", "Seu laboratório quântico"),
     "examples": ("Exemplos", "Aprenda a partir de experimentos reais"),
     "simulation": ("Experimento", "Configure e execute"),
@@ -95,6 +96,8 @@ PAGE_META = {
     "docs": ("Aprender", "Conceitos e ajuda"),
     "settings": ("Configurações", "Preferências"),
 }
+
+WORKSPACE_PAGES = ("simulation", "circuit", "results", "bloch", "library")
 
 
 class MainWindow(QMainWindow):
@@ -210,8 +213,13 @@ class MainWindow(QMainWindow):
         )
         self.pages.update(analysis=self.page_analysis, library=self.page_library)
         self.pages["documentation"]=self.page_documentation
-        for page in self.pages.values():
-            self.stack.addWidget(page)
+        self.page_workspace = ExperimentWorkspace({key: self.pages[key] for key in WORKSPACE_PAGES})
+        self.page_workspace.add_context_action(self.page_simulation.examples_button, "simulation")
+        self.page_simulation._header.hide()
+        self.stack.addWidget(self.page_workspace)
+        for key, page in self.pages.items():
+            if key not in WORKSPACE_PAGES:
+                self.stack.addWidget(page)
         self.setStatusBar(QStatusBar())
 
     def _build_help(self):
@@ -242,6 +250,10 @@ class MainWindow(QMainWindow):
         self.sidebar.navigate.connect(self._show_page)
         self.topbar.help_requested.connect(lambda: self._show_help("Início"))
         self.topbar.commands_requested.connect(self._open_commands)
+        self.page_workspace.page_selected.connect(self._show_page)
+        self.page_workspace.template_requested.connect(self._load_template)
+        self.page_workspace.recent_requested.connect(self._open_experiment)
+        self.page_workspace.configurations_requested.connect(self._show_saved_configurations)
         p = self.page_simulation
         p.run_requested.connect(self._run_simulation)
         p.example_requested.connect(self._load_example)
@@ -282,6 +294,7 @@ class MainWindow(QMainWindow):
         self.page_circuit.run_requested.connect(self._run_editor_circuit)
         self.page_analysis.requested.connect(self._run_analysis)
         self.page_analysis.cancel_requested.connect(self._cancel_simulation)
+        self.page_analysis.source_requested.connect(self._open_study_source)
         self.page_analysis.protocol.save_requested.connect(self._save_protocol)
         self.page_analysis.protocol.load_requested.connect(self._load_protocol)
         self.page_comparison.prepare_requested.connect(self._prepare_comparison)
@@ -301,6 +314,8 @@ class MainWindow(QMainWindow):
         self.page_library.template_load_requested.connect(self._load_template)
         self.page_library.annotation_requested.connect(self._annotate_current)
         self.page_library.template_delete_requested.connect(self._delete_template)
+        self.page_library.navigation_requested.connect(self._show_page)
+        self.page_library.project_history_requested.connect(self._show_project_history)
 
     def _build_commands(self):
         self.command_palette = CommandPalette(self)
@@ -309,7 +324,7 @@ class MainWindow(QMainWindow):
         for key, callback in [
             ("Ctrl+N", self._new_experiment),
             ("Ctrl+O", self._import_experiment),
-            ("Ctrl+Return", self._run_simulation),
+            ("Ctrl+Return", self._run_active_context),
             ("F1", lambda: self._show_help("Início")),
             ("F11", self._toggle_presentation),
         ]:
@@ -369,6 +384,27 @@ class MainWindow(QMainWindow):
             self._show_help(identifier[5:])
         elif identifier.startswith("mode:"):
             self.page_simulation.config_panel.set_mode(identifier[5:])
+            self._show_page("simulation")
+
+    def _run_active_context(self):
+        """Executa o editor visível, sem confundi-lo com o formulário Hamiltoniano."""
+        if self._current_worker is not None:
+            return
+        if self._current_page == "circuit":
+            if self.page_circuit.tabs.currentWidget() is self.page_circuit.editor:
+                self.page_circuit.editor.run.click()
+            else:
+                self.statusBar().showMessage("Abra a aba Editor de circuitos para executar uma cópia editável.")
+        elif self._current_page == "analysis":
+            self.page_analysis.btn_run.click()
+        elif self._current_page in WORKSPACE_PAGES:
+            if self._current_page != "simulation":
+                self._show_page("simulation")
+                self.statusBar().showMessage("Revise os parâmetros da próxima evolução e use Executar simulação.")
+            else:
+                self._run_simulation()
+        else:
+            self.statusBar().showMessage("Abra o laboratório ou um estudo para executar a configuração desse contexto.")
 
     def _show_help(self, topic):
         aliases = {
@@ -397,11 +433,33 @@ class MainWindow(QMainWindow):
         if key not in self.pages:
             return
         self._current_page = key
-        self.stack.setCurrentWidget(self.pages[key])
+        if key in WORKSPACE_PAGES:
+            self.stack.setCurrentWidget(self.page_workspace)
+            self.page_workspace.select_page(key)
+        else:
+            self.stack.setCurrentWidget(self.pages[key])
         self.sidebar.set_active(key)
         group=next((title for _,title,_,items in Sidebar.GROUPS if key in items),"Aplicativo")
         self.topbar.set_context(dict(Sidebar.ITEMS).get(key,PAGE_META[key][0]),group+" · Entrela")
         self._update_tutorial()
+
+    def is_page_active(self, key):
+        if key in WORKSPACE_PAGES:
+            return self.stack.currentWidget() is self.page_workspace and self.page_workspace.current_page_key == key
+        return key in self.pages and self.stack.currentWidget() is self.pages[key]
+
+    def _show_project_history(self, project):
+        self.page_history.search.setText(project)
+        self._show_page("history")
+
+    def _show_saved_configurations(self):
+        self.page_library.show_configurations()
+        self._show_page("library")
+
+    def _open_study_source(self, identifier):
+        self._open_experiment(identifier)
+        if self._current_experiment is not None and self._current_experiment.id == identifier:
+            self._show_page("analysis")
 
     def _restore_workspace(self):
         panel = self.page_simulation.config_panel
@@ -446,7 +504,12 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("workspace/draft", json.dumps(asdict(config)))
             except ValueError:
                 self._draft_dirty = True
+        self._update_configuration_context()
         self._update_tutorial()
+
+    def _update_configuration_context(self):
+        rows = self.page_simulation._summary_rows
+        self.page_library.set_configuration_context(rows["sistema"].text() + " · " + rows["protocolo"].text())
 
     def _can_replace(self, config=None):
         if self._current_worker is not None:
@@ -616,6 +679,7 @@ class MainWindow(QMainWindow):
         self.page_bloch.metrics.set_busy(True)
         self.page_comparison.set_running(True)
         self.page_documentation.set_running(True)
+        self.page_workspace.set_running(True)
         task = {SimulationWorker:"Simulando circuito…",MitigationWorker:"Calculando mitigação…",
                 AnalysisWorker:"Calculando análise…",ComparisonWorker:"Preparando comparação…",
                 DocumentationWorker:"Exportando documentação…",ReportWorker:"Preparando relatório…",
@@ -662,9 +726,7 @@ class MainWindow(QMainWindow):
         self.tutorial.record_run(experiment)
         self._display_experiment(experiment)
         self._autosave_current()
-        self._show_page(
-            "bloch" if experiment.config.protocol.save_snapshots else "results"
-        )
+        self._show_page("results")
 
     def _on_mitigation(self, analysis):
         if self._current_worker and self._current_worker.isInterruptionRequested():
@@ -712,6 +774,9 @@ class MainWindow(QMainWindow):
         self.page_mitigation.load_experiment(experiment)
         self._refresh_library()
         self.page_simulation.set_experiment(experiment,self._experiment_name(experiment))
+        if hasattr(self.page_workspace, "set_selected_experiment"):
+            self.page_workspace.set_selected_experiment(self._experiment_name(experiment),
+                                                       "circuit" if experiment.config.circuit is not None else "hamiltonian")
         if self._current_worker:
             self.page_mitigation.set_running(True)
         self.page_analysis.set_running(self._current_worker is not None)
@@ -770,6 +835,7 @@ class MainWindow(QMainWindow):
         self.page_history.load(records)
         self.page_comparison.load(records)
         self.page_dashboard.load_recent(records[:5])
+        self._refresh_workspace_recent()
         latest = next((e for e in records if not e.result.error), None)
         self.page_dashboard.update_stats(
             len(records),
@@ -786,16 +852,21 @@ class MainWindow(QMainWindow):
             return
         try:
             experiment = self.repository.load(identifier)
-            if not self._can_replace(experiment.config):
+            hamiltonian = experiment.config.circuit is None
+            if hamiltonian:
+                if not self._can_replace(experiment.config):
+                    return
+                self._apply_draft(experiment.config, self._experiment_name(experiment))
+                self.page_simulation.experiment_name.setText(self._experiment_name(experiment))
+            elif not self._confirm_unsaved():
                 return
-            self._apply_draft(experiment.config, self._experiment_name(experiment))
-            self.page_simulation.experiment_name.setText(self._experiment_name(experiment))
             self._current_experiment = experiment
-            self.page_simulation.experiment_description.setText((self._current_annotation() or {}).get("description",""))
-            self.drafts.mark_identity_baseline()
+            if hamiltonian:
+                self.page_simulation.experiment_description.setText((self._current_annotation() or {}).get("description",""))
+                self.drafts.mark_identity_baseline()
+                self._pending_example_id = experiment.result.metadata.get("example_id")
             self._unsaved_result = False
             self._display_experiment(experiment)
-            self._pending_example_id = experiment.result.metadata.get("example_id")
         except (OSError, ValueError, TypeError, KeyError) as exc:
             self.statusBar().showMessage("Não foi possível abrir: " + str(exc))
             return
@@ -872,6 +943,7 @@ class MainWindow(QMainWindow):
         self.page_bloch.metrics.set_busy(False)
         self.page_comparison.set_running(False)
         self.page_documentation.set_running(False)
+        self.page_workspace.set_running(False)
         self._pending_parent_id=None
         self._pending_circuit_context = None
         self._reproduction_source = None
@@ -1120,7 +1192,7 @@ class MainWindow(QMainWindow):
             AnalysisWorker(config, kind, source, options, self), self._on_analysis
         )
         self.page_analysis.message.setText(
-            "Calculando em segundo plano; cancele pela página Simulação."
+            "Calculando em segundo plano. Você pode cancelar nesta tela."
         )
 
     def _on_analysis(self, data):
@@ -1344,6 +1416,9 @@ class MainWindow(QMainWindow):
             )
             current = self._current_experiment
             self.page_library.load(data, identifier, self._experiment_name(current) if current else None)
+            self.page_workspace.set_templates([{"id": name, "name": name}
+                                               for name in sorted(data["templates"], key=str.casefold)])
+            self._update_configuration_context()
             self.page_history.annotations = data["annotations"]
             self.page_history._filter()
             self._refresh_protocols()
@@ -1351,16 +1426,25 @@ class MainWindow(QMainWindow):
             self.page_comparison.load(list(self.page_comparison.records.values()))
             if hasattr(self.page_dashboard, "set_annotations"):
                 self.page_dashboard.set_annotations(data["annotations"])
+            self._refresh_workspace_recent()
             if identifier:
                 title = experiment_title(current, data["annotations"])
+                self.page_workspace.set_selected_experiment(title, "circuit" if current.config.circuit is not None else "hamiltonian")
                 self.page_results.set_title(title, "Dados da execução selecionada")
                 self.page_results.set_experiment_title(title)
-                self.page_analysis.context.setText(title + " · " + system_label(current.config))
+                self.page_analysis.set_experiment_title(title)
                 self.page_mitigation.context.setText(title)
                 self.page_circuit.context.setText(title + " · " + system_label(current.config)
                     + f" · {current.config.system.num_qubits} qubits · {len(self.page_circuit.operations)} portas · profundidade {current.result.circuit_depth}")
         except (OSError, ValueError, TypeError, KeyError) as exc:
-            self.page_library.message.setText(str(exc))
+            self.page_workspace.set_templates([])
+            self.page_library.set_unavailable(str(exc))
+
+    def _refresh_workspace_recent(self):
+        annotations = self.page_history.annotations
+        entries = [(record.id, experiment_title(record, annotations)) for record in self._history[:20]]
+        self.page_workspace.set_recent(entries)
+        self.page_analysis.set_recent_sources(entries)
 
     def _save_template(self, name):
         try:

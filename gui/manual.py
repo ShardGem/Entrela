@@ -1,6 +1,10 @@
 """Scientific help, shared by the learning page and contextual dock."""
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
+<p>O Laboratório de simulação reúne Configurar, Circuitos, Resultados, Estados 3D e Caderno.
+Escolha uma configuração salva ou edite um circuito, execute e consulte os resultados nas abas do mesmo ambiente.
+Configurar prepara evoluções por Hamiltoniano; o editor de portas tem seu próprio rascunho e parâmetros.
+Resultados e caderno acompanham a execução selecionada, sem modificar o que você está editando.</p>
 <p>Use Configuração guiada para percorrer as etapas ou Todos os parâmetros (modo Avançado) para abrir as seções que precisar.
 Os mesmos controles preservam a configuração ao alternar. O botão Buscar encontra comandos, exemplos e conceitos.</p>
 <p>No modo Avançado, cada categoria pode ser expandida ou recolhida; seu cabeçalho resume os valores.
@@ -49,6 +53,10 @@ o plano anterior. Carregar protocolo reabre fonte e parâmetros; Calcular análi
 A reprodução de uma análise usa as opções registradas. Documentação mostra os vínculos entre fonte,
 estudos, protocolos e referências no texto.</p>
 <h2 id="Análises">Estudos de ruído e amostragem</h2>
+<p>Em Estudos e varreduras, escolha uma execução pelo seletor de fonte. A aba Configurar explica os requisitos,
+parâmetros e saídas de cada estudo. Resultados mostra os dados calculados; Planejamento guarda pergunta e hipótese.
+O cancelamento está disponível na própria tela. Abrir uma análise salva restaura suas opções disponíveis e identifica
+quando faltam insumos antigos para reproduzi-la.</p>
 <p>Mapas de calor variam dois parâmetros em até 64 pontos reais. Estabilidade ZNE investiga viés,
 variância amostral e RMSE de estimativas de Z. Orçamento equivalente distribui o mesmo total de shots
 por método; isso não iguala profundidade ou tempo. Sementes distintas caracterizam amostragem, não
@@ -58,6 +66,10 @@ incerteza das fidelidades do ensemble. Ajustes linear e quadrático compartilham
 snapshots sincronizados; sem grades temporais compatíveis, exibe estados finais. Observáveis ZNE
 usam o baseline compilado do próprio ajuste. Não há estado mitigado reconstruído por extrapolação.</p>
 <h2 id="Documentação">Documentação científica</h2>
+<h3>Caderno e configurações</h3>
+<p>O caderno guarda nome, objetivo, hipótese e interpretação da execução selecionada. Projeto é um nome usado para
+agrupar execuções no histórico. Configurações salvas guardam os parâmetros do formulário Hamiltoniano; circuitos
+de portas são guardados com revisões na biblioteca do editor. Salvar uma configuração não executa a simulação.</p>
 <p>Exporte uma execução ou a comparação carregada como ZIP, PDF ou GIF. O pacote inclui dados integrais,
 PNG/SVG/PDF, tabelas LaTeX, protocolos, manifesto e hashes. GIF usa snapshots reais, sem interpolação,
 reprodução única e tempo didático. O pacote inclui a sequência PNG selecionada. Na página 3D, exporte

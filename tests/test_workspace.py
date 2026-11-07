@@ -92,7 +92,10 @@ def test_actual_tutorial_requires_actions_and_real_reopen(window):
     exp=execute(window)
     assert t.run_id==exp.id
     t.advance()
-    assert t.step==5 and not t.ready()
+    assert t.step==5 and t.ready()
+    assert window.is_page_active("results")
+    window._show_page("simulation")
+    assert not t.ready()
     window._show_page("results")
     assert t.ready()
     t.advance()

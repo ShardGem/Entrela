@@ -11,6 +11,7 @@ from PySide6.QtSvg import QSvgRenderer
 _BODIES = {
     "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
     "search": '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+    "eye": '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     "help": '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
     "documentation": '<path d="M6 3h9l4 4v14H6V3zM15 3v5h4M9 12h7M9 16h7"/>',
     "undo": '<path d="M3 7h11a6 6 0 1 1 0 12M3 7l5-5M3 7l5 5"/>',

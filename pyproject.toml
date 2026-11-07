@@ -1,6 +1,6 @@
 [project]
 name = "entrela"
-version = "0.18.1"
+version = "0.19.0"
 description = "Simulador de qubits em ambientes ruidosos com mitigação"
 requires-python = ">=3.11"
 dependencies = [

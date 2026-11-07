@@ -29,11 +29,11 @@ def test_compact_navigation_keeps_labels_and_group_selection(window):
     window._show_page('analysis')
     sidebar=window.sidebar
     sidebar.set_compact(True)
-    assert sidebar.buttons['analysis'].accessibleName()=='Análises e varreduras'
+    assert sidebar.buttons['analysis'].accessibleName()=='Estudos e varreduras'
     assert not sidebar.buttons['analysis'].icon().isNull()
     assert not sidebar.group_bodies['research'].isHidden()
     sidebar.set_compact(False)
-    assert 'Análises e varreduras' in sidebar.buttons['analysis'].text()
+    assert 'Estudos e varreduras' in sidebar.buttons['analysis'].text()
     assert sidebar.buttons['analysis'].isChecked()
 
 

@@ -320,6 +320,7 @@ class SimulationPage(PageBase):
 
     def _arrange_header(self):
         super()._arrange_header()
+        self.body().setContentsMargins(20, 4, 20, 12)
         # O menu estreito mantém os nomes; use o espaço real antes de empilhar
         # o único botão desta página e criar outra rolagem com fonte ampliada.
         if self._actions_slot.count() != 1:
