@@ -78,12 +78,16 @@ def histogram_figure(experiments, side_by_side=False):
         total = sum((exp.result.counts or {}).values())
         width = .8 if side_by_side or len(experiments) == 1 else .36
         xs = np.arange(len(keys)) + (0 if side_by_side or len(experiments) == 1 else (i-.5)*width)
-        ax.bar(xs, [exp.result.counts.get(k,0)/total if total else 0 for k in keys], width=width, color=COLORS[i], label=f"Execução {'AB'[i]}")
+        ax.bar(xs, [(exp.result.counts or {}).get(k,0)/total if total else 0 for k in keys], width=width, color=COLORS[i], label=f"Execução {'AB'[i]}")
         ax.set_xticks(range(len(keys)), keys, rotation=90 if len(keys)>8 else 0, fontsize=8)
-        ax.set_ylabel("Frequência observada")
+        # A common full frequency scale prevents equal-height bars from
+        # suggesting equal frequencies across independently scaled panels.
+        ax.set_ylim(0, 1.05)
+        ax.set_ylabel("Frequência observada (0–1)")
         ax.set_xlabel("Bitstring · q0 à direita")
         ax.legend(fontsize=8)
         ax.grid(axis="y", alpha=.2)
+    fig.suptitle("Contagens normalizadas pelo total observado de cada execução", fontsize=10)
     return fig
 
 

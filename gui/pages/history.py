@@ -46,6 +46,21 @@ class HistoryPage(PageBase):
         self.columns.setAccessibleName("Escolher colunas do histórico")
         filters.addWidget(self.columns)
         self.body().addLayout(filters)
+        self.project_filter_bar = QWidget()
+        project_row = QHBoxLayout(self.project_filter_bar)
+        project_row.setContentsMargins(0, 0, 0, 0)
+        self.project_filter_label = QLabel()
+        self.project_filter_label.setTextFormat(Qt.PlainText)
+        self.project_filter_label.setWordWrap(True)
+        self.project_filter_label.setToolTip("Mostra apenas execuções vinculadas a este projeto. A busca refina esse conjunto.")
+        self.clear_project_filter = SecondaryButton("Todos os projetos")
+        self.clear_project_filter.setToolTip("Remover o filtro de projeto e manter os demais filtros.")
+        self.clear_project_filter.setAccessibleName("Remover filtro de projeto")
+        self.clear_project_filter.clicked.connect(lambda: self.set_project_filter(None))
+        project_row.addWidget(self.project_filter_label, 1)
+        project_row.addWidget(self.clear_project_filter)
+        self.project_filter_bar.hide()
+        self.body().addWidget(self.project_filter_bar)
 
         splitter = QSplitter(Qt.Vertical)
         splitter.setChildrenCollapsible(False)
@@ -128,6 +143,7 @@ class HistoryPage(PageBase):
         self.next.clicked.connect(lambda: self._paginate(1))
         self.offset, self.page_size = 0, 100
         self.records, self.annotations = [], {}
+        self.project_filter = None
         self.search.textChanged.connect(self._search_changed)
         self.status_filter.currentIndexChanged.connect(self._search_changed)
         self.table.horizontalHeader().sortIndicatorChanged.connect(self._sort_changed)
@@ -155,6 +171,8 @@ class HistoryPage(PageBase):
             status_key = "error" if exp.result.error else ("zne" if exp.result.mitigation else "ok")
             status = {"error": "Falhou", "zne": "ZNE", "ok": "Concluído"}[status_key]
             annotation = self.annotations.get(exp.id, {})
+            if self.project_filter is not None and annotation.get("project", "") != self.project_filter:
+                continue
             values = [
                 exp.created_at.astimezone().strftime("%d/%m/%Y %H:%M %z"),
                 experiment_title(exp, self.annotations), system_label(exp.config),
@@ -209,6 +227,16 @@ class HistoryPage(PageBase):
         )
         self.previous.setEnabled(self.offset > 0)
         self.next.setEnabled(self.offset + self.page_size < len(matches))
+
+    def set_project_filter(self, project):
+        """Filter the project field exactly, independently of free-text search."""
+        if project is not None and not isinstance(project, str):
+            raise TypeError("O filtro de projeto deve ser um nome ou None.")
+        self.project_filter = project.strip() if project and project.strip() else None
+        self.project_filter_label.setText(f"Projeto: {self.project_filter}" if self.project_filter else "")
+        self.project_filter_bar.setVisible(self.project_filter is not None)
+        self.offset = 0
+        self._filter()
 
     def _view(self, identifier):
         record = next((record for record in self.records if record.id == identifier), None)

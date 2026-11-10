@@ -107,6 +107,7 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="cyan", densi
     if app:
         app.setProperty("entrelaReduceMotion", bool(reduce_motion))
         app.setProperty("entrelaDensity", density)
+        app.setProperty("entrelaFontSize", int(font_size))
     window.setProperty("entrelaTheme", theme)
     # Capture before setFont/QSS can serialize the previous font into spans.
     browsers = {
@@ -176,6 +177,8 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="cyan", densi
         if hasattr(widget, "refresh_theme"):
             widget.refresh_theme()
         if isinstance(widget, FigureCanvasQTAgg):
+            if hasattr(widget, "set_interface_font_size"):
+                widget.set_interface_font_size(font_size)
             for artist in widget.figure.findobj():
                 for getter, setter in [
                     ("get_color", "set_color"),

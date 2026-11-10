@@ -30,6 +30,7 @@ from gui.widgets.bloch_canvas import BlochCanvas
 from gui.widgets.bloch_controls import BlochCameraPanel
 from gui.widgets.snapshot_metrics import SnapshotMetrics
 from gui.widgets.flow_layout import FlowLayout
+from gui.widgets.state_inspector import StateInspector
 from PySide6.QtGui import QShortcut, QKeySequence
 
 
@@ -173,7 +174,10 @@ class BlochPage(PageBase):
         self.visual_tabs.setElideMode(Qt.ElideRight)
         self.visual_tabs.addTab(self.canvas, "Esferas de Bloch")
         self.visual_tabs.addTab(self.probabilities_canvas, "Probabilidades no instante")
+        self.state_inspector = StateInspector()
+        self.visual_tabs.addTab(self.state_inspector, "Estado global")
         self.visual_tabs.currentChanged.connect(self._refresh_ui)
+        self.visual_tabs.currentChanged.connect(self._visual_mode_changed)
         stage = QHBoxLayout()
         stage.addWidget(self.visual_tabs, 1)
         self.camera_scroll = QScrollArea()
@@ -237,6 +241,13 @@ class BlochPage(PageBase):
         if hasattr(self, "camera_scroll"):
             QTimer.singleShot(0, self._fit_camera)
 
+    def _visual_mode_changed(self, index):
+        global_state = self.visual_tabs.widget(index) is self.state_inspector
+        self.camera_scroll.setVisible(not global_state and not self._maximized)
+        self.selection_label.setVisible(not global_state)
+        self.maximize_button.setText("Restaurar painéis" if self._maximized else
+                                     "Ampliar visualização" if global_state else "Ampliar área 3D")
+
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange):
@@ -263,6 +274,7 @@ class BlochPage(PageBase):
         self.selection_label.setText("Clique numa esfera para selecionar")
         self.focus_selected.setEnabled(False)
         self.original_svs = list(statevectors or [])
+        self.state_inspector.set_state(None)
         self.interpolated_svs = list(self.original_svs)
         self.precomputed_bloch = []
         self.ideal_bloch = []
@@ -498,6 +510,11 @@ class BlochPage(PageBase):
             self.probabilities_canvas.draw_idle()
             self._probability_plot_key = plot_key
         self.metrics.select_snapshot(idx)
+        self.state_inspector.set_state(
+            self.original_svs[idx],
+            self.ideal_states[idx] if self.ideal_states else None,
+            f"Snapshot {idx + 1} de {len(self.original_svs)} · estado simulado",
+        )
         self._render_timeline()
         self.frame_changed.emit(idx)
 
@@ -611,6 +628,7 @@ class BlochPage(PageBase):
             self.metrics,
         ):
             widget.setVisible(not enabled)
+        self._visual_mode_changed(self.visual_tabs.currentIndex())
 
     def _select_qubit(self, index):
         valid = 0 <= index < len(self._qubit_panels)

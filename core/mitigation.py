@@ -2,11 +2,12 @@
 
 from secrets import randbits
 from importlib.metadata import version
+from statistics import NormalDist
 import numpy as np
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 from qiskit.quantum_info import Statevector, SparsePauliOp
-from core.types import integer
+from core.types import integer, finite
 from core.simulation import SimulationCancelled
 from core import __version__
 
@@ -44,6 +45,71 @@ def _expectation_z(counts, num_qubits, qubit=0):
     return total / shots
 
 
+def wilson_z_interval(positive_count, shots, confidence_level=0.95):
+    """Approximate binomial score interval mapped by Z = 2 p(+1) - 1.
+
+    This is a marginal interval for one sampled factor, not an interval for the
+    extrapolated zero-noise target. Nominal coverage is approximate, including
+    for small samples; it does not account for model bias or multiple factors.
+    """
+    integer(shots, "Shots")
+    integer(positive_count, "Contagens de +1", 0)
+    if positive_count > shots:
+        raise ValueError("Contagens de +1 não podem exceder os shots")
+    finite(confidence_level, "Nível de confiança")
+    if not 0 < confidence_level < 1:
+        raise ValueError("Nível de confiança deve estar entre 0 e 1")
+    z = -NormalDist().inv_cdf((1 - confidence_level) / 2)
+    proportion = positive_count / shots
+    denominator = 1 + z * z / shots
+    center = (proportion + z * z / (2 * shots)) / denominator
+    radius = z * np.sqrt(proportion * (1 - proportion) / shots + z * z / (4 * shots**2)) / denominator
+    return [max(-1., float(2 * (center - radius) - 1)),
+            min(1., float(2 * (center + radius) - 1))]
+
+
+def z_sampling_metadata(samples, num_qubits, qubit=0):
+    """Describe shot limitations without changing estimates or plug-in errors.
+
+    The 30-shot threshold is an advisory heuristic, never an execution limit or
+    a coverage guarantee. Boundary observations may be physically deterministic
+    or merely undersampled; counts alone cannot distinguish those possibilities.
+    """
+    intervals, low_factors, boundary_factors = [], [], []
+    for sample in samples:
+        counts = sample["counts"]
+        mean = _expectation_z(counts, num_qubits, qubit)
+        shots = sum(counts.values())
+        positive = sum(count for bits, count in counts.items()
+                       if bits.replace(" ", "").zfill(num_qubits)[-1 - qubit] == "0")
+        intervals.append(wilson_z_interval(positive, shots))
+        factor = sample["scale_factor"]
+        if shots < 30:
+            low_factors.append(factor)
+        if abs(mean) == 1:
+            boundary_factors.append(factor)
+    warnings = []
+    if low_factors:
+        warnings.append("Poucos shots nos fatores " + ", ".join(map(str, low_factors))
+                        + ": a amostra pode ser insuficiente para caracterizar a dispersão.")
+    if boundary_factors:
+        warnings.append("Sem variação observada nos fatores " + ", ".join(map(str, boundary_factors))
+                        + ": erro padrão plug-in igual a zero não comprova ausência de incerteza.")
+    return dict(
+        sampling_intervals=intervals,
+        sampling_confidence_level=0.95,
+        sampling_interval_method="wilson",
+        sampling_diagnostics=dict(
+            low_shots_factors=low_factors, boundary_factors=boundary_factors,
+            advisory_shots_threshold=30, warnings=warnings,
+            stderr_method="Plug-in: sqrt((1 − média²) / shots); propagado linearmente pelo ajuste.",
+            interval_scope=("Wilson binomial aproximado por fator para Z = 2p(+1) − 1; "
+                            "não simultâneo e não propagado à extrapolação. Não cobre viés "
+                            "do modelo de ruído nem do ajuste; 95% é cobertura nominal aproximada."),
+        ),
+    )
+
+
 def compile_unitary(circuit, seed):
     """Compile once before folding; keep global phase and remove unused clbits."""
     for instruction in circuit.data:
@@ -62,7 +128,13 @@ def compile_unitary(circuit, seed):
 
 
 def fit_zne_samples(factors, measured, errors, method):
-    """Unweighted polynomial fit; propagated error covers independent shot sampling."""
+    """Unweighted fit with propagated plug-in SE for independent shot sampling.
+
+    SE = sqrt(sum(w_i² s_i²)), where w is the intercept row of the design
+    pseudoinverse. It can vanish for boundary samples despite nonzero sampling
+    uncertainty. It excludes model/fit bias and is not a zero-noise confidence
+    interval; use raw-count diagnostics alongside it.
+    """
     if method not in ("linear", "quadratic"):
         raise ValueError("Ajuste não suportado")
     degree = 1 if method == "linear" else 2
@@ -165,6 +237,7 @@ def run_zne(
     baseline = measured[factors.index(1)]
     return dict(
         **fit,
+        **z_sampling_metadata(samples, native.num_qubits, qubit),
         ideal_observable=ideal,
         baseline_absolute_error=abs(baseline - ideal),
         extrapolated_absolute_error=abs(extrapolated - ideal),

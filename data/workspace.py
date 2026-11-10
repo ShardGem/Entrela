@@ -2,13 +2,44 @@
 
 from pathlib import Path
 import json, os, tempfile
+from contextlib import contextmanager
 from dataclasses import asdict
+import threading
 from core.types import ExperimentConfig, config_from_dict
+from data.file_lock import directory_lock
+
+
+_transactions = threading.local()
 
 
 class WorkspaceLibrary:
-    def __init__(self, directory):
+    def __init__(self, directory, *, lock_timeout=5.0):
         self.path = Path(directory) / "workspace.json"
+        self.lock_timeout = lock_timeout
+
+    @contextmanager
+    def transaction(self):
+        """Read, modify and atomically save under one local-process lock.
+
+        Nested transactions in the same thread share the current document,
+        including when two library objects refer to the same directory.
+        Exceptions leave the existing file intact.
+        """
+        key = str(self.path.resolve())
+        with directory_lock(self.path.parent, timeout=self.lock_timeout):
+            active = getattr(_transactions, "active", None)
+            if active is None:
+                active = _transactions.active = {}
+            if key in active:
+                yield active[key]
+                return
+            raw = self.read()
+            active[key] = raw
+            try:
+                yield raw
+                self._write(raw)
+            finally:
+                active.pop(key, None)
 
     def read(self):
         if not self.path.exists():
@@ -86,9 +117,8 @@ class WorkspaceLibrary:
             config.validate()
         except OverflowError as exc:
             raise ValueError("Os parâmetros da configuração excedem o intervalo numérico suportado.") from exc
-        raw = self.read()
-        raw["templates"][name.strip()] = asdict(config)
-        self._write(raw)
+        with self.transaction() as raw:
+            raw["templates"][name.strip()] = asdict(config)
 
     def template(self, name):
         return config_from_dict(self.read()["templates"][name])
@@ -116,31 +146,29 @@ class WorkspaceLibrary:
             or any(not isinstance(value, str) for value in categories)
         ):
             raise ValueError("Categorias devem ser uma lista de textos.")
-        raw = self.read()
-        if project.strip():
-            raw["projects"].setdefault(project.strip(), {"description": ""})
-        annotation = dict(raw["annotations"].get(identifier, {}))
-        annotation.update({
-            "title": (
-                title.strip() if title is not None
-                else raw["annotations"].get(identifier, {}).get("title", "")
-            ),
-            "project": project.strip(),
-            "notes": notes,
-            "tags": list(dict.fromkeys(tag.strip() for tag in tags if tag.strip())),
-        })
-        for key, value in extras.items():
-            if value is not None:
-                annotation[key] = value.strip()
-        if categories is not None:
-            annotation["categories"] = list(dict.fromkeys(value.strip() for value in categories if value.strip()))
-        raw["annotations"][identifier] = annotation
-        self._write(raw)
+        with self.transaction() as raw:
+            if project.strip():
+                raw["projects"].setdefault(project.strip(), {"description": ""})
+            annotation = dict(raw["annotations"].get(identifier, {}))
+            annotation.update({
+                "title": (
+                    title.strip() if title is not None
+                    else raw["annotations"].get(identifier, {}).get("title", "")
+                ),
+                "project": project.strip(),
+                "notes": notes,
+                "tags": list(dict.fromkeys(tag.strip() for tag in tags if tag.strip())),
+            })
+            for key, value in extras.items():
+                if value is not None:
+                    annotation[key] = value.strip()
+            if categories is not None:
+                annotation["categories"] = list(dict.fromkeys(value.strip() for value in categories if value.strip()))
+            raw["annotations"][identifier] = annotation
 
     def delete_template(self, name):
-        raw = self.read()
-        raw["templates"].pop(name, None)
-        self._write(raw)
+        with self.transaction() as raw:
+            raw["templates"].pop(name, None)
 
 
 def experiment_title(experiment, annotations=None):

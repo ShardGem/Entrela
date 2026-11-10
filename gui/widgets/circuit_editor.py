@@ -5,7 +5,8 @@ from pathlib import Path
 import json
 import math
 from textwrap import fill
-from PySide6.QtCore import Qt, Signal, QSignalBlocker, QMimeData, QEvent, QTimer, QSize
+import unicodedata
+from PySide6.QtCore import Qt, Signal, QSignalBlocker, QMimeData, QEvent, QTimer, QSize, QItemSelectionModel
 from PySide6.QtGui import QUndoStack, QUndoCommand, QKeySequence, QAction
 from PySide6.QtWidgets import (
     QWidget,
@@ -24,6 +25,11 @@ from PySide6.QtWidgets import (
     QApplication,
     QPlainTextEdit,
     QMessageBox,
+    QFrame,
+    QTabWidget,
+    QListWidget,
+    QListWidgetItem,
+    QAbstractItemView,
 )
 from core.circuit_document import (
     CircuitDocument,
@@ -44,6 +50,19 @@ from gui.theme import PALETTE
 from data.circuit_library import CircuitLibrary
 
 CIRCUIT_CLIPBOARD = "application/x-entrela-circuit-gates"
+
+# Categories describe use, without altering the gate IDs saved in documents.
+GATE_CATEGORIES = {
+    "Básicas": ("h", "x", "y", "z", "sx", "id"),
+    "Fases e rotações": ("s", "sdg", "t", "tdg", "rx", "ry", "rz", "p", "u"),
+    "Controladas": ("cx", "cy", "cz", "ch", "ccx"),
+    "Operações conjuntas": ("swap", "rxx", "ryy", "rzz"),
+}
+
+
+def _search_text(text):
+    return "".join(char for char in unicodedata.normalize("NFD", text.casefold())
+                   if not unicodedata.combining(char))
 
 
 class GatePaletteButton(SecondaryButton):
@@ -88,6 +107,7 @@ def operation_records(document):
 
 class CircuitEditor(QWidget):
     run_requested = Signal(object)
+    cancel_requested = Signal()
     draft_changed = Signal()
     document_replacing = Signal(object)
     recovery_requested = Signal()
@@ -262,6 +282,7 @@ class CircuitEditor(QWidget):
         palette_body = QGridLayout(palette)
         palette_body.setContentsMargins(4, 4, 4, 4)
         palette_body.setHorizontalSpacing(6)
+        palette_body.setAlignment(Qt.AlignTop)
         self.palette_grid = palette_body
         self.palette_buttons = {}
         for i, name in enumerate(GATES):
@@ -272,17 +293,62 @@ class CircuitEditor(QWidget):
             button.clicked.connect(lambda _, n=name: self._add(n))
             palette_body.addWidget(button, i // 2, i % 2)
             self.palette_buttons[name] = button
+        palette_panel = QWidget()
+        palette_layout = QVBoxLayout(palette_panel)
+        palette_layout.setContentsMargins(0, 0, 0, 0)
+        palette_layout.setSpacing(6)
+        self.gate_search = QLineEdit()
+        self.gate_search.setPlaceholderText("Buscar porta…")
+        self.gate_search.setAccessibleName("Buscar portas por nome ou símbolo")
+        self.gate_search.setClearButtonEnabled(True)
+        self.gate_search.setToolTip("Busque pelo nome ou símbolo, como Hadamard, rotação ou CX.")
+        palette_layout.addWidget(self.gate_search)
+        self.gate_category = QComboBox()
+        self.gate_category.setAccessibleName("Categoria de portas")
+        self.gate_category.addItem("Todas as portas", None)
+        for category in GATE_CATEGORIES:
+            self.gate_category.addItem(category, category)
+        self.gate_category.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.gate_category.setMinimumContentsLength(8)
+        palette_layout.addWidget(self.gate_category)
+        self.palette_empty = QLabel("Nenhuma porta encontrada.")
+        self.palette_empty.setWordWrap(True)
+        self.palette_empty.hide()
+        palette_layout.addWidget(self.palette_empty)
         palette_scroll = QScrollArea()
         palette_scroll.setWidgetResizable(True)
         palette_scroll.setWidget(palette)
         palette_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.palette_scroll = palette_scroll
+        self.palette_panel = palette_panel
+        palette_layout.addWidget(palette_scroll, 1)
         self._palette_columns = 2
-        row.addWidget(palette_scroll)
+        self._visible_gates = list(GATES)
+        self.gate_search.textChanged.connect(self._filter_gate_palette)
+        self.gate_category.currentIndexChanged.connect(self._filter_gate_palette)
+        row.addWidget(palette_panel)
         self.canvas = CircuitCanvas(editable=True)
         self.canvas.setMinimumWidth(220)
         self.canvas.zoom_changed.connect(self._sync_zoom)
-        row.addWidget(self.canvas, 1)
+        self.operation_views = QTabWidget()
+        self.operation_views.setDocumentMode(True)
+        self.operation_views.addTab(self.canvas, "Desenho")
+        operations_panel = QWidget()
+        operations_layout = QVBoxLayout(operations_panel)
+        operations_layout.setContentsMargins(6, 6, 6, 6)
+        operations_hint = QLabel("Selecione uma operação para editar. Use as setas; Shift ou Ctrl selecionam várias portas.")
+        operations_hint.setWordWrap(True)
+        operations_hint.setObjectName("FieldHint")
+        operations_layout.addWidget(operations_hint)
+        self.operations_list = QListWidget()
+        self.operations_list.setAccessibleName("Operações do circuito em ordem de execução")
+        self.operations_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.operations_list.setWordWrap(True)
+        self.operations_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        operations_layout.addWidget(self.operations_list, 1)
+        self.operation_views.addTab(operations_panel, "Operações")
+        row.addWidget(self.operation_views, 1)
+        self.operations_list.itemSelectionChanged.connect(self._select_from_list)
         self.canvas.operations_selected.connect(self._select_many)
         # A scene must not be cleared while Qt is dispatching a gate's release event.
         self.canvas.move_requested.connect(self._reorder, Qt.QueuedConnection)
@@ -426,9 +492,6 @@ class CircuitEditor(QWidget):
             label.setBuddy(widget)
             settings.add_group(label, widget)
         settings.addWidget(self.noise)
-        self.run = PrimaryButton("Executar circuito", icon="play")
-        self.run.clicked.connect(self._run)
-        settings.addWidget(self.run)
         root.addLayout(settings)
         self.message = QLabel(
             "Até 200 portas · Ctrl+clique seleciona várias · Ctrl+C/V copia e cola · arraste para reordenar."
@@ -436,6 +499,27 @@ class CircuitEditor(QWidget):
         self.message.setWordWrap(True)
         self.message.setTextFormat(Qt.PlainText)
         root.addWidget(self.message)
+        # CircuitPage can host this bar outside its page scroll. Keep the same
+        # run button and signal when this editor is used on its own.
+        self.execution_bar = QFrame()
+        self.execution_bar.setObjectName("ExecutionBar")
+        execution = QHBoxLayout(self.execution_bar)
+        execution.setContentsMargins(20, 10, 20, 12)
+        execution.setSpacing(12)
+        self.execution_status = QLabel("Pronto para executar · medição final na base Z.")
+        self.execution_status.setObjectName("FieldHint")
+        self.execution_status.setWordWrap(True)
+        execution.addWidget(self.execution_status, 1)
+        self.cancel = SecondaryButton("Cancelar", icon="stop")
+        self.cancel.setEnabled(False)
+        self.cancel.setAccessibleName("Cancelar execução do circuito")
+        self.cancel.clicked.connect(self.cancel_requested.emit)
+        execution.addWidget(self.cancel)
+        self.run = PrimaryButton("Executar circuito", icon="play")
+        self.run.setAccessibleName("Executar circuito")
+        self.run.clicked.connect(self._run)
+        execution.addWidget(self.run)
+        root.addWidget(self.execution_bar)
         self.gate_type.currentTextChanged.connect(self._show_fields)
         self.qubits.valueChanged.connect(self._change_qubits)
         self.noise.toggled.connect(self._update_noise_fields)
@@ -448,11 +532,12 @@ class CircuitEditor(QWidget):
             ("Selecionar todas as portas", QKeySequence.SelectAll, self._select_all),
             ("Remover portas", QKeySequence.Delete, self._remove),
         ):
-            action = QAction(title, self.canvas)
-            action.setShortcut(sequence)
-            action.setShortcutContext(Qt.WidgetWithChildrenShortcut)
-            action.triggered.connect(callback)
-            self.canvas.addAction(action)
+            for target in (self.canvas, self.operations_list):
+                action = QAction(title, target)
+                action.setShortcut(sequence)
+                action.setShortcutContext(Qt.WidgetWithChildrenShortcut)
+                action.triggered.connect(callback)
+                target.addAction(action)
         self._set_document(self.document)
         for widget in (self.circuit_name, self.circuit_description, self.phase, self.seed, *self.param_fields):
             widget.textChanged.connect(lambda *_: self.draft_changed.emit())
@@ -534,11 +619,8 @@ class CircuitEditor(QWidget):
             return
         columns = 1 if self.width() < 1000 * max(1, self.font().pixelSize()/15) else 2
         if columns != self._palette_columns:
-            for button in self.palette_buttons.values():
-                self.palette_grid.removeWidget(button)
-            for index, button in enumerate(self.palette_buttons.values()):
-                self.palette_grid.addWidget(button, index // columns, index % columns)
             self._palette_columns = columns
+            self._layout_gate_palette()
         widths = [0] * columns
         for index, button in enumerate(self.palette_buttons.values()):
             button.ensurePolished()
@@ -551,6 +633,25 @@ class CircuitEditor(QWidget):
                  + 2 * self.palette_scroll.frameWidth() + 2)
         if self.palette_scroll.width() != width:
             self.palette_scroll.setFixedWidth(width)
+            self.palette_panel.setFixedWidth(width)
+
+    def _layout_gate_palette(self):
+        for name, button in self.palette_buttons.items():
+            self.palette_grid.removeWidget(button)
+            button.setVisible(name in self._visible_gates)
+        for index, name in enumerate(self._visible_gates):
+            self.palette_grid.addWidget(self.palette_buttons[name],
+                                        index // self._palette_columns, index % self._palette_columns)
+        self.palette_empty.setVisible(not self._visible_gates)
+
+    def _filter_gate_palette(self, *_):
+        query = _search_text(self.gate_search.text().strip())
+        category = self.gate_category.currentData()
+        allowed = GATE_CATEGORIES[category] if category else GATES
+        self._visible_gates = [name for name in GATES if name in allowed
+                               and query in _search_text(" ".join((name, *GATE_NAMES[name], GATE_HELP[name])))]
+        self._layout_gate_palette()
+        self.palette_scroll.verticalScrollBar().setValue(0)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -694,6 +795,20 @@ class CircuitEditor(QWidget):
             button.setEnabled(GATES[name][1] <= document.num_qubits)
         self.canvas.description = f"Fase global: {document.global_phase!r} rad; {document.num_qubits} qubits; medição final na base Z."
         self.canvas.set_operations(operation_records(document), document.num_qubits)
+        blocker = QSignalBlocker(self.operations_list)
+        self.operations_list.clear()
+        for index, gate in enumerate(document.gates):
+            symbol, title = GATE_NAMES[gate.name]
+            connections = ", ".join(f"q{qubit}" for qubit in gate.qubits)
+            parameters = ", ".join(repr(float(value)) for value in gate.parameters)
+            text = f"{index + 1}. {symbol} · {title}\nQubits: {connections}"
+            if parameters:
+                text += " · ângulos (rad): " + parameters
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, index)
+            item.setToolTip(text + "\n" + GATE_HELP[gate.name])
+            self.operations_list.addItem(item)
+        del blocker
         circuit = document.to_quantum_circuit()
         counts = " · ".join(f"{name.upper()} {count}" for name, count in sorted(circuit.count_ops().items()))
         self.summary.setText(f"{document.num_qubits} qubits · {len(document.gates)} portas · profundidade lógica {circuit.depth()}"
@@ -705,10 +820,29 @@ class CircuitEditor(QWidget):
         self.selected_indices = sorted(i for i in indexes if 0 <= i < len(self.document.gates))
         self._select(self.selected_indices[-1] if self.selected_indices else -1, sync_canvas=False)
 
+    def _select_from_list(self):
+        indexes = sorted(item.data(Qt.UserRole) for item in self.operations_list.selectedItems())
+        self.canvas.select_operations(indexes)
+        self._select_many(indexes)
+
+    def _sync_operation_list(self):
+        blocker = QSignalBlocker(self.operations_list)
+        selected = set(self.selected_indices)
+        for index in range(self.operations_list.count()):
+            self.operations_list.item(index).setSelected(index in selected)
+        if self.selected >= 0:
+            item = self.operations_list.item(self.selected)
+            if not self.operations_list.hasFocus():
+                self.operations_list.setCurrentRow(self.selected, QItemSelectionModel.NoUpdate)
+            self.operations_list.scrollToItem(item)
+        del blocker
+
     def _select(self, index, sync_canvas=True):
         self.selected = index if 0 <= index < len(self.document.gates) else -1
         if sync_canvas:
             self.selected_indices = [self.selected] if self.selected >= 0 else []
+            self.canvas.select_operations(self.selected_indices)
+        self._sync_operation_list()
         if self.selected < 0:
             self.selection_label.setText("Adicione uma porta pela paleta.")
             self.gate_matrix.clear()
@@ -726,8 +860,6 @@ class CircuitEditor(QWidget):
         for i, value in enumerate(gate.parameters):
             # Compact drawing labels must never round editable scientific values.
             self.param_fields[i].setText(repr(float(value)))
-        if sync_canvas:
-            self.canvas.select_operation(self.selected)
         self._show_matrix(gate)
         self._show_fields()
 
@@ -923,11 +1055,15 @@ class CircuitEditor(QWidget):
             self.run_requested.emit(self.configuration())
         except ValueError as exc:
             self.message.setText(str(exc))
+            self.execution_status.setText("Revise a configuração: " + str(exc))
 
     def set_running(self, running):
         self._running = running
         self.run.setEnabled(not running)
         self.run.setText("Executando…" if running else "Executar circuito")
+        self.cancel.setEnabled(running)
+        self.execution_status.setText("Execução em andamento. Você pode cancelar com segurança."
+                                      if running else "Pronto para executar · medição final na base Z.")
         self._describe_template()
 
     def _import(self):

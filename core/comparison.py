@@ -13,14 +13,21 @@ def incompatibility(a,b, *, mode="controlled"):
         return "Selecione dois registros diferentes."
     if a.result.error or b.result.error:
         return "Execuções com erro não são comparáveis."
-    if a.config.system != b.config.system:
+    free_a, free_b = a.config.circuit is not None, b.config.circuit is not None
+    if free_a != free_b:
+        return "Tipos de execução diferentes: compare dois circuitos livres ou duas evoluções de Hamiltoniano."
+    if free_a and a.config.system.num_qubits != b.config.system.num_qubits:
+        return "Circuitos com quantidades diferentes de qubits."
+    # Free circuits start from |0…0> and use the document's gates. Hamiltonian,
+    # J, h, boundary and SystemConfig.initial_state do not enter that execution.
+    if not free_a and a.config.system != b.config.system:
         return "Sistemas diferentes: iguale qubits, Hamiltoniano, J, h, fronteira e estado inicial."
     if a.config.circuit != b.config.circuit:
         return "Circuitos diferentes: compare a mesma sequência de portas."
     pa,pb=a.config.protocol,b.config.protocol
     if mode == "trotter" and (a.config.circuit is not None or pa.total_time != pb.total_time):
         return "Compare evoluções do mesmo Hamiltoniano e tempo total para variar passos ou ordem de Trotter."
-    if mode == "controlled" and (pa.total_time,pa.trotter_steps,pa.trotter_order)!=(pb.total_time,pb.trotter_steps,pb.trotter_order):
+    if mode == "controlled" and not free_a and (pa.total_time,pa.trotter_steps,pa.trotter_order)!=(pb.total_time,pb.trotter_steps,pb.trotter_order):
         return "Protocolos de evolução diferentes: iguale tempo, passos e ordem."
     return ""
 

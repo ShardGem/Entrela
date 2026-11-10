@@ -25,6 +25,7 @@ from gui.widgets.flow_layout import FlowLayout
 class CircuitPage(PageBase):
     snapshot_requested = Signal(int)
     run_requested = Signal(object)
+    cancel_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(
@@ -112,9 +113,18 @@ class CircuitPage(PageBase):
         self.tabs.addTab(source, "Circuito da execução")
         self.editor = CircuitEditor()
         self.editor.run_requested.connect(self.run_requested.emit)
+        self.editor.cancel_requested.connect(self.cancel_requested.emit)
         self.tabs.addTab(self.editor, "Editor de circuitos")
+        # Keep execution reachable while the editor and its configuration scroll.
+        self.editor.layout().removeWidget(self.editor.execution_bar)
+        self._root.addWidget(self.editor.execution_bar)
+        self.tabs.currentChanged.connect(self._sync_execution_bar)
+        self._sync_execution_bar()
         self.snapshot_button.setEnabled(False)
         self.copy_button.setEnabled(False)
+
+    def _sync_execution_bar(self, *_):
+        self.editor.execution_bar.setVisible(self.tabs.currentWidget() is self.editor)
 
     def show_experiment(self, experiment, title=None):
         self.experiment = experiment

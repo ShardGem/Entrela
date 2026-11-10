@@ -30,6 +30,7 @@ from gui.widgets.sidebar import Sidebar
 from gui.widgets.topbar import Topbar
 from gui.widgets.tutorial import BellTutorial, STEPS
 from gui.widgets.command_palette import CommandPalette
+from gui.widgets.job_monitor import JobMonitor
 from gui.pages.dashboard import DashboardPage
 from gui.pages.simulation import SimulationPage
 from gui.pages.circuit import CircuitPage
@@ -55,6 +56,8 @@ from gui.workers.comparison_worker import ComparisonWorker
 from gui.workers.documentation_worker import DocumentationWorker
 from gui.workers.detail_worker import DetailWorker
 from gui.workers.study_import_worker import StudyImportWorker
+from gui.workers.workspace_backup_worker import WorkspaceBackupWorker
+from gui.controllers.workspace_backup import WorkspaceBackupController
 from gui.widgets.data_table import configure_table
 from data.workspace import WorkspaceLibrary, experiment_title
 from data.protocols import ProtocolRepository
@@ -160,6 +163,9 @@ class MainWindow(QMainWindow):
         QApplication.instance().styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self._refresh_library()
         self.drafts = DraftController(self)
+        self.workspace_backup = WorkspaceBackupController(self)
+        self.page_settings.backup_requested.connect(self.workspace_backup.export)
+        self.page_settings.restore_backup_requested.connect(self.workspace_backup.restore)
         self._show_page("dashboard")
         if self._storage_error:
             self.statusBar().showMessage(
@@ -183,6 +189,8 @@ class MainWindow(QMainWindow):
         body.addWidget(self.topbar)
         self.stack = QStackedWidget()
         body.addWidget(self.stack, 1)
+        self.job_monitor = JobMonitor()
+        body.addWidget(self.job_monitor)
         layout.addWidget(right, 1)
         self.page_dashboard = DashboardPage()
         self.page_examples = ExamplesPage()
@@ -240,12 +248,14 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.tutorial_dock)
         self.tutorial_dock.hide()
         self.tutorial.section_requested.connect(self._tutorial_section)
+        self.tutorial.destination_requested.connect(self._show_page)
         self.tutorial.progress_changed.connect(self._persist_tutorial)
         self.tutorial.paused.connect(self.tutorial_dock.hide)
         self.tutorial.completed.connect(self._tutorial_completed)
         self.tutorial_dock.visibilityChanged.connect(self._tutorial_visibility)
 
     def _wire_signals(self):
+        self.job_monitor.cancel_requested.connect(self._cancel_simulation)
         self.sidebar.compact_requested.connect(self._toggle_sidebar)
         self.sidebar.navigate.connect(self._show_page)
         self.topbar.help_requested.connect(lambda: self._show_help("Início"))
@@ -292,6 +302,7 @@ class MainWindow(QMainWindow):
         )
         self.page_circuit.snapshot_requested.connect(self._show_circuit_snapshot)
         self.page_circuit.run_requested.connect(self._run_editor_circuit)
+        self.page_circuit.cancel_requested.connect(self._cancel_simulation)
         self.page_analysis.requested.connect(self._run_analysis)
         self.page_analysis.cancel_requested.connect(self._cancel_simulation)
         self.page_analysis.source_requested.connect(self._open_study_source)
@@ -449,7 +460,7 @@ class MainWindow(QMainWindow):
         return key in self.pages and self.stack.currentWidget() is self.pages[key]
 
     def _show_project_history(self, project):
-        self.page_history.search.setText(project)
+        self.page_history.set_project_filter(project)
         self._show_page("history")
 
     def _show_saved_configurations(self):
@@ -614,12 +625,17 @@ class MainWindow(QMainWindow):
             return
         self._pending_example_id = "bell"
         self._apply_draft(cfg, "Tutorial · Seu primeiro Bell")
+        if experiment is not None and step >= 4:
+            self._current_experiment = experiment
+            self._unsaved_result = False
+            self._display_experiment(experiment)
         self.page_simulation.config_panel.set_mode("guided")
         self.help_dock.hide()
         self.tutorial_dock.show()
         self.settings.setValue("tutorial/bell/completed", False)
-        self.tutorial.start(step, experiment)
         self._show_page("simulation")
+        self.tutorial.start(step, experiment)
+        self._update_tutorial()
         self._persist_tutorial()
 
     def _tutorial_section(self, key):
@@ -634,7 +650,9 @@ class MainWindow(QMainWindow):
             config = self.page_simulation.config_panel.get_config()
         except ValueError:
             config = None
-        self.tutorial.update_context(config, self._current_page)
+        displayed = getattr(self.page_results, "_experiment", None)
+        self.tutorial.update_context(config, self._current_page,
+                                     getattr(displayed, "id", None))
 
     def _persist_tutorial(self):
         if not self.tutorial.started:
@@ -671,6 +689,7 @@ class MainWindow(QMainWindow):
         worker.progress.connect(self.page_simulation.status._progress.setValue)
         worker.progress.connect(self.page_analysis.progress.setValue)
         worker.progress.connect(self.page_documentation.progress.setValue)
+        worker.progress.connect(self.job_monitor.set_progress)
         worker.finished.connect(self._on_thread_finished)
         self.page_simulation.set_running(True)
         self.page_mitigation.set_running(True)
@@ -684,7 +703,17 @@ class MainWindow(QMainWindow):
                 AnalysisWorker:"Calculando análise…",ComparisonWorker:"Preparando comparação…",
                 DocumentationWorker:"Exportando documentação…",ReportWorker:"Preparando relatório…",
                 StudyImportWorker:"Importando estudo…",DetailWorker:"Carregando experimento…"}.get(type(worker),"Processando…")
+        if isinstance(worker, WorkspaceBackupWorker):
+            task = "Criando backup completo…" if worker.mode == "export" else "Validando backup completo…"
         self.page_simulation.status.set_running(task)
+        context = ""
+        if isinstance(worker, WorkspaceBackupWorker):
+            context = "Espaço de trabalho"
+        elif isinstance(worker, SimulationWorker):
+            context = self.page_simulation.experiment_name.text().strip()
+        elif self._current_experiment is not None:
+            context = self._experiment_name(self._current_experiment)
+        self.job_monitor.start(task, context)
         worker.start()
 
     def _run_mitigation(self, qubit, method, shots):
@@ -874,14 +903,20 @@ class MainWindow(QMainWindow):
         self.tutorial.record_open(identifier)
 
     def _cancel_simulation(self):
+        if self._storage_worker is not None and self._current_worker is not None and self._current_worker.isFinished():
+            self.statusBar().showMessage("Concluindo a gravação do resultado; aguarde para preservar os dados.")
+            return
         if self._current_worker:
             self._current_worker.requestInterruption()
+            self.job_monitor.cancelling()
             self.page_simulation.btn_cancel.setEnabled(False)
             self.statusBar().showMessage(
                 "Cancelando; aguardando a operação atual do simulador."
             )
 
     def _on_cancelled(self):
+        if isinstance(self._current_worker, WorkspaceBackupWorker):
+            self.page_settings.backup_message.setText("Operação cancelada; espaço de trabalho preservado.")
         self.page_analysis.message.setText("Tarefa cancelada; resultados anteriores preservados.")
         if isinstance(self._current_worker,DocumentationWorker):
             self.page_documentation.message.setText("Exportação cancelada; arquivo de destino anterior e dados de origem preservados.")
@@ -894,6 +929,10 @@ class MainWindow(QMainWindow):
         )
 
     def _on_error(self, message):
+        if isinstance(self._current_worker, WorkspaceBackupWorker):
+            self.page_settings.backup_message.setText(message)
+            self.statusBar().showMessage(message)
+            return
         if isinstance(self._current_worker, (DetailWorker, StudyImportWorker)):
             if isinstance(self._current_worker,StudyImportWorker):
                 self.page_documentation.message.setText(message)
@@ -944,6 +983,7 @@ class MainWindow(QMainWindow):
         self.page_comparison.set_running(False)
         self.page_documentation.set_running(False)
         self.page_workspace.set_running(False)
+        self.job_monitor.finish()
         self._pending_parent_id=None
         self._pending_circuit_context = None
         self._reproduction_source = None
@@ -1106,6 +1146,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(str(exc))
 
     def closeEvent(self, event):
+        if getattr(self, "_workspace_replaced", False):
+            self.page_bloch.timer.stop()
+            self.drafts.timer.stop()
+            self._pending_detail_id = None
+            self._pending_comparison = None
+            event.accept()
+            return
         if self._current_worker is not None or self._storage_worker is not None:
             self._close_pending = True
             self._cancel_simulation()
@@ -1142,6 +1189,8 @@ class MainWindow(QMainWindow):
         self._storage_worker.error.connect(self._on_save_error)
         self._storage_worker.finished.connect(self._on_storage_finished)
         self.statusBar().showMessage("Salvando resultado em segundo plano…")
+        if self._current_worker is not None:
+            self.job_monitor.set_phase("Salvando resultado…", cancellable=False)
         self._storage_worker.start()
 
     def _on_saved(self, identifier):

@@ -71,7 +71,11 @@ class ComparisonPage(PageBase):
         self.hist_layout=QComboBox()
         self.hist_layout.addItems(["Distribuições sobrepostas","Distribuições lado a lado"])
         self.hist_layout.currentIndexChanged.connect(self._compare)
-        layout.addWidget(self.hist_layout)
+        hist_tools=QHBoxLayout()
+        hist_tools.addWidget(self.hist_layout,1)
+        hist_tools.addWidget(self.canvas.exploration_button(hist))
+        layout.addLayout(hist_tools)
+        self.canvas.set_value_lookup(self._histogram_value)
         layout.addWidget(self.canvas)
         self.tabs.addTab(hist,"Distribuições")
         self.curve_canvas=MplCanvas()
@@ -202,7 +206,7 @@ class ComparisonPage(PageBase):
             self.message.setText(error)
             self.canvas.draw()
             return
-        note = "Comparação compatível. Distribuições normalizadas pelo número observado de medições. "
+        note = "Comparação compatível. Distribuições normalizadas pelo total observado de cada execução; escala comum de 0 a 1. "
         note += f"A: {a.config.shots} shots / {a.duration_s:.4g} s · B: {b.config.shots} shots / {b.duration_s:.4g} s. "
         if self.comparison_mode.currentData() == "trotter":
             note += "As curvas comparam com a evolução exata do Hamiltoniano. Grades temporais diferentes não são interpoladas. "
@@ -256,7 +260,7 @@ class ComparisonPage(PageBase):
                 ax=self.canvas.fig.add_subplot(1,2,i+1)
             total = sum((e.result.counts or {}).values())
             xs = [j + ((i - 0.5) * 0.36 if self.hist_layout.currentIndex()==0 else 0) for j in range(len(keys))]
-            ax.bar(
+            bars=ax.bar(
                 xs,
                 [
                     (e.result.counts or {}).get(k, 0) / total if total else 0
@@ -266,10 +270,14 @@ class ComparisonPage(PageBase):
                 label="A" if i == 0 else "B",
                 color=PALETTE.primary if i == 0 else PALETTE.q2,
             )
+            for key,bar in zip(keys,bars):
+                bar._observed = ("AB"[i],key,(e.result.counts or {}).get(key,0),total)
         for ax in self.canvas.fig.axes:
             style_axes(ax)
             ax.set_xticks(range(len(keys)), keys, rotation=90 if len(keys) > 8 else 0)
-            ax.set_ylabel("Frequência observada")
+            ax.set_ylim(0, 1.05)
+            ax.set_ylabel("Frequência observada (0–1)")
+            ax.set_xlabel("Estado (q0 à direita)")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
         self.canvas.draw()
         if previous and previous.get("mode","controlled") == self.comparison_mode.currentData() and tuple(e.id for e in previous["experiments"])==(a.id,b.id):
@@ -277,6 +285,17 @@ class ComparisonPage(PageBase):
             self.set_full_data(previous)
         elif self.tabs.currentIndex() in (1, 2) and not self._suppress_load:
             self._load_timer.start()
+
+    def _histogram_value(self,event):
+        for ax in self.canvas.fig.axes:
+            if ax is not event.inaxes:
+                continue
+            for bar in ax.patches:
+                if hasattr(bar,"_observed") and bar.contains(event)[0]:
+                    run,state,count,total=bar._observed
+                    frequency=count/total if total else 0
+                    return f"Execução {run} · |{state}⟩\nContagens: {count} de {total}\nFrequência observada: {frequency:.16g} ({frequency*100:.12g}%)"
+        return None
 
     def set_full_data(self,data):
         identifiers=tuple(e.id for e in data["experiments"])

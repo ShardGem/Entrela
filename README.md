@@ -12,6 +12,18 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Confiabilidade e interpretação dos resultados — 0.20
+
+- Histogramas comparados com escala comum e curvas temporais que preservam picos anteriores; seleção manual e soma dos estados omitidos em **Outros**.
+- Intervalos de Wilson por fator e diagnóstico de poucos shots/contagens extremas na ZNE, sem confundir erro de amostragem com viés da extrapolação.
+- Inspetor do estado global em Resultados e Estados 3D: matriz densidade, coerência, espectro, pureza, entropia e bipartições.
+- Orientações científicas antes de executar e monitor de tarefas com progresso/cancelamento acessível durante a navegação.
+- Editor com execução fixa, portas pesquisáveis por categoria e lista de operações utilizável pelo teclado.
+- Recuperação de caches, proteção contra gravações concorrentes da biblioteca, tutorial retomado com resultados reais e filtro exato por projeto.
+- Backup completo em **Preferências**, com verificação de integridade, prévia e confirmação antes de substituir o espaço de trabalho.
+
+Veja o [plano completo por prioridade](docs/plano-evolucao.md) e o [guia da entrega e suas limitações](docs/confiabilidade-0.20.md).
+
 ## Laboratório integrado e clareza científica — 0.19
 
 - Configuração, circuitos, resultados, estados 3D e caderno nas abas do mesmo laboratório, reutilizando as páginas e os rascunhos existentes.
@@ -143,7 +155,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.19.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.20.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

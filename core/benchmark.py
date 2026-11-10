@@ -25,6 +25,7 @@ from core.circuits import build_circuit, build_editor_circuit, _build_hamiltonia
 from core.metrics import fidelity, purity, energy_expectation
 from core.mitigation import (
     _expectation_z, _insert_identity_pairs, compile_unitary, fit_zne_samples,
+    z_sampling_metadata,
 )
 from core.noise import build_noise_model
 from core.simulation import SimulationCancelled
@@ -150,7 +151,10 @@ def mitigation_benchmark(
             sample["state"] = _state_payload(baseline_state)
         samples.append(sample)
     checkpoint(85)
+    sampling = z_sampling_metadata(samples, native.num_qubits, qubit)
     baseline = next(s for s in samples if s["scale_factor"] == 1)
+    baseline_sampling = z_sampling_metadata([baseline], native.num_qubits, qubit)
+    sampling_by_method = {"none": baseline_sampling}
     row_start = perf_counter()
     rows = [_row(
         "none", "Sem mitigação", estimate=baseline["estimate"],
@@ -170,6 +174,8 @@ def mitigation_benchmark(
             factors, [s["estimate"] for s in samples], [s["stderr"] for s in samples], method,
         )
         fits[method] = fit
+        fit.update(sampling)
+        sampling_by_method["zne_" + method] = sampling
         processing = perf_counter() - row_start
         acquisition = sum(s["acquisition_s"] for s in samples)
         rows.append(_row(
@@ -215,6 +221,10 @@ def mitigation_benchmark(
                 state_metrics_source="ensemble condicionado simulado; não é tomografia das contagens",
                 reason="Pós-seleção no setor ideal de paridade Z. Pode descartar shots e não detecta todo erro.",
             )
+            conditional_sampling = z_sampling_metadata(
+                [dict(scale_factor=1, counts=selected)], native.num_qubits, qubit,
+            )
+            sampling_by_method["symmetry_parity"] = conditional_sampling
         verification.update(
             circuits=1, shots=shots, retained_shots=retained, acceptance=retained / shots,
             acquisition_s=baseline["acquisition_s"], shared_samples=[1],
@@ -239,6 +249,7 @@ def mitigation_benchmark(
         id=uuid4().hex, created_at=datetime.now(timezone.utc).isoformat(),
         source_id=experiment.id, config=replay_config,
         rows=rows, samples=samples, fits=fits, symmetry=symmetry,
+        **sampling, sampling_by_method=sampling_by_method,
         ideal_observable=ideal_z, qubit=qubit, scale_factors=factors,
         provenance=dict(
             fingerprint=fingerprint, effective_seed=seed,
@@ -254,7 +265,8 @@ def mitigation_benchmark(
             thermal_gate_time_ns=config.noise.gate_time_1q_ns if config.noise.gate_time_1q_ns == config.noise.gate_time_2q_ns else None,
             thermal_gate_durations_ns={"1q":config.noise.gate_time_1q_ns,"2q":config.noise.gate_time_2q_ns},
             fidelity_reference="Mesmo circuito compilado em u/cx sem ruído; não evolução exata exp(-iHt)",
-            uncertainty="Erro padrão de amostragem; exclui viés de extrapolação e incerteza do modelo.",
+            uncertainty=("Erro padrão plug-in de amostragem; pode ser zero em amostras sem variação. "
+                         "Wilson aproximado 95% por fator, não propagado ao alvo ZNE; exclui viés de extrapolação e incerteza do modelo."),
         ),
         actual_cost=dict(circuits=len(factors), shots=len(factors) * shots,
                          acquisition_s=sum(s["acquisition_s"] for s in samples)),
@@ -264,7 +276,10 @@ def mitigation_benchmark(
               "O setor de paridade é inferido da simulação ideal; uso em hardware exige justificar a simetria independentemente. "
               "Custos por linha equivalem ao uso isolado: não somar linhas compartilhadas. "
               "O benchmark recompila em u/cx e recalcula o baseline; a decomposição pode mudar "
-              "o canal de ruído em relação à execução de origem. Semente não garante identidade entre versões/plataformas."),
+              "o canal de ruído em relação à execução de origem. Semente não garante identidade entre versões/plataformas. "
+              + " ".join(sampling["sampling_diagnostics"]["warnings"])
+              + (" Paridade Z: " + " ".join(sampling_by_method["symmetry_parity"]["sampling_diagnostics"]["warnings"])
+                 if sampling_by_method.get("symmetry_parity", {}).get("sampling_diagnostics", {}).get("warnings") else "")),
     )
     checkpoint(100)
     return result

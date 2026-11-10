@@ -12,6 +12,7 @@ STEPS=(
 
 class BellTutorial(QWidget):
     section_requested=Signal(str)
+    destination_requested=Signal(str)
     progress_changed=Signal()
     completed=Signal()
     paused=Signal()
@@ -24,6 +25,7 @@ class BellTutorial(QWidget):
         self.experiment=None
         self.config=None
         self.page=""
+        self.displayed_id=None
         self.opened_id=None
         layout=QVBoxLayout(self)
         self.progress=QProgressBar()
@@ -37,9 +39,9 @@ class BellTutorial(QWidget):
         self.feedback=QLabel()
         self.feedback.setWordWrap(True)
         for w in (self.title,self.body,self.feedback):layout.addWidget(w)
-        locate=QPushButton("Ir para a configuração")
-        locate.clicked.connect(lambda:self.section_requested.emit(STEPS[self.step][2]))
-        layout.addWidget(locate)
+        self.locate=QPushButton("Ir para a configuração")
+        self.locate.clicked.connect(self.locate_current_step)
+        layout.addWidget(self.locate)
         row=QHBoxLayout()
         self.btn_back=QPushButton("Voltar")
         self.btn_next=QPushButton("Continuar")
@@ -58,7 +60,7 @@ class BellTutorial(QWidget):
     def run_id(self):return self.experiment.id if self.experiment else None
     @staticmethod
     def matches(cfg):
-        return bool(cfg and cfg.system.num_qubits==2 and cfg.system.initial_state=="bell" and cfg.system.J==0
+        return bool(cfg and cfg.circuit is None and cfg.system.num_qubits==2 and cfg.system.initial_state=="bell" and cfg.system.J==0
                     and cfg.system.h==0 and cfg.system.hamiltonian in ("Ising","Custom")
                     and not cfg.noise.enabled and cfg.protocol.save_snapshots)
     def start(self,step=0,experiment=None):
@@ -69,10 +71,19 @@ class BellTutorial(QWidget):
         self.experiment=experiment
         self.opened_id=None
         self.refresh()
-        self.section_requested.emit(STEPS[self.step][2])
-    def update_context(self,config,page):
+        self.locate_current_step()
+    def update_context(self,config,page,displayed_id=None):
+        """Use the actual displayed record, rather than the selected page alone."""
         self.config,self.page=config,page
+        self.displayed_id=displayed_id
         self.refresh()
+    def locate_current_step(self):
+        if self.step==5:
+            self.destination_requested.emit("results")
+        elif self.step==6:
+            self.destination_requested.emit("history")
+        else:
+            self.section_requested.emit(STEPS[self.step][2])
     def record_run(self,experiment):
         if self.active and self.step>=4 and not experiment.result.error and self.matches(experiment.config):
             self.experiment=experiment
@@ -90,7 +101,7 @@ class BellTutorial(QWidget):
                                     and c.system.J==0 and c.system.h==0 and not c.noise.enabled)
         if self.step==3:return self.matches(c)
         if self.step==4:return self.experiment is not None
-        if self.step==5:return bool(self.experiment and self.page=="results")
+        if self.step==5:return bool(self.run_id and self.page=="results" and self.displayed_id==self.run_id)
         return bool(self.run_id and self.opened_id==self.run_id)
     def refresh(self):
         if self.finished:
@@ -102,6 +113,7 @@ class BellTutorial(QWidget):
         self.btn_back.setEnabled(self.step>0)
         self.btn_next.setText("Concluir" if self.step==6 else "Continuar")
         self.btn_next.setEnabled(self.ready())
+        self.locate.setText("Ver resultados do tutorial" if self.step==5 else "Ir para o histórico" if self.step==6 else "Ir para a configuração")
         if self.experiment:
             counts=self.experiment.result.counts or {}
             total=sum(counts.values())
@@ -121,13 +133,13 @@ class BellTutorial(QWidget):
         else:
             self.step+=1
             self.refresh()
-            self.section_requested.emit(STEPS[self.step][2])
+            self.locate_current_step()
         self.progress_changed.emit()
     def back(self):
         if self.step>0:
             self.step-=1
             self.refresh()
-            self.section_requested.emit(STEPS[self.step][2])
+            self.locate_current_step()
             self.progress_changed.emit()
     def pause(self):
         self.active=False

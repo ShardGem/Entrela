@@ -1,5 +1,9 @@
+"""Observed distributions and snapshot probabilities, with explicit selection."""
+
 import numpy as np
-from PySide6.QtWidgets import QWidget, QHBoxLayout
+from PySide6.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QComboBox, QToolButton, QMenu,
+)
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
 
@@ -7,67 +11,151 @@ from gui.theme import PALETTE
 class ResultsTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._counts = {}
+        self._hist_title = "Distribuição observada"
+        self._probabilities = None
+        self._times = None
+        self._time_unit = "Tempo (adimensional, ℏ=1)"
+        self._manual_states = set()
         layout = QHBoxLayout(self)
         self.canvas_hist = MplCanvas(self)
         self.canvas_evol = MplCanvas(self)
-        layout.addWidget(self.canvas_hist)
-        layout.addWidget(self.canvas_evol)
+        self.hist_measure = QComboBox()
+        self.hist_measure.addItems(["Contagens", "Frequência observada"])
+        self.hist_measure.setAccessibleName("Unidade da distribuição observada")
+        self.hist_measure.setToolTip("Contagens são medições observadas. Frequência divide cada contagem pelo total observado; não é uma probabilidade exata do estado.")
+        self.hist_measure.currentIndexChanged.connect(self._render_histogram)
+        self.state_criterion = QComboBox()
+        self.state_criterion.addItems(["Picos na trajetória", "Probabilidade final", "Seleção manual"])
+        self.state_criterion.setAccessibleName("Critério de seleção dos estados na evolução")
+        self.state_criterion.setToolTip("Exibe até quatro estados com maior probabilidade em algum snapshot (picos), os quatro maiores no final, ou os estados escolhidos. Outros soma todos os estados omitidos.")
+        self.state_criterion.currentIndexChanged.connect(self._render_evolution)
+        self.state_picker = QToolButton()
+        self.state_picker.setText("Estados…")
+        self.state_picker.setAccessibleName("Selecionar estados da evolução")
+        self.state_picker.setPopupMode(QToolButton.InstantPopup)
+        self.state_menu = QMenu(self.state_picker)
+        self.state_picker.setMenu(self.state_menu)
+        self.state_picker.hide()
+        for canvas, control, extra in (
+            (self.canvas_hist, self.hist_measure, None),
+            (self.canvas_evol, self.state_criterion, self.state_picker),
+        ):
+            pane = QWidget(self)
+            column = QVBoxLayout(pane)
+            column.setContentsMargins(0, 0, 0, 0)
+            tools = QHBoxLayout()
+            tools.addWidget(control, 1)
+            if extra is not None:
+                tools.addWidget(extra)
+            tools.addWidget(canvas.exploration_button(pane))
+            column.addLayout(tools)
+            column.addWidget(canvas, 1)
+            layout.addWidget(pane, 1)
+        self.canvas_hist.set_value_lookup(self._histogram_value)
+        self.canvas_evol.set_value_lookup(self._evolution_value)
 
     def exibir_histograma(self, counts, titulo="Distribuição observada"):
+        self._counts = dict(counts or {})
+        self._hist_title = titulo
+        self._render_histogram()
+
+    def _render_histogram(self, *_):
         ax = self.canvas_hist.reset_axes()
-        if counts:
-            keys = sorted(counts)
-            ax.bar(keys, [counts[k] for k in keys], color=PALETTE.primary)
+        total = sum(self._counts.values())
+        frequency = self.hist_measure.currentIndex() == 1
+        if self._counts:
+            keys = sorted(self._counts)
+            values = [self._counts[k] / total if total else 0 for k in keys] if frequency else [self._counts[k] for k in keys]
+            ax.bar(keys, values, color=PALETTE.primary)
             ax.tick_params(axis="x", labelrotation=90 if len(keys) > 8 else 0)
         else:
-            ax.text(
-                0.5,
-                0.5,
-                "Sem contagens",
-                color=PALETTE.text,
-                ha="center",
-                transform=ax.transAxes,
-            )
-        ax.set_title(titulo)
-        ax.set_ylabel("Contagens")
+            ax.text(.5, .5, "Sem contagens", color=PALETTE.text,
+                    ha="center", transform=ax.transAxes)
+        if frequency:
+            ax.set_ylim(0, 1.05)
+        else:
+            ax.set_ylim(bottom=0)
+        ax.set_title(self._hist_title)
+        ax.set_ylabel("Frequência observada (0–1)" if frequency else "Contagens")
         ax.set_xlabel("Estado (q0 à direita)")
         self.canvas_hist.draw()
 
-    def exibir_evolucao_temporal(
-        self, states, times=None, time_unit="Tempo (adimensional, ℏ=1)"
-    ):
-        ax = self.canvas_evol.reset_axes()
-        if states:
-            probabilities = np.asarray([s.probabilities() for s in states])
-            indices = np.argsort(probabilities[-1])[-min(4, probabilities.shape[1]) :]
-            time = (
-                times
-                if times is not None and len(times) == len(states)
-                else np.arange(len(states))
-            )
-            for index in sorted(indices):
-                ax.plot(
-                    time,
-                    probabilities[:, index],
-                    ".-",
-                    label=f"|{index:0{int(np.log2(states[0].dim))}b}⟩",
-                )
-            ax.legend(
-                facecolor=PALETTE.surface,
-                edgecolor=PALETTE.border,
-                labelcolor=PALETTE.text,
-            )
-            ax.set_ylim(-0.03, 1.03)
+    def exibir_evolucao_temporal(self, states, times=None, time_unit="Tempo (adimensional, ℏ=1)"):
+        previous_dim = None if self._probabilities is None else self._probabilities.shape[1]
+        self._probabilities = np.asarray([s.probabilities() for s in states]) if states else None
+        self._times = np.asarray(times) if times is not None and len(times) == len(states) else np.arange(len(states))
+        self._time_unit = time_unit
+        if self._probabilities is not None and previous_dim != self._probabilities.shape[1]:
+            self._manual_states = set(self._rank_states("peak"))
+        self._rebuild_state_menu()
+        self._render_evolution()
+
+    def _rank_states(self, criterion):
+        scores = (self._probabilities.max(axis=0) if criterion == "peak" else self._probabilities[-1])
+        # Deterministic ties prefer the lower bitstring; no final-only bias.
+        return np.lexsort((np.arange(len(scores)), -scores))[:4].tolist()
+
+    def _rebuild_state_menu(self):
+        self.state_menu.clear()
+        if self._probabilities is None:
+            return
+        dim = self._probabilities.shape[1]
+        self._manual_states.intersection_update(range(dim))
+        width = int(np.log2(dim))
+        for index in range(dim):
+            action = self.state_menu.addAction(f"|{index:0{width}b}⟩")
+            action.setCheckable(True)
+            action.setChecked(index in self._manual_states)
+            action.toggled.connect(lambda checked, index=index: self._select_state(index, checked))
+
+    def _select_state(self, index, checked):
+        if checked:
+            self._manual_states.add(index)
         else:
-            ax.text(
-                0.5,
-                0.5,
-                "Ative snapshots para registrar a evolução",
-                color=PALETTE.text,
-                ha="center",
-                transform=ax.transAxes,
-            )
-        ax.set_title("Evolução — até 4 estados mais prováveis")
-        ax.set_xlabel(time_unit)
-        ax.set_ylabel("Probabilidade")
+            self._manual_states.discard(index)
+        self._render_evolution()
+
+    def _render_evolution(self, *_):
+        ax = self.canvas_evol.reset_axes()
+        criterion = self.state_criterion.currentIndex()
+        self.state_picker.setVisible(criterion == 2)
+        self.state_picker.setEnabled(self._probabilities is not None)
+        if self._probabilities is not None:
+            probabilities = self._probabilities
+            indices = sorted(self._manual_states if criterion == 2 else self._rank_states("final" if criterion == 1 else "peak"))
+            width = int(np.log2(probabilities.shape[1]))
+            for index in indices:
+                ax.plot(self._times, probabilities[:, index], ".-", label=f"|{index:0{width}b}⟩")
+            omitted = sorted(set(range(probabilities.shape[1])) - set(indices))
+            if omitted:
+                ax.plot(self._times, probabilities[:, omitted].sum(axis=1), "--",
+                        color=PALETTE.text_muted, label=f"Outros ({len(omitted)} estados)")
+            ax.legend(facecolor=PALETTE.surface, edgecolor=PALETTE.border, labelcolor=PALETTE.text)
+            ax.set_ylim(-.03, 1.03)
+            description = (f"{len(indices)} maiores picos", f"{len(indices)} maiores no final", f"{len(indices)} selecionados")[criterion]
+            ax.set_title(f"Evolução · {description}")
+        else:
+            ax.text(.5, .5, "Ative snapshots para registrar a evolução", color=PALETTE.text,
+                    ha="center", transform=ax.transAxes)
+            ax.set_title("Evolução das probabilidades")
+        ax.set_xlabel(self._time_unit)
+        ax.set_ylabel("Probabilidade do estado (0–1)")
         self.canvas_evol.draw()
+
+    def _histogram_value(self, event):
+        total = sum(self._counts.values())
+        for state, bar in zip(sorted(self._counts), self.canvas_hist.fig.axes[0].patches):
+            if bar.contains(event)[0]:
+                frequency = self._counts[state] / total if total else 0
+                return f"Estado |{state}⟩\nContagens: {self._counts[state]} de {total}\nFrequência observada: {frequency:.16g} ({frequency * 100:.12g}%)"
+        return None
+
+    def _evolution_value(self, event):
+        for line in self.canvas_evol.fig.axes[0].lines:
+            hit, info = line.contains(event)
+            if hit and len(info.get("ind", [])):
+                index = info["ind"][0]
+                probability = line.get_ydata()[index]
+                return f"{line.get_label()}\n{self._time_unit}: {line.get_xdata()[index]:.16g}\nProbabilidade: {probability:.16g} ({probability * 100:.12g}%)"
+        return None

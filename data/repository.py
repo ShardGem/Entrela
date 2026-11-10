@@ -322,17 +322,30 @@ class ExperimentRepository:
                 cache = self.base_dir / ".summaries" / path.name
                 stat = path.stat()
                 payload = None
+                experiment = None
                 if cache.exists():
                     try:
                         saved = json.loads(cache.read_text(encoding="utf-8"))
                         if (
-                            saved.get("mtime_ns") == stat.st_mtime_ns
+                            isinstance(saved, dict)
+                            and isinstance(saved.get("experiment"), dict)
+                            and saved.get("mtime_ns") == stat.st_mtime_ns
                             and saved.get("size") == stat.st_size
                         ):
                             payload = saved["experiment"]
-                    except (ValueError, KeyError, TypeError):
-                        pass
-                if payload is None:
+                            if payload.get("id") != path.stem:
+                                raise ValueError("Identificador do resumo incompatível")
+                            result = payload.get("result")
+                            if not isinstance(result, dict) or any(
+                                key in result for key in (*STATE_LISTS, *SINGLE_STATES)
+                            ):
+                                raise ValueError("Conteúdo de resumo inválido")
+                            experiment = self._deserialize(payload)
+                    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError):
+                        # O cache é descartável: sua corrupção não torna a fonte
+                        # ilegível. Reabrir a fonte também cobre payloads inválidos.
+                        experiment = None
+                if experiment is None:
                     raw = json.loads(path.read_text(encoding="utf-8"))
                     if not isinstance(raw, dict) or raw.get("id") != path.stem:
                         raise ValueError("Identificador incompatível")
@@ -359,10 +372,10 @@ class ExperimentRepository:
                             if key in result
                         },
                     )
-                    exp = self._deserialize(payload)
-                    self._save_summary(exp, path)
-                records.append(self._deserialize(payload))
-            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                    experiment = self._deserialize(payload)
+                    self._save_summary(experiment, path)
+                records.append(experiment)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
                 self.load_errors.append(f"{path.name}: {exc}")
         return records
 

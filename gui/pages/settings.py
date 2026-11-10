@@ -1,6 +1,6 @@
 """Workspace preferences, independent of scientific experiment parameters."""
 
-from PySide6.QtCore import Signal, QSignalBlocker
+from PySide6.QtCore import Signal, QSignalBlocker, Qt
 from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBox
 from gui.pages.base import PageBase
 from gui.widgets.card import Card
@@ -10,6 +10,8 @@ from gui.widgets.button import SecondaryButton
 class SettingsPage(PageBase):
     appearance_changed = Signal()
     restore_requested = Signal()
+    backup_requested = Signal()
+    restore_backup_requested = Signal()
     DEFAULTS = {
         "theme": "dark", "font_size": 15, "accent": "cyan",
         "density": "comfortable", "reduce_motion": False,
@@ -51,6 +53,21 @@ class SettingsPage(PageBase):
         self.export_dpi.setSuffix(' DPI')
         self.export_dpi.setToolTip('Resolução de figuras rasterizadas. Texto e gráficos vetoriais em PDF/SVG preservam a resolução independente.')
         self._card('Exportação', [('Resolução de imagens', self.export_dpi)])
+        backup = Card('Backup do espaço de trabalho')
+        description = QLabel('Guarde experimentos, circuitos, análises, protocolos, anotações, rascunhos e preferências em um único ZIP. Restaurar substitui o espaço atual após uma prévia e confirmação.')
+        description.setWordWrap(True)
+        backup.add(description)
+        self.backup_button = SecondaryButton('Criar backup completo', icon='export')
+        self.restore_backup_button = SecondaryButton('Inspecionar e restaurar backup', icon='history')
+        self.backup_button.clicked.connect(self.backup_requested.emit)
+        self.restore_backup_button.clicked.connect(self.restore_backup_requested.emit)
+        backup.add(self.backup_button)
+        backup.add(self.restore_backup_button)
+        self.backup_message = QLabel('Backups completos são diferentes dos pacotes de estudo usados em Documentação.')
+        self.backup_message.setWordWrap(True)
+        self.backup_message.setTextFormat(Qt.PlainText)
+        backup.add(self.backup_message)
+        self.body().addWidget(backup)
         note = QLabel('Velocidade, repetição, rastros e foco dos qubits ficam nos controles de Estados em 3D e são lembrados entre sessões. As preferências são salvas automaticamente.')
         note.setWordWrap(True)
         self.body().addWidget(note)

@@ -12,6 +12,7 @@ from gui.pages.base import PageBase
 from gui.widgets.card import MetricCard
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.tabs.results_tab import ResultsTab
+from gui.widgets.state_inspector import StateInspector
 from core.export import result_interpretation
 from core.reproduction import scientific_context
 from data.workspace import experiment_title
@@ -69,6 +70,8 @@ class ResultsPage(PageBase):
         self.tabs.addTab(self.interpretation, "Entender resultado")
         self.tabs.addTab(self.table, "Dados")
         self.tabs.addTab(self.metadata, "Reprodutibilidade")
+        self.state_inspector = StateInspector()
+        self.tabs.addTab(self.state_inspector, "Estado global")
         self.body().addWidget(self.tabs, 1)
         for name, text, signal in [
             ("btn_rerun", "Reexecutar", self.rerun_requested),
@@ -122,6 +125,9 @@ class ResultsPage(PageBase):
 
     def show_experiment(self, experiment):
         self._experiment = experiment
+        self.state_inspector.set_state(experiment.result.final_state,
+                                       experiment.result.ideal_final_state,
+                                       "Estado final da execução · calculado pelo simulador")
         self._display_title = experiment_title(experiment)
         r, c = experiment.result, experiment.config
         self.btn_rerun.setText("Reproduzir ZNE" if r.mitigation else "Reexecutar")

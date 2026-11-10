@@ -43,6 +43,12 @@ exp=run_experiment(replace(create_example_config('bell'),shots=64))
 window.repository.save(exp)
 assert window.repository.load(exp.id).result.counts==exp.result.counts
 assert exp.result.metadata['entrela_version']==core.__version__
+window._current_experiment=exp
+window._display_experiment(exp)
+window._show_page('results')
+window.page_results.tabs.setCurrentWidget(window.page_results.state_inspector)
+app.processEvents()
+assert abs(window.page_results.state_inspector.quantities['purity']-1)<1e-10
 from core.circuit_document import CircuitDocument,CircuitGate
 from core.types import ExperimentConfig,SystemConfig,SimulationProtocol,NoiseConfig
 custom=run_experiment(ExperimentConfig(SystemConfig(2,J=0,h=0),SimulationProtocol(2,2,True),NoiseConfig(False),64,42,CircuitDocument(2,(CircuitGate('h',(0,)),CircuitGate('cx',(0,1))),.3)))
@@ -53,11 +59,17 @@ window.page_circuit._copy_to_editor()
 assert window.page_circuit.editor.document==custom.config.circuit
 window.page_circuit.editor.circuit_name.setText('Recovered packaged circuit')
 window.close();app.processEvents()
+from data.workspace_backup import create_workspace_backup,prepare_workspace_restore
+create_workspace_backup('data','backup.zip',{'appearance/theme':'dark'})
+prepared=prepare_workspace_restore('backup.zip','restored-data')
+assert prepared.preview.experiments==2
+assert prepared.commit()=={'appearance/theme':'dark'}
+assert ExperimentRepository('restored-data').load(exp.id).result.counts==exp.result.counts
 reopened=MainWindow(window.repository,window.settings)
 assert reopened.page_circuit.editor.document==custom.config.circuit
 assert reopened.page_circuit.editor.circuit_name.text()=='Recovered packaged circuit'
 reopened.close();splash.close();app.processEvents()
-print('PASS: isolated wheel, packaged assets, Qt window, scientific engine and persistence')
+print('PASS: isolated wheel, assets, Qt workspace, scientific engine, state inspector, backup and persistence')
 """
 
 

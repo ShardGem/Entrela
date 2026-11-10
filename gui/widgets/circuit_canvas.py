@@ -34,6 +34,7 @@ class GateItem(QGraphicsItem):
         self.setPos(LEFT + column * COLUMN, 0)
         self.setData(0, index)
         self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemIsFocusable)
         self.setFlag(QGraphicsItem.ItemIsMovable, view.editable)
         self.setAcceptHoverEvents(True)
         self.hover = False
@@ -122,13 +123,14 @@ class GateItem(QGraphicsItem):
                     text = painter.fontMetrics().elidedText(text, Qt.ElideRight, 64)
                     painter.drawText(QRectF(-34, y + 4, 68, 18), Qt.AlignCenter, text)
                     painter.setPen(pen)
-        if self.isSelected():
+        if self.isSelected() or self.hasFocus():
             painter.setPen(QPen(QColor(PALETTE.text), 1, Qt.DashLine))
             painter.setBrush(Qt.NoBrush)
             painter.drawRoundedRect(self.boundingRect(), 8, 8)
 
     def mousePressEvent(self, event):
         self._press_x = self.pos().x()
+        self.setFocus(Qt.MouseFocusReason)
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -168,6 +170,10 @@ class CircuitCanvas(QGraphicsView):
         self.description = "Circuito Entrela"
         self.operations = []
         self.num_qubits = 2
+        self._keyboard_index = None
+        self._selection_anchor = None
+        self.setAccessibleName("Desenho do circuito quântico")
+        self.setAccessibleDescription("Use as setas para selecionar portas em ordem de execução. Shift e setas ampliam a seleção.")
         self.refresh_theme()
 
     def sizeHint(self):
@@ -189,6 +195,10 @@ class CircuitCanvas(QGraphicsView):
 
     def _selection(self):
         items = self.scene_model.selectedItems()
+        focus = self.scene_model.focusItem()
+        self._keyboard_index = (focus.index if isinstance(focus, GateItem) and focus.isSelected()
+                                else max((item.index for item in items), default=None))
+        self._selection_anchor = self._keyboard_index
         self.operations_selected.emit(sorted(item.data(0) for item in items))
         if items:
             self.operation_selected.emit(items[0].data(0))
@@ -259,6 +269,8 @@ class CircuitCanvas(QGraphicsView):
 
     def select_operations(self, indexes):
         indexes = set(indexes)
+        self._keyboard_index = max(indexes, default=None)
+        self._selection_anchor = self._keyboard_index
         self.scene_model.blockSignals(True)
         for item in self.scene_model.items():
             if isinstance(item, GateItem):
@@ -267,6 +279,39 @@ class CircuitCanvas(QGraphicsView):
                 if chosen:
                     self.ensureVisible(item)
         self.scene_model.blockSignals(False)
+
+    def keyPressEvent(self, event):
+        previous = (Qt.Key_Left, Qt.Key_Up)
+        following = (Qt.Key_Right, Qt.Key_Down)
+        navigation = (*previous, *following, Qt.Key_Home, Qt.Key_End)
+        if (event.key() not in navigation or not self.operations
+                or event.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)):
+            super().keyPressEvent(event)
+            return
+        first, last = self.offset, self.offset + len(self.operations) - 1
+        current = self._keyboard_index
+        if event.key() == Qt.Key_Home:
+            target = first
+        elif event.key() == Qt.Key_End:
+            target = last
+        elif current is None:
+            target = last if event.key() in previous else first
+        else:
+            target = max(first, min(last, current + (-1 if event.key() in previous else 1)))
+        anchor = self._selection_anchor
+        extending = bool(event.modifiers() & Qt.ShiftModifier)
+        indexes = list(range(min(anchor, target), max(anchor, target) + 1)) if extending and anchor is not None else [target]
+        self.select_operations(indexes)
+        self._keyboard_index = target
+        self._selection_anchor = anchor if extending and anchor is not None else target
+        item = next((item for item in self.scene_model.items()
+                     if isinstance(item, GateItem) and item.index == target), None)
+        if item:
+            item.setFocus(Qt.OtherFocusReason)
+            self.ensureVisible(item)
+        self.operations_selected.emit(indexes)
+        self.operation_selected.emit(target)
+        event.accept()
 
     def set_zoom(self, percent):
         factor = max(0.35, min(2.5, percent / 100))

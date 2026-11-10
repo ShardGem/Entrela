@@ -57,20 +57,19 @@ class PreparedStudy:
         created = []
         try:
             library = WorkspaceLibrary(self.repository.base_dir / ".workspace")
-            current = library.read()
-            for identifier, annotation in self.annotations.items():
-                current["annotations"][identifier] = annotation
-                project = annotation.get("project", "")
-                if project:
-                    current["projects"].setdefault(project, {"description":""})
-            for relative in self.paths:
-                target = self.repository.base_dir / relative
-                if target.exists():
-                    raise ValueError("Conflito de importação; nenhum registro anterior será substituído")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                (Path(self.temporary.name) / relative).replace(target)
-                created.append(target)
-            library._write(current)
+            with library.transaction() as current:
+                for identifier, annotation in self.annotations.items():
+                    current["annotations"][identifier] = annotation
+                    project = annotation.get("project", "")
+                    if project:
+                        current["projects"].setdefault(project, {"description":""})
+                for relative in self.paths:
+                    target = self.repository.base_dir / relative
+                    if target.exists():
+                        raise ValueError("Conflito de importação; nenhum registro anterior será substituído")
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    (Path(self.temporary.name) / relative).replace(target)
+                    created.append(target)
             return self.experiments
         except Exception:
             for target in reversed(created):

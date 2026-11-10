@@ -175,6 +175,14 @@ class SimulationPage(PageBase):
         note.setWordWrap(True)
         note.setObjectName("FieldHint")
         review.add(note)
+        self.diagnostics = QLabel()
+        self.diagnostics.setObjectName("FieldHint")
+        self.diagnostics.setWordWrap(True)
+        self.diagnostics.setTextFormat(Qt.PlainText)
+        self.diagnostics.setAccessibleName("Orientações científicas para a configuração")
+        self.diagnostics_section = CollapsibleSection("O que esperar desta configuração")
+        self.diagnostics_section.content_layout.addWidget(self.diagnostics)
+        review.add(self.diagnostics_section)
         layout.addWidget(review)
         self.science = CollapsibleSection("Método e interpretação")
         explanation = QLabel("Fidelidade compara com o mesmo circuito sem ruído; a referência exata em Análises permite avaliar a aproximação Trotter. Pureza global mede mistura do sistema completo. Energia é a média do Hamiltoniano. ZNE extrapola observáveis e não reconstrói um estado mitigado.")
@@ -268,12 +276,19 @@ class SimulationPage(PageBase):
         from core.types import resource_estimate
         try:
             config = self.config_panel.get_config()
+            from core.experiment_diagnostics import diagnose_experiment
+            diagnostics = diagnose_experiment(config)
+            self.diagnostics.setText("\n\n".join(item.title + ": " + item.message for item in diagnostics))
+            self.diagnostics_section.set_summary(" · ".join(item.title for item in diagnostics))
+            self.diagnostics_section.setVisible(bool(diagnostics))
             estimate = resource_estimate(config)
             self._summary_rows['resources'].setText(f"{estimate['snapshots']} snapshots · {estimate['state_bytes']/1024**2:.2f} MiB")
             self._summary_rows['resources'].setToolTip("Estimativa dos estados brutos. JSON e renderização consomem mais memória. Limites: 6 qubits e 200 passos.")
             self.configuration_feedback.setText("Configuração válida · pronta para executar e registrar no histórico.")
             self._valid = True
         except ValueError as exc:
+            self.diagnostics.clear()
+            self.diagnostics_section.hide()
             message = str(exc)
             self._valid = False
             self._summary_rows['resources'].setText("Revisar configuração")

@@ -9,7 +9,7 @@ from qiskit_aer import AerSimulator
 from core.analysis import checkpoint, analysis_provenance, analysis_run_record, exact_states
 from core.benchmark import _unitary
 from core.metrics import fidelity
-from core.mitigation import compile_unitary, _insert_identity_pairs, _expectation_z, fit_zne_samples
+from core.mitigation import compile_unitary, _insert_identity_pairs, _expectation_z, fit_zne_samples, z_sampling_metadata
 from core.noise import build_noise_model
 from core.simulation import run_experiment
 from core.types import integer
@@ -186,6 +186,7 @@ def sampling_study(experiment, *, mode="stability", factor_sets=((1, 3, 5), (1, 
                 samples = []
                 if mode == "budget":
                     sample = _acquire(simulator, native, 1, shots, run_seed)
+                    sample.update(z_sampling_metadata([sample], native.num_qubits, qubit))
                     mean = _expectation_z(sample["counts"], native.num_qubits, qubit)
                     estimates["none"].append(mean)
                     reported["none"].append(float(np.sqrt(max(0., 1 - mean**2) / shots)))
@@ -195,14 +196,17 @@ def sampling_study(experiment, *, mode="stability", factor_sets=((1, 3, 5), (1, 
                 for i, (factor, allocated) in enumerate(zip(factors, allocation)):
                     checkpoint(is_cancelled, None, 0)
                     sample = _acquire(simulator, native, factor, allocated, (run_seed + i + 1) % 2**32)
+                    sample.update(z_sampling_metadata([sample], native.num_qubits, qubit))
                     mean = _expectation_z(sample["counts"], native.num_qubits, qubit)
                     means.append(mean)
                     errors.append(float(np.sqrt(max(0., 1 - mean**2) / allocated)))
                     samples.append(dict(sample, role="zne"))
                 fits = {}
+                sampling = z_sampling_metadata([s for s in samples if s["role"] == "zne"], native.num_qubits, qubit)
                 for method in ("linear", "quadratic"):
                     fit_start=perf_counter()
                     fit = fit_zne_samples(factors, means, errors, method)
+                    fit.update(sampling)
                     processing["zne_"+method] += perf_counter()-fit_start
                     acquisition["zne_"+method] += sum(s["acquisition_s"] for s in samples if s["role"]=="zne")
                     fits[method] = fit
@@ -210,7 +214,7 @@ def sampling_study(experiment, *, mode="stability", factor_sets=((1, 3, 5), (1, 
                     reported["zne_" + method].append(fit["extrapolated_stderr"])
                 elapsed += sum(s["acquisition_s"] for s in samples)
                 runs.append(dict(repeat=repeat, factors=factors, shots_setting=shots,
-                                 samples=samples, fits=fits, effective_seed=run_seed))
+                                 samples=samples, fits=fits, effective_seed=run_seed, **sampling))
                 job += 1
             for method, values in estimates.items():
                 rows.append(dict(method=method, factors="/".join(map(str, factors)),
@@ -227,6 +231,8 @@ def sampling_study(experiment, *, mode="stability", factor_sets=((1, 3, 5), (1, 
     options = dict(factor_sets=sets, shot_counts=counts, total_shots=total_shots,
                    repetitions=repetitions, qubit=qubit, seed=base_seed)
     operations = [dict(name=ins.operation.name, qubits=[native.find_bit(q).index for q in ins.qubits], parameters=[float(v) for v in ins.operation.params]) for ins in native.data]
+    low_samples = sum(bool(s["sampling_diagnostics"]["low_shots_factors"]) for run in runs for s in run["samples"])
+    boundary_samples = sum(bool(s["sampling_diagnostics"]["boundary_factors"]) for run in runs for s in run["samples"])
     checkpoint(is_cancelled, progress, 100)
     return dict(kind="zne_stability" if mode == "stability" else "equal_budget",
                 source_id=experiment.id, config=asdict(experiment.config), options=options,
@@ -237,6 +243,8 @@ def sampling_study(experiment, *, mode="stability", factor_sets=((1, 3, 5), (1, 
                             "reference": "Mesmo circuito compilado U/CX sem ruído; não exp(−iHt)",
                             "actual_shots": sum(s["shots"] for run in runs for s in run["samples"])},
                 note=("Repetições com sementes distintas avaliam flutuação de amostragem de ⟨Z⟩, não incerteza do modelo nem das fidelidades do ensemble. Viés é média estimada menos referência ideal; variância amostral usa n−1; MSE é média empírica dos erros quadráticos. Ajustes compartilham medições; custos não são somados entre variantes. O tempo adicional de processamento mede o ajuste polinomial, sem setup nem estatísticas agregadas; baseline não possui esse ajuste. Três fatores com ajuste quadrático têm zero grau de liberdade residual. "
+                      + f"Diagnóstico: {low_samples} amostras com menos de 30 shots; {boundary_samples} sem variação observada. "
+                      + "Erro padrão plug-in zero não comprova certeza. Wilson aproximado 95% é registrado por fator, sem propagação à ZNE e sem cobrir viés. "
                       + ("Cada método dispõe do mesmo total de shots por repetição, distribuído entre os fatores da ZNE; isso não iguala profundidade nem tempo." if mode == "budget" else "Os pontos com mais shots têm maior custo; compare precisão e custo conjuntamente.")))
 
 
