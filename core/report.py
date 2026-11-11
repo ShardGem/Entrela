@@ -6,17 +6,10 @@ from html import escape
 from io import BytesIO
 import json
 
-import numpy as np
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-
 from core.export import result_interpretation
-from core.metrics import fidelity, purity, energy_expectation
+from core.figures import MAX_PLOT_SNAPSHOTS
 from core.types import system_label
 from data.workspace import experiment_title
-
-
-MAX_PLOT_SNAPSHOTS = 101
 
 
 def _printed_summary(value):
@@ -74,12 +67,6 @@ def _image(figure, description):
     return '<img alt="' + escape(description, quote=True) + '" src="data:image/png;base64,' + b64encode(buffer.getvalue()).decode("ascii") + '">'
 
 
-def _figure(width=8.5, height=3):
-    figure = Figure(figsize=(width, height), layout="constrained")
-    FigureCanvasAgg(figure)
-    return figure
-
-
 def _report_analysis_data(analysis):
     presented = dict(analysis)
     if "source_metadata" in presented:
@@ -113,53 +100,21 @@ def hamiltonian_description(config):
 
 
 def _distribution(experiment):
-    result = experiment.result
-    counts = result.counts or {}
-    keys = sorted(counts)
-    if not keys:
+    from core.figures import histogram_figure
+    if not experiment.result.counts:
         return "<p>Esta execução não possui contagens registradas.</p>"
-    total = sum(counts.values())
-    fig = _figure(height=3.2)
-    ax = fig.add_subplot(111)
-    ax.bar(keys, [counts[key] / total if total else 0 for key in keys], color="#007ea7")
-    ax.set_ylabel("Frequência observada")
-    ax.set_xlabel("Bitstring (q0 à direita)")
-    ax.set_ylim(0, max(1, max(counts.values()) / total) if total else 1)
-    ax.grid(axis="y", alpha=.2)
-    if len(keys) > 8:
-        ax.tick_params(axis="x", rotation=90, labelsize=7)
-    return _image(fig, "Distribuição das medições")
+    return _image(histogram_figure([experiment]), "Distribuição das medições")
 
 
 def _temporal_plot(experiment):
-    c, r = experiment.config, experiment.result
+    from core.figures import temporal_figure
+    r = experiment.result
     if not r.states or not r.times:
         return "<p>Snapshots não foram registrados nesta execução; não há curva temporal a reconstruir.</p>"
-    from core.circuits import _build_hamiltonian
-
     count = min(len(r.states), len(r.times))
-    indices = np.unique(np.linspace(0, count - 1, min(count, MAX_PLOT_SNAPSHOTS), dtype=int))
-    times = [r.times[i] for i in indices]
-    H = None if c.circuit is not None else _build_hamiltonian(
-        c.system.num_qubits, c.system.hamiltonian, c.system.J, c.system.h, c.system.periodic
-    )
-    ideal = r.ideal_statevectors
-    series = [("Pureza global", [purity(r.states[i]) for i in indices], "#007ea7")]
-    if ideal and len(ideal) >= count:
-        series.insert(0, ("Fidelidade ao circuito ideal", [fidelity(r.states[i], ideal[i]) for i in indices], "#7158bb"))
-    if H is not None:
-        series.append(("Energia ⟨H⟩", [energy_expectation(r.states[i], H) for i in indices], "#b05a22"))
-    fig = _figure(height=2.5 * len(series))
-    for position, (label, values, color) in enumerate(series, 1):
-        ax = fig.add_subplot(len(series), 1, position)
-        ax.plot(times, values, color=color, marker="." if len(times) < 20 else None)
-        ax.set_ylabel(label)
-        ax.set_xlabel("Índice da porta lógica" if c.circuit is not None else "Tempo adimensional (ℏ = 1)")
-        ax.grid(alpha=.2)
-        if "Energia" not in label:
-            ax.set_ylim(-.025, 1.025)
-    note = f"Curvas derivadas de {len(indices)} dos {count} snapshots reais; sem interpolação física."
-    return _image(fig, "Métricas dos snapshots da execução") + "<p class=caption>" + note + "</p>"
+    selected = min(count, MAX_PLOT_SNAPSHOTS)
+    note = f"Curvas derivadas de {selected} dos {count} snapshots reais; sem interpolação física."
+    return _image(temporal_figure([experiment]), "Métricas dos snapshots da execução") + "<p class=caption>" + note + "</p>"
 
 
 def _analysis_section(analysis):
@@ -169,36 +124,11 @@ def _analysis_section(analysis):
         kind = analysis.get("kind")
         rows = analysis.get("rows", [])
         section = "<h2>Análise científica adicional</h2>"
-        if kind in ("heatmap","zne_stability","equal_budget"):
+        if rows:
             from core.figures import analysis_figure
             section += _image(analysis_figure(analysis), "Estudo científico calculado")
         if analysis.get("protocol"):
-            section += "<h3>Protocolo e referência no TCC</h3>"+_pre(analysis["protocol"])
-        groups = {
-            "trotter_noise": ("steps", "Passos Trotter", [("ideal_infidelity", "Trotter ideal × exato"), ("noisy_infidelity", "Ruidoso × exato")], "Infidelidade (1 − F)"),
-            "convergence": ("steps", "Passos Trotter", [("infidelity", "Circuito ideal × exato")], "Infidelidade (1 − F)"),
-            "sweep": ("value", str(analysis.get("parameter", "Parâmetro")), [("fidelity", "Fidelidade ao circuito ideal"), ("purity", "Pureza global")], "Métrica do estado"),
-            "temporal": ("time", "Tempo / índice registrado", [("fidelity", "Fidelidade ao circuito ideal"), ("purity", "Pureza global")], "Métrica do estado"),
-        }
-        if rows and kind in groups:
-            x_key, x_label, series, y_label = groups[kind]
-            fig = _figure(height=3.6)
-            ax = fig.add_subplot(111)
-            drawn = False
-            for key, label in series:
-                points = [(row[x_key], row[key]) for row in rows if row.get(x_key) is not None and row.get(key) is not None]
-                if points:
-                    xs, ys = zip(*points)
-                    ax.plot(xs, ys, marker=".", label=label)
-                    drawn = True
-            if drawn:
-                ax.set_xlabel(x_label)
-                ax.set_ylabel(y_label)
-                ax.grid(alpha=.2)
-                ax.legend()
-                section += _image(fig, "Curvas calculadas da análise científica")
-            else:
-                fig.clear()
+            section += "<h3>Protocolo e referência no TCC</h3>" + _pre(analysis["protocol"])
         # The machine-readable export preserves every underlying run, including
         # potentially thousands of operations. Keep the printed report bounded.
         presented = _report_analysis_data(analysis)
@@ -223,12 +153,8 @@ def _analysis_section(analysis):
     section += "<p>Referência ideal do observável: " + _number(analysis.get("ideal_observable")) + ". Tempos por método incluem aquisição compartilhada quando indicada; não devem ser somados. Custo total de circuitos e shots efetivamente executados:</p>" + _pre(analysis.get("actual_cost", {}))
     valid = [row for row in rows if row.get("absolute_error") is not None]
     if valid:
-        fig = _figure(height=3.3)
-        ax = fig.add_subplot(111)
-        ax.barh([row.get("label", row.get("method", "Método")) for row in valid], [row["absolute_error"] for row in valid], color="#007ea7")
-        ax.set_xlabel("Erro absoluto da estimativa em relação à referência ideal")
-        ax.grid(axis="x", alpha=.2)
-        section += _image(fig, "Erro de estimativa por método de mitigação")
+        from core.figures import analysis_figure
+        section += _image(analysis_figure(analysis, 'absolute_error'), "Erro de estimativa por método de mitigação")
     return section + _fit_limitation(analysis) + "<h3>Protocolo, custos e dados do benchmark</h3>" + _pre(_report_analysis_data(analysis))
 
 

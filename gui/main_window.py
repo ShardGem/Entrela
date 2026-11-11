@@ -327,6 +327,7 @@ class MainWindow(QMainWindow):
         self.page_library.template_delete_requested.connect(self._delete_template)
         self.page_library.navigation_requested.connect(self._show_page)
         self.page_library.project_history_requested.connect(self._show_project_history)
+        self.page_library.view_preferences_changed.connect(self._persist_library_view)
 
     def _build_commands(self):
         self.command_palette = CommandPalette(self)
@@ -1555,6 +1556,10 @@ class MainWindow(QMainWindow):
             self.settings.setValue("appearance/readability_v1", True)
         self.page_settings.apply_values(values)
         try:
+            self.page_library.apply_view_preferences(json.loads(self.settings.value("library/view", '{"tab":0,"expanded":["identification","notes"]}')))
+        except (ValueError, TypeError):
+            self.page_library.apply_view_preferences({})
+        try:
             self.page_documentation.apply_report_options(json.loads(self.settings.value("export/report_options", "{}")))
         except (ValueError, TypeError):
             self.page_documentation.apply_report_options({})
@@ -1578,6 +1583,9 @@ class MainWindow(QMainWindow):
     def _preference_path(key):
         return {"font_size": "appearance/font", "export_dpi": "export/dpi",
                 "completion_notifications": "notifications/completion"}.get(key, "appearance/" + key)
+
+    def _persist_library_view(self):
+        self.settings.setValue("library/view", json.dumps(self.page_library.collect_view_preferences()))
 
     def _system_theme_changed(self, *_):
         if self.page_settings.theme.currentData() == "auto":
@@ -1641,6 +1649,7 @@ class MainWindow(QMainWindow):
         self._adaptive_sidebar()
 
     def _reset_preferences(self):
+        self.settings.remove("library/view")
         for prefix in ("appearance", "bloch", "export", "notifications", "comparison"):
             self.settings.remove(prefix)
         self.page_settings.spin_shots.setValue(8192)

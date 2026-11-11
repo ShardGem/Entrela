@@ -52,6 +52,10 @@ class Sidebar(QFrame):
 
     def __init__(self,parent=None):
         super().__init__(parent)
+        self._width_timer = QTimer(self)
+        self._width_timer.setSingleShot(True)
+        self._width_timer.setInterval(0)
+        self._width_timer.timeout.connect(self._fit_width)
         self.setObjectName('Sidebar')
         self.buttons={}
         self.group_buttons={}
@@ -242,7 +246,7 @@ class Sidebar(QFrame):
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange) and getattr(self, 'group_buttons', None):
-            QTimer.singleShot(0, self._fit_width)
+            self._width_timer.start()
 
     def refresh_theme(self):
         if hasattr(self,'toggle'):

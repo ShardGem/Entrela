@@ -19,6 +19,23 @@ def style_axes(ax):
     return ax
 
 
+def style_figure(fig):
+    """Apply the live palette after a shared scientific renderer draws data."""
+    fig.set_facecolor(PALETTE.bg)
+    for axes in fig.axes:
+        style_axes(axes)
+        for label in axes.texts:
+            label.set_color(PALETTE.text)
+        legend = axes.get_legend()
+        if legend is not None:
+            legend.get_frame().set_facecolor(PALETTE.surface)
+            legend.get_frame().set_edgecolor(PALETTE.border)
+            for label in legend.get_texts():
+                label.set_color(PALETTE.text)
+    for label in fig.texts:
+        label.set_color(PALETTE.text)
+
+
 class MplCanvas(StableFigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(
@@ -36,6 +53,14 @@ class MplCanvas(StableFigureCanvas):
         self.fig.clear()
         ax = self.fig.add_subplot(111)
         return style_axes(ax)
+
+    def draw(self, *args, **kwargs):
+        axes = tuple(self.fig.axes)
+        navigation = getattr(self, "_navigation", None)
+        if navigation is not None and axes != getattr(self, "_navigation_axes", None):
+            navigation.update()
+            self._navigation_axes = axes
+        return super().draw(*args, **kwargs)
 
     def exploration_button(self, parent=None):
         """Compact access to Matplotlib navigation; exports keep their own flow."""

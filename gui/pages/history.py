@@ -15,7 +15,10 @@ from PySide6.QtWidgets import (
 from gui.pages.base import PageBase
 from gui.widgets.button import SecondaryButton
 from gui.widgets.data_table import configure_table, DataTableItem
-from gui.widgets.plot_canvas import MplCanvas, style_axes
+from gui.widgets.plot_canvas import MplCanvas
+from gui.widgets.circuit_inspector import CircuitInspector
+from gui.widgets.flow_layout import FlowLayout
+from gui.theme import PALETTE
 
 
 class HistoryPage(PageBase):
@@ -63,6 +66,7 @@ class HistoryPage(PageBase):
         self.body().addWidget(self.project_filter_bar)
 
         splitter = QSplitter(Qt.Vertical)
+        self.splitter = splitter
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(6)
         self.table = QTableWidget(0, 10)
@@ -96,21 +100,28 @@ class HistoryPage(PageBase):
         details = QWidget()
         detail_layout = QVBoxLayout(details)
         detail_layout.setContentsMargins(0, 8, 0, 0)
-        bar = QHBoxLayout()
+        bar = FlowLayout()
         self.detail_title = QLabel("Selecione Visualizar em uma execução")
         self.detail_title.setWordWrap(True)
-        bar.addWidget(self.detail_title, 1)
+        self.detail_title.setTextFormat(Qt.PlainText)
+        detail_layout.addWidget(self.detail_title)
         self.open_result = QPushButton("Abrir resultados")
         self.edit_annotation = QPushButton("Editar identificação")
         bar.addWidget(self.open_result)
         bar.addWidget(self.edit_annotation)
+        self.expand_details = SecondaryButton("Ampliar detalhes")
+        self.expand_details.setCheckable(True)
+        self.expand_details.setEnabled(False)
+        self.expand_details.setAccessibleName("Ampliar ou restaurar os detalhes do experimento")
+        self.expand_details.setToolTip("Oculta a lista temporariamente para consultar gráficos, circuito e anotações com mais espaço.")
+        self.expand_details.toggled.connect(self._set_detail_expanded)
+        bar.addWidget(self.expand_details)
         detail_layout.addLayout(bar)
         self.detail_tabs = QTabWidget()
         self.summary = QTextBrowser()
         self.summary.setOpenExternalLinks(False)
         self.chart = MplCanvas()
-        self.circuit = QPlainTextEdit()
-        self.circuit.setReadOnly(True)
+        self.circuit = CircuitInspector()
         self.technical = QPlainTextEdit()
         self.technical.setReadOnly(True)
         self.detail_tabs.addTab(self.summary, "Resumo e anotações")
@@ -152,6 +163,9 @@ class HistoryPage(PageBase):
         self.records = list(experiments)
         if self.selected_identifier and not any(e.id == self.selected_identifier for e in self.records):
             self.selected_identifier = None
+            self._detail_experiment = None
+            self.expand_details.setChecked(False)
+            self.expand_details.setEnabled(False)
             self.detail_title.setText("Selecione Visualizar em uma execução")
             self.summary.clear()
             self.circuit.clear()
@@ -234,7 +248,7 @@ class HistoryPage(PageBase):
             raise TypeError("O filtro de projeto deve ser um nome ou None.")
         self.project_filter = project.strip() if project and project.strip() else None
         self.project_filter_label.setText(f"Projeto: {self.project_filter}" if self.project_filter else "")
-        self.project_filter_bar.setVisible(self.project_filter is not None)
+        self.project_filter_bar.setVisible(self.project_filter is not None and not self.expand_details.isChecked())
         self.offset = 0
         self._filter()
 
@@ -246,6 +260,13 @@ class HistoryPage(PageBase):
         self.set_detail(record)
         self.detail_requested.emit(identifier)
 
+    def _set_detail_expanded(self, expanded):
+        for widget in (self._header, self.table, self.search, self.status_filter, self.columns,
+                       self.previous, self.next, self.page_label):
+            widget.setVisible(not expanded)
+        self.project_filter_bar.setVisible(self.project_filter is not None and not expanded)
+        self.expand_details.setText("Voltar à lista" if expanded else "Ampliar detalhes")
+
     def set_detail(self, experiment, files=None):
         """Accept summaries immediately and replace them with loaded scientific data."""
         if (self.selected_identifier is not None and experiment.id != self.selected_identifier) or not any(record.id == experiment.id for record in self.records):
@@ -256,6 +277,7 @@ class HistoryPage(PageBase):
         self.detail_title.setText(name)
         self.open_result.setEnabled(True)
         self.edit_annotation.setEnabled(True)
+        self.expand_details.setEnabled(True)
         annotation = self.annotations.get(experiment.id, {})
         result, config = experiment.result, experiment.config
         def paragraph(label, value):
@@ -273,21 +295,21 @@ class HistoryPage(PageBase):
             text += paragraph("Falha registrada", result.error)
         text += paragraph("Arquivos", "\n".join(str(path) for path in files) if files else "Consulte Documentar e exportar para produzir relatórios, figuras e dados deste experimento.")
         self.summary.setHtml(text)
-        ax = self.chart.reset_axes()
-        counts = result.counts or {}
-        total = sum(counts.values())
-        if total:
-            keys = sorted(counts)
-            ax.bar(keys, [counts[key] / total for key in keys])
-            ax.set_ylabel("Frequência observada")
-            ax.set_xlabel("Estado computacional")
-            if len(keys) > 8:
-                ax.tick_params(axis="x", labelrotation=90)
-        else:
-            ax.text(.5, .5, "Sem contagens disponíveis nesta execução.", ha="center", va="center", transform=ax.transAxes)
-        style_axes(ax)
+        from core.figures import histogram_figure
+        from gui.widgets.plot_canvas import style_figure
+        histogram_figure([experiment], fig=self.chart.fig, colors=(PALETTE.primary,), label_size=10)
+        style_figure(self.chart.fig)
         self.chart.draw_idle()
-        self.circuit.setPlainText(result.circuit_text or "Circuito textual indisponível neste registro.")
+        if result.metadata.get("operations") or result.circuit_text or files is not None:
+            if result.error and not result.metadata.get("operations"):
+                self.circuit.clear("Esta execução falhou e não possui operações registradas para consulta.")
+            else:
+                try:
+                    self.circuit.show_experiment(experiment, name)
+                except (ValueError, TypeError, KeyError) as exc:
+                    self.circuit.clear("Não foi possível apresentar o circuito deste registro: " + str(exc))
+        else:
+            self.circuit.clear("Carregando as operações registradas do circuito…")
         metadata = {key: (f"{len(value)} operações; veja JSON completo" if key == "operations" else value) for key, value in result.metadata.items()}
         self.technical.setPlainText(json.dumps({"id": experiment.id, "created_at": experiment.created_at.isoformat(), "configuration": asdict(config), "metadata": metadata, "mitigation_method": (result.mitigation or {}).get("method")}, ensure_ascii=False, indent=2, default=str))
 

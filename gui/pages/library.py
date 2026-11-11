@@ -1,11 +1,12 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QSignalBlocker
 from PySide6.QtWidgets import (
     QLabel, QLineEdit, QComboBox, QPlainTextEdit, QFormLayout,
-    QGroupBox, QVBoxLayout, QTabWidget, QWidget, QMessageBox,
+    QFrame, QVBoxLayout, QTabWidget, QWidget, QMessageBox,
 )
 from gui.pages.base import PageBase
 from gui.widgets.button import SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
+from gui.widgets.collapsible import CollapsibleSection
 
 
 class LibraryPage(PageBase):
@@ -17,6 +18,7 @@ class LibraryPage(PageBase):
     template_delete_requested = Signal(str)
     navigation_requested = Signal(str)
     project_history_requested = Signal(str)
+    view_preferences_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(
@@ -34,13 +36,13 @@ class LibraryPage(PageBase):
         self.tabs = QTabWidget()
         self.body().addWidget(self.tabs, 1)
 
-        self.annotation_group = QGroupBox("Caderno da execução selecionada")
+        self.annotation_group = QWidget()
         group_layout = QVBoxLayout(self.annotation_group)
         annotation_help = QLabel("Este caderno acompanha uma execução. Salvar registra identificação e interpretação; os valores científicos da execução são preservados.")
         annotation_help.setWordWrap(True)
         annotation_help.setObjectName("FieldHint")
         group_layout.addWidget(annotation_help)
-        tabs = QTabWidget()
+        self.sections = {}
         identification = QWidget()
         form = QFormLayout(identification)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
@@ -72,7 +74,7 @@ class LibraryPage(PageBase):
         ]:
             widget.setAccessibleName(label)
             form.addRow(label, widget)
-        tabs.addTab(identification, "Identificação")
+        self._add_section(group_layout, "identification", "Identificação", identification, expanded=True)
         planning = QWidget()
         planning_form = QFormLayout(planning)
         planning_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
@@ -89,13 +91,12 @@ class LibraryPage(PageBase):
             field.setPlaceholderText(example)
             field.setToolTip(example)
             planning_form.addRow(label, field)
-        tabs.addTab(planning, "Plano científico")
+        self._add_section(group_layout, "planning", "Plano científico", planning, expanded=False)
         notes_page = QWidget()
         notes_layout = QVBoxLayout(notes_page)
         notes_layout.addWidget(QLabel("Anotações de interpretação e acompanhamento"))
         notes_layout.addWidget(self.notes)
-        tabs.addTab(notes_page, "Anotações")
-        group_layout.addWidget(tabs)
+        self._add_section(group_layout, "notes", "Interpretação e anotações", notes_page, expanded=True)
         self.save_annotation = SecondaryButton("Salvar caderno")
         self.save_annotation.setToolTip("Salva nome, plano científico e anotações da execução selecionada.")
         self.save_annotation.clicked.connect(
@@ -110,10 +111,14 @@ class LibraryPage(PageBase):
         self.project_history.setToolTip("Busca no histórico as execuções já salvas com o nome deste projeto.")
         self.project_history.clicked.connect(self._request_project_history)
         annotation_actions.addWidget(self.project_history)
-        group_layout.addLayout(annotation_actions)
+        self.notebook_actions_bar = QFrame()
+        self.notebook_actions_bar.setObjectName("ExecutionBar")
+        self.notebook_actions_bar.setContentsMargins(20, 8, 20, 12)
+        self.notebook_actions_bar.setLayout(annotation_actions)
+        self._root.addWidget(self.notebook_actions_bar)
         self.tabs.addTab(self.annotation_group, "Caderno da execução")
 
-        templates_group = QGroupBox("Parâmetros do formulário Hamiltoniano")
+        templates_group = QWidget()
         self.templates_group = templates_group
         templates_layout = QVBoxLayout(templates_group)
         help_label = QLabel("Salve os parâmetros do formulário de simulação para usá-los em outra execução: sistema, evolução, ruído, medições e semente. Abrir um resultado ou editar um circuito de portas não muda essa fonte.")
@@ -169,11 +174,37 @@ class LibraryPage(PageBase):
         self.templates.currentIndexChanged.connect(self._update_actions)
         self.project.textChanged.connect(self._update_actions)
         self.tabs.currentChanged.connect(self._refresh_context)
+        self.tabs.currentChanged.connect(lambda *_: self.view_preferences_changed.emit())
         for widget in (self.run_title,self.project,self.tags,self.categories,self.description,
                        self.notes,self.objective,self.hypothesis,self.methodology):
             widget.textChanged.connect(self._edited)
         self.annotation_group.setEnabled(False)
         self._update_actions()
+
+    def _add_section(self, layout, key, title, content, *, expanded):
+        section = CollapsibleSection(title, expanded=expanded)
+        section.set_summary("")
+        section.content_layout.addWidget(content)
+        section.expanded_changed.connect(lambda *_: self.view_preferences_changed.emit())
+        self.sections[key] = section
+        layout.addWidget(section)
+
+    def collect_view_preferences(self):
+        return dict(tab=self.tabs.currentIndex(), expanded=[key for key, section in self.sections.items() if section.is_expanded])
+
+    def apply_view_preferences(self, values):
+        if not isinstance(values, dict):
+            return
+        blockers = [QSignalBlocker(self.tabs), *(QSignalBlocker(section) for section in self.sections.values())]
+        expanded = values.get("expanded")
+        if isinstance(expanded, list) and all(isinstance(key, str) for key in expanded):
+            for key, section in self.sections.items():
+                section.set_expanded(key in expanded, animate=False)
+        tab = values.get("tab")
+        if type(tab) is int and 0 <= tab < self.tabs.count():
+            self.tabs.setCurrentIndex(tab)
+        del blockers
+        self._refresh_context()
 
     def show_notebook(self):
         self.tabs.setCurrentWidget(self.annotation_group)
@@ -192,8 +223,10 @@ class LibraryPage(PageBase):
         self.templates_group.setEnabled(False)
         self.context.setText("Caderno e configurações indisponíveis. O arquivo foi preservado.")
         self.message.setText(message)
+        self._update_actions()
 
     def _refresh_context(self, *_):
+        self.notebook_actions_bar.setVisible(self.tabs.currentWidget() is self.annotation_group)
         if not self.templates_group.isEnabled():
             self.context.setText("Caderno e configurações indisponíveis. O arquivo foi preservado.")
         elif self.tabs.currentWidget() is self.templates_group:
@@ -204,6 +237,7 @@ class LibraryPage(PageBase):
             self.context.setText("Selecione uma execução para abrir seu caderno. As configurações salvas ficam na outra aba.")
 
     def _update_actions(self, *_):
+        self.save_annotation.setEnabled(bool(self.identifier) and self.annotation_group.isEnabled())
         self.save_template.setEnabled(bool(self.name.text().strip()))
         selected = self.templates.currentText() in self._template_names
         self.load_template.setEnabled(selected)

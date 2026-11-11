@@ -78,6 +78,10 @@ class BlochPage(PageBase):
             "Snapshots reais · câmera independente · q0 à direita no histograma.",
             parent,
         )
+        self._camera_layout_timer = QTimer(self)
+        self._camera_layout_timer.setSingleShot(True)
+        self._camera_layout_timer.setInterval(0)
+        self._camera_layout_timer.timeout.connect(self._fit_camera)
         self.original_svs = []
         self.interpolated_svs = []
         self.precomputed_bloch = []
@@ -239,7 +243,7 @@ class BlochPage(PageBase):
 
     def refresh_theme(self):
         if hasattr(self, "camera_scroll"):
-            QTimer.singleShot(0, self._fit_camera)
+            self._camera_layout_timer.start()
 
     def _visual_mode_changed(self, index):
         global_state = self.visual_tabs.widget(index) is self.state_inspector

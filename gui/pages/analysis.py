@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QWidget, QVBoxLayout, QTabWidget, QFrame, QSizePolicy, QToolButton, QMenu, QScrollArea,
 )
+from core.figure_labels import field_label, axis_label
 from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.widgets.plot_canvas import MplCanvas
@@ -488,10 +489,7 @@ class AnalysisPage(PageBase):
 
     def _field_label(self, key):
         config = self.data.get("config", {}) if self.data else {}
-        circuit = config.get("circuit") if isinstance(config, dict) else None
-        if key == "time" and (circuit is not None or (not config and self.experiment is not None and self.experiment.config.circuit is not None)):
-            return "Índice da porta lógica (sem tempo físico)"
-        return field_label(key)
+        return axis_label(key, config)
 
     def replay_unavailable_reason(self):
         if not self.data:
@@ -557,64 +555,13 @@ class AnalysisPage(PageBase):
         self.requested.emit(kind, options)
 
     def _plot(self, *_):
-        if not self.data:
+        if not self.data or not self.series_combo.currentData():
             return
-        rows = self.data["rows"]
-        key = self.series_combo.currentData()
-        if not key:
-            return
-        ax = self.canvas.reset_axes()
-        kind = self.data["kind"]
-        if kind in ("heatmap","zne_stability","equal_budget"):
-            from core.figures import analysis_figure
-            analysis_figure(self.data,key,self.canvas.fig)
-            self.canvas.fig.set_facecolor(PALETTE.bg)
-            for axis in self.canvas.fig.axes:
-                axis.set_facecolor(PALETTE.bg)
-                axis.tick_params(colors=PALETTE.text_muted)
-                axis.xaxis.label.set_color(PALETTE.text)
-                axis.yaxis.label.set_color(PALETTE.text)
-                axis.title.set_color(PALETTE.text)
-            self.canvas.draw_idle()
-            return
-        if kind == "mitigation_benchmark":
-            selected = [r for r in rows if r.get("status") == "available" and type(r.get(key)) in (int, float)]
-            xs = list(range(len(selected)))
-            ax.bar(xs, [r[key] for r in selected], color=[PALETTE.primary, PALETTE.q2, PALETTE.q4, PALETTE.q3][:len(selected)])
-            if key == "estimate":
-                ax.errorbar(xs, [r[key] for r in selected], yerr=[r.get("stderr") or 0 for r in selected], fmt="none", color=PALETTE.text, capsize=5)
-                ax.axhline(self.data["ideal_observable"], color=PALETTE.q3, ls="--", label="Referência ideal")
-                ax.legend()
-            ax.set_xticks(xs, [r["label"].replace(" ", "\n", 1) for r in selected], fontsize=9)
-            ax.set_xlabel("Método · somente resultados disponíveis")
-            ax.set_ylabel(field_label(key))
-            self.canvas.draw_idle()
-            return
-        xkey = {"temporal": "time", "convergence": "steps", "sweep": "value", "trotter_noise": "steps"}[kind]
-        if key == "paired_infidelity":
-            for field, label, color in [("ideal_infidelity", "Trotter ideal × exata", PALETTE.primary), ("noisy_infidelity", "Ruidosa × exata", PALETTE.q2)]:
-                ax.plot([r[xkey] for r in rows], [r[field] for r in rows], "o-", color=color, label=label)
-            ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
-        elif kind == "sweep":
-            for seed in sorted(set(row.get("seed") for row in rows), key=lambda value: (-1 if value is None else value)):
-                selected = [r for r in rows if r.get("seed") == seed]
-                ax.plot(
-                    [r[xkey] for r in selected],
-                    [r[key] for r in selected],
-                    "o-",
-                    label=f"semente {seed}" if seed is not None else "semente não registrada",
-                    alpha=0.8,
-                )
-            ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
-        else:
-            ax.plot(
-                [r[xkey] for r in rows],
-                [np_nan(r.get(key)) for r in rows],
-                "o-",
-                color=PALETTE.primary,
-            )
-        ax.set_xlabel(self._field_label(xkey))
-        ax.set_ylabel(field_label(key))
+        from core.figures import analysis_figure
+        from gui.widgets.plot_canvas import style_figure
+        analysis_figure(self.data, self.series_combo.currentData(), self.canvas.fig,
+                        colors=(PALETTE.primary, PALETTE.q2, PALETTE.q3, PALETTE.q4, PALETTE.q5, PALETTE.q6), label_size=10)
+        style_figure(self.canvas.fig)
         self.canvas.draw_idle()
 
     def _select(self, row, column):
@@ -688,64 +635,3 @@ class AnalysisPage(PageBase):
         self.progress.setVisible(running)
         if running:
             self.progress.setValue(0)
-
-
-def np_nan(value):
-    return float("nan") if value is None else value
-
-
-def field_label(key):
-    if key.startswith("entropy_q"):
-        return "Entropia de q" + key.removeprefix("entropy_q") + " (bits)"
-    return {
-        "snapshot": "Snapshot",
-        "time": "Tempo (ℏ=1)",
-        "fidelity": "Fidelidade ao circuito ideal",
-        "purity": "Pureza global",
-        "energy": "Energia ⟨H⟩",
-        "fidelity_exact": "Fidelidade à evolução exata",
-        "trotter_infidelity": "Erro de Trotter (1−F ideal/exato)",
-        "negativity_q0_rest": "Negatividade q0 | resto",
-        "steps": "Passos Trotter",
-        "infidelity": "Infidelidade à evolução exata",
-        "depth": "Profundidade",
-        "order": "Ordem Suzuki",
-        "seed": "Semente",
-        "sampled_Z0": "⟨Z0⟩ amostrado",
-        "value": "Valor do parâmetro",
-        "paired_infidelity": "Erro 1−F contra evolução exata (ideal e ruidoso)",
-        "fidelity_ideal_exact": "Fidelidade Trotter ideal/exata",
-        "fidelity_noisy_exact": "Fidelidade ruidosa/exata",
-        "fidelity_noisy_ideal": "Fidelidade ruidosa/circuito ideal",
-        "ideal_infidelity": "Erro Trotter ideal/exato (1−F)",
-        "noisy_infidelity": "Erro ruidoso/exato (1−F)",
-        "gate_count": "Portas unitárias",
-        "ideal_runtime_s": "Tempo ideal (s)",
-        "noisy_runtime_s": "Tempo ruidoso (s)",
-        "method": "Método",
-        "label": "Descrição",
-        "status": "Disponibilidade",
-        "reason": "Condição / limitação",
-        "estimate": "Estimativa de ⟨Z⟩",
-        "stderr": "Erro padrão de amostragem",
-        "absolute_error": "Erro absoluto do observável",
-        "circuits": "Circuitos por método",
-        "shots": "Shots por método",
-        "retained_shots": "Shots aceitos",
-        "acceptance": "Fração amostral aceita",
-        "acquisition_s": "Aquisição compartilhada (s)",
-        "processing_s": "Processamento (s)",
-        "duration_s": "Tempo equivalente do método (s)",
-        "shared_samples": "Amostras compartilhadas",
-        "state_metrics_source": "Origem das métricas de estado",
-        "x":"Valor X", "y":"Valor Y", "factors":"Fatores efetivos",
-        "shots_setting":"Shots configurados", "repetitions":"Repetições independentes",
-        "mean_estimate":"Média de ⟨Z⟩", "bias":"Viés empírico", "sample_variance":"Variância amostral",
-        "mse":"Erro quadrático médio empírico", "rmse":"Raiz do erro quadrático médio",
-        "stderr_mean":"Erro padrão da média amostral", "out_of_range":"Estimativas fora de [-1,1]",
-        "mean_reported_stderr":"Erro padrão previsto médio", "mean_absolute_error":"Erro absoluto médio",
-        "shots_per_method":"Shots por método / repetição", "circuits_per_method":"Circuitos por método / repetição",
-        "degrees_of_freedom":"Graus de liberdade residuais", "acquisition_group_s":"Aquisição total do grupo (s)",
-        "mean_acquisition_s":"Aquisição média por método (s)","mean_processing_s":"Tempo médio do ajuste (s)",
-        "mean_duration_s":"Aquisição + ajuste médios (s)",
-    }.get(key, key)

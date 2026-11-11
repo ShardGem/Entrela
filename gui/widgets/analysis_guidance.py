@@ -1,5 +1,6 @@
 """Rótulos e orientação de estudos; identificadores científicos ficam intactos."""
 from copy import deepcopy
+from core.figure_labels import STUDY_TITLES
 from PySide6.QtWidgets import QComboBox
 
 
@@ -14,14 +15,14 @@ PARAMETERS = {
 }
 
 STUDIES = {
-    "temporal": ("Acompanhar métricas e correlações", "Leia fidelidade, pureza, energia e correlações nos snapshots salvos. Clique na curva ou tabela para selecionar o mesmo estado em 3D. Requer estados salvos na execução."),
-    "convergence": ("Avaliar a precisão da Trotterização", "Compare diferentes quantidades de passos com a evolução exata exp(−iHt). Este estudo desliga o ruído e calcula a fidelidade diretamente do estado, sem erro de amostragem. Requer evolução por Hamiltoniano."),
-    "sweep": ("Variar um parâmetro", "Escolha a variável e os valores; obtenha curvas de fidelidade, pureza, energia e ⟨Z₀⟩ amostrado. Limites: 20 valores, 5 sementes e 50 execuções. Sementes variam as contagens, não a incerteza das métricas do ensemble."),
-    "trotter_noise": ("Estudar passos Trotter e ruído juntos", "Compare o erro ideal e o ruidoso contra a evolução exata nos mesmos passos. Mantém o tempo final, a ordem Suzuki e o ruído da fonte. O melhor ponto vale apenas entre os valores calculados; requer Hamiltoniano."),
-    "mitigation_benchmark": ("Comparar métodos de mitigação", "Compare sem mitigação, extrapolação para ruído zero (ZNE) linear/quadrática e verificação de paridade, quando aplicável. O resultado informa erro do observável, amostragem e custo. ZNE não reconstrói um estado: sua fidelidade fica indisponível; os ajustes compartilham medições."),
-    "heatmap": ("Variar dois parâmetros em um mapa", "Escolha dois eixos distintos, com até 8 valores por eixo e 64 simulações. Cada célula representa um ponto calculado, sem interpolação física. Não combine parâmetros de ruído térmico e despolarizador no mesmo mapa."),
-    "zne_stability": ("Avaliar a estabilidade da ZNE", "Varie fatores de ruído e medições com repetições independentes. Obtenha viés, variância amostral e RMSE do estimador de ⟨Z⟩ contra o circuito ideal. Essas incertezas não são da fidelidade do ensemble."),
-    "equal_budget": ("Comparar com o mesmo total de medições", "Sem mitigação e ZNE usam o mesmo total de shots por repetição. Na ZNE, o orçamento é dividido entre os fatores; os ajustes compartilham amostras. Isso não iguala profundidade nem tempo de execução."),
+    "temporal": (STUDY_TITLES["temporal"], "Leia fidelidade, pureza, energia e correlações nos snapshots salvos. Clique na curva ou tabela para selecionar o mesmo estado em 3D. Requer estados salvos na execução."),
+    "convergence": (STUDY_TITLES["convergence"], "Compare diferentes quantidades de passos com a evolução exata exp(−iHt). Este estudo desliga o ruído e calcula a fidelidade diretamente do estado, sem erro de amostragem. Requer evolução por Hamiltoniano."),
+    "sweep": (STUDY_TITLES["sweep"], "Escolha a variável e os valores; obtenha curvas de fidelidade, pureza, energia e ⟨Z₀⟩ amostrado. Limites: 20 valores, 5 sementes e 50 execuções. Sementes variam as contagens, não a incerteza das métricas do ensemble."),
+    "trotter_noise": (STUDY_TITLES["trotter_noise"], "Compare o erro ideal e o ruidoso contra a evolução exata nos mesmos passos. Mantém o tempo final, a ordem Suzuki e o ruído da fonte. O melhor ponto vale apenas entre os valores calculados; requer Hamiltoniano."),
+    "mitigation_benchmark": (STUDY_TITLES["mitigation_benchmark"], "Compare sem mitigação, extrapolação para ruído zero (ZNE) linear/quadrática e verificação de paridade, quando aplicável. O resultado informa erro do observável, amostragem e custo. ZNE não reconstrói um estado: sua fidelidade fica indisponível; os ajustes compartilham medições."),
+    "heatmap": (STUDY_TITLES["heatmap"], "Escolha dois eixos distintos, com até 8 valores por eixo e 64 simulações. Cada célula representa um ponto calculado, sem interpolação física. Não combine parâmetros de ruído térmico e despolarizador no mesmo mapa."),
+    "zne_stability": (STUDY_TITLES["zne_stability"], "Varie fatores de ruído e medições com repetições independentes. Obtenha viés, variância amostral e RMSE do estimador de ⟨Z⟩ contra o circuito ideal. Essas incertezas não são da fidelidade do ensemble."),
+    "equal_budget": (STUDY_TITLES["equal_budget"], "Sem mitigação e ZNE usam o mesmo total de shots por repetição. Na ZNE, o orçamento é dividido entre os fatores; os ajustes compartilham amostras. Isso não iguala profundidade nem tempo de execução."),
 }
 
 

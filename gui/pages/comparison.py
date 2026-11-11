@@ -252,33 +252,11 @@ class ComparisonPage(PageBase):
                 self.metrics_table.setItem(row, col, QTableWidgetItem(text))
         self.metrics_table.resizeRowsToContents()
         self.metrics_table.setFixedHeight(self.metrics_table.horizontalHeader().height()+sum(self.metrics_table.rowHeight(i) for i in range(3))+6)
-        keys = sorted(set(a.result.counts or {}) | set(b.result.counts or {}))
-        for i, e in enumerate((a, b)):
-            if self.hist_layout.currentIndex()==1:
-                if i==0:
-                    self.canvas.fig.clear()
-                ax=self.canvas.fig.add_subplot(1,2,i+1)
-            total = sum((e.result.counts or {}).values())
-            xs = [j + ((i - 0.5) * 0.36 if self.hist_layout.currentIndex()==0 else 0) for j in range(len(keys))]
-            bars=ax.bar(
-                xs,
-                [
-                    (e.result.counts or {}).get(k, 0) / total if total else 0
-                    for k in keys
-                ],
-                width=0.35 if self.hist_layout.currentIndex()==0 else .7,
-                label="A" if i == 0 else "B",
-                color=PALETTE.primary if i == 0 else PALETTE.q2,
-            )
-            for key,bar in zip(keys,bars):
-                bar._observed = ("AB"[i],key,(e.result.counts or {}).get(key,0),total)
-        for ax in self.canvas.fig.axes:
-            style_axes(ax)
-            ax.set_xticks(range(len(keys)), keys, rotation=90 if len(keys) > 8 else 0)
-            ax.set_ylim(0, 1.05)
-            ax.set_ylabel("Frequência observada (0–1)")
-            ax.set_xlabel("Estado (q0 à direita)")
-            ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
+        from core.figures import histogram_figure
+        from gui.widgets.plot_canvas import style_figure
+        histogram_figure((a, b), side_by_side=self.hist_layout.currentIndex() == 1,
+                         fig=self.canvas.fig, colors=(PALETTE.primary, PALETTE.q2), label_size=10)
+        style_figure(self.canvas.fig)
         self.canvas.draw()
         if previous and previous.get("mode","controlled") == self.comparison_mode.currentData() and tuple(e.id for e in previous["experiments"])==(a.id,b.id):
             self.full_data=previous
@@ -329,24 +307,11 @@ class ComparisonPage(PageBase):
         self.slider.setEnabled(data["synchronous"])
         self.play.setEnabled(data["synchronous"])
         self.btn_document.setEnabled(not self._running)
-        self.curve_canvas.fig.clear()
-        fidelity_key = "fidelity_exact" if data.get("mode") == "trotter" else "fidelity"
-        for index,key in enumerate((fidelity_key,"purity","energy")):
-            ax=self.curve_canvas.fig.add_subplot(3,1,index+1)
-            style_axes(ax)
-            for run,rows in enumerate(data["curves"]):
-                exp=data["experiments"][run]
-                if not exp.result.states:
-                    continue
-                points=[r for r in rows if r[key] is not None]
-                if points:
-                    ax.plot([r["time"] for r in points],[r[key] for r in points],label="AB"[run],color=PALETTE.primary if run==0 else PALETTE.q2)
-            ax.set_ylabel({"fidelity_exact":"F à evolução exata","fidelity":"F ao circuito ideal","purity":"Pureza","energy":"Energia"}[key])
-            if not ax.lines:
-                ax.text(.5, .5, "Métrica indisponível para estes registros.", ha="center", va="center", transform=ax.transAxes, color=PALETTE.text_muted)
-            if ax.lines:
-                ax.legend(facecolor=PALETTE.surface,labelcolor=PALETTE.text)
-            ax.set_xlabel("Índice da porta" if data["experiments"][0].config.circuit else "Tempo (ℏ=1)")
+        from core.figures import temporal_figure
+        from gui.widgets.plot_canvas import style_figure
+        temporal_figure(data['experiments'], reference='exact' if data.get('mode') == 'trotter' else 'circuit',
+                        fig=self.curve_canvas.fig, curves=data['curves'], colors=(PALETTE.primary, PALETTE.q2), label_size=10)
+        style_figure(self.curve_canvas.fig)
         self.curve_canvas.draw_idle()
         self._frame(0)
         if not any(exp.result.states for exp in data["experiments"]):

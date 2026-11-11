@@ -4,6 +4,8 @@ Este plano ordena as propostas pela contribuição ao TCC: resultados confiávei
 
 Não é necessário refazer o que já existe. O Entrela já possui simulação ideal e ruidosa, snapshots, referências exatas, métricas de estado, ZNE, benchmarks, varreduras, comparações, editor versionado, caderno, recuperação de rascunhos e exportações CSV/JSON/ZIP/PNG/SVG/PDF/GIF/LaTeX. A primeira entrega deste plano corrige limites desses recursos e acrescenta ferramentas que ajudam a interpretá-los.
 
+Na versão 0.21, o histórico ganhou consulta gráfica de circuitos sem edição, compartilhando o componente do laboratório. O item 16 foi concluído, e o item 17 passou a utilizar renderizadores científicos comuns para distribuições, estudos e métricas. As escolhas de séries dos relatórios continuam seguindo o perfil de exportação; ampliar essa personalização permanece no plano.
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |
@@ -30,11 +32,13 @@ Os intervalos de amostragem não cobrem automaticamente o viés do modelo de ext
 | 13 | Fontes e exploração dos gráficos | Fontes acompanham a preferência da interface; contagens e frequência são identificadas; exportação científica mantém estilo próprio | Implementado na 0.20 |
 | 14 | Diagnóstico antes de executar | Casos como H nulo, autoestado e termos comutantes recebem explicação informativa, sem bloquear experimentos válidos | Implementado na 0.20 |
 | 15 | Inspetor do estado global | Matriz densidade, espectro, coerência, pureza e entropia distinguem Bell puro de mistura com os mesmos vetores locais; usa estados já calculados | Implementado na 0.20 |
-| 16 | Revisar densidade e navegação do caderno | Reduzir níveis redundantes e preservar rascunhos, seleção e identidade das configurações | Pendente |
-| 17 | Unificar geração de figuras da tela e dos relatórios | Mesmos nomes, unidades, referências e critérios de seleção; estilos adequados a cada meio | Pendente |
+| 16 | Revisar densidade e navegação do caderno | Reduzir níveis redundantes e preservar rascunhos, seleção e identidade das configurações | Implementado na 0.21 |
+| 17 | Unificar geração de figuras da tela e dos relatórios | Mesmos nomes, unidades, referências e critérios de seleção; estilos adequados a cada meio | Renderizadores compartilhados na 0.21; ampliar seleção de séries nos relatórios |
 | 18 | Revisão visual transversal | Validar telas vazias, carregamento/erro, tabelas extensas, teclado, contraste, resoluções menores e escala de texto | Contínuo; ampliar a cada entrega |
 
 Preservar a splash restaurada, os grupos inicialmente abertos, os nomes no menu estreito e a identidade Entrela. Alterar apenas componentes relacionados ao problema tratado. Preferências de redução de movimento e acessibilidade continuam obrigatórias.
+
+Pedido adicional concluído na 0.21: circuito do histórico em diagrama interativo de consulta, com explicações, zoom e navegação, sem edição dos resultados nem substituição da execução aberta no laboratório. Reconstruções de registros antigos são identificadas explicitamente.
 
 ## P2 — Mais valor científico para o TCC
 

@@ -46,6 +46,10 @@ class ExperimentWorkspace(QWidget):
 
     def __init__(self, pages: Mapping[str, QWidget], parent=None):
         super().__init__(parent)
+        self._selected_label_timer = QTimer(self)
+        self._selected_label_timer.setSingleShot(True)
+        self._selected_label_timer.setInterval(0)
+        self._selected_label_timer.timeout.connect(self._fit_selected_label)
         keys = [key for key, _, _ in self.TABS]
         if any(key not in pages or not isinstance(pages[key], QWidget) for key in keys):
             raise ValueError("O laboratório precisa das cinco páginas existentes.")
@@ -220,4 +224,4 @@ class ExperimentWorkspace(QWidget):
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, "selected_label"):
-            QTimer.singleShot(0, self._fit_selected_label)
+            self._selected_label_timer.start()

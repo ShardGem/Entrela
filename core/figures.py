@@ -7,6 +7,7 @@ from matplotlib.patches import Rectangle, Circle
 from core.metrics import bloch_vector, fidelity, purity, energy_expectation
 
 COLORS = ("#007ea7", "#8157c4", "#cb6500", "#16834a", "#c63e62", "#3a62b0")
+MAX_PLOT_SNAPSHOTS = 101
 
 
 def figure(width=7, height=4):
@@ -65,126 +66,155 @@ def bloch_figure(experiments, indices=None, *, qubits=None):
     return fig
 
 
-def histogram_figure(experiments, side_by_side=False):
-    fig = figure()
-    keys = sorted(set().union(*(set(e.result.counts or {}) for e in experiments)))
-    if not keys:
-        ax=fig.add_subplot(111)
-        ax.axis("off")
-        ax.text(.5,.5,"Esta execução não possui contagens registradas.",ha="center",va="center",transform=ax.transAxes)
-        return fig
-    for i, exp in enumerate(experiments):
-        ax = fig.add_subplot(1, len(experiments), i+1) if side_by_side else (fig.axes[0] if fig.axes else fig.add_subplot(111))
-        total = sum((exp.result.counts or {}).values())
-        width = .8 if side_by_side or len(experiments) == 1 else .36
-        xs = np.arange(len(keys)) + (0 if side_by_side or len(experiments) == 1 else (i-.5)*width)
-        ax.bar(xs, [(exp.result.counts or {}).get(k,0)/total if total else 0 for k in keys], width=width, color=COLORS[i], label=f"Execução {'AB'[i]}")
-        ax.set_xticks(range(len(keys)), keys, rotation=90 if len(keys)>8 else 0, fontsize=8)
-        # A common full frequency scale prevents equal-height bars from
-        # suggesting equal frequencies across independently scaled panels.
-        ax.set_ylim(0, 1.05)
-        ax.set_ylabel("Frequência observada (0–1)")
-        ax.set_xlabel("Bitstring · q0 à direita")
-        ax.legend(fontsize=8)
-        ax.grid(axis="y", alpha=.2)
+def draw_histograms(fig, counts_by_run, *, side_by_side=False, frequency=True,
+                    colors=COLORS, labels=None, label_size=8, title=None):
+    """One distribution renderer for screens and portable exports."""
+    fig.clear()
+    if not 1 <= len(counts_by_run) <= 2:
+        raise ValueError("Selecione uma ou duas distribuições.")
+    labels = labels or [f"Execução {'AB'[i]}" for i in range(len(counts_by_run))]
+    keys = sorted(set().union(*(set(counts or {}) for counts in counts_by_run)))
+    for i, counts in enumerate(counts_by_run):
+        counts = counts or {}
+        ax = fig.add_subplot(1, len(counts_by_run), i + 1) if side_by_side else (fig.axes[0] if fig.axes else fig.add_subplot(111))
+        total = sum(counts.values())
+        width = .8 if side_by_side or len(counts_by_run) == 1 else .36
+        xs = np.arange(len(keys)) + (0 if side_by_side or len(counts_by_run) == 1 else (i - .5) * width)
+        values = [counts.get(key, 0) / total if total else 0 for key in keys] if frequency else [counts.get(key, 0) for key in keys]
+        bars = ax.bar(xs, values, width=width, color=colors[i], label=labels[i])
+        for key, bar in zip(keys, bars):
+            bar._observed = ('AB'[i], key, counts.get(key, 0), total)
+        ax.set_xticks(range(len(keys)), keys, rotation=90 if len(keys) > 8 else 0, fontsize=label_size)
+        ax.set_ylabel("Frequência observada (0–1)" if frequency else "Contagens")
+        ax.set_xlabel("Estado (q0 à direita)")
+        if frequency:
+            ax.set_ylim(0, 1.05)
+        else:
+            ax.set_ylim(bottom=0)
+        if keys:
+            ax.legend(fontsize=label_size)
+        elif not ax.texts:
+            ax.text(.5, .5, "Sem contagens", ha="center", va="center", transform=ax.transAxes)
+        ax.grid(axis='y', alpha=.2)
+        if title:
+            ax.set_title(title, parse_math=False)
+    return fig
+
+
+def histogram_figure(experiments, side_by_side=False, *, fig=None, colors=COLORS, label_size=8):
+    fig = figure() if fig is None else fig
+    draw_histograms(fig, [exp.result.counts for exp in experiments], side_by_side=side_by_side,
+                    colors=colors, label_size=label_size)
     fig.suptitle("Contagens normalizadas pelo total observado de cada execução", fontsize=10)
     return fig
 
 
-def temporal_figure(experiments, series=None, *, reference="circuit"):
+def temporal_figure(experiments, series=None, *, reference="circuit", fig=None, curves=None, colors=COLORS, label_size=8):
     from core.circuits import _build_hamiltonian
-    if reference not in ("circuit","exact"):
+    from core.figure_labels import field_label, axis_label
+    if reference not in ("circuit", "exact"):
         raise ValueError("Referência temporal desconhecida")
     if reference == "exact" and any(exp.config.circuit is not None for exp in experiments):
         raise ValueError("A referência exata exige evolução por Hamiltoniano")
-    if len({bool(exp.config.circuit) for exp in experiments}) > 1:
+    if len({exp.config.circuit is not None for exp in experiments}) > 1:
         raise ValueError("Curvas temporais exigem o mesmo tipo de eixo: tempo de evolução ou índice da porta.")
-    keys = [series] if series else ["fidelity", "purity", "energy"]
-    fig = figure(7, 2.6 * len(keys))
-    labels = {"fidelity": "Fidelidade ao circuito ideal", "purity": "Pureza global", "energy": "Energia ⟨H⟩"}
-    exact = {}
-    if reference == "exact":
-        from core.analysis import exact_states
-        labels["fidelity"] = "Fidelidade à evolução exata"
-        exact = {i:exact_states(exp.config,exp.result.times) for i,exp in enumerate(experiments) if exp.result.states}
-    for j, key in enumerate(keys):
-        ax = fig.add_subplot(len(keys), 1, j+1)
-        for i, exp in enumerate(experiments):
+    keys = [series] if isinstance(series, str) else list(series) if series else ["fidelity", "purity", "energy"]
+    keys = ["fidelity_exact" if key == "fidelity" and reference == "exact" else key for key in keys]
+    fig = figure(7, 2.6 * len(keys)) if fig is None else fig
+    fig.clear()
+    if curves is None:
+        curves = []
+        for exp in experiments:
             r, c = exp.result, exp.config
-            if not r.states or not r.times:
+            rows = []
+            if r.states:
+                H = None if c.circuit is not None else _build_hamiltonian(c.system.num_qubits, c.system.hamiltonian, c.system.J, c.system.h, c.system.periodic)
+                targets = r.ideal_statevectors
+                if reference == "exact":
+                    from core.analysis import exact_states
+                    targets = exact_states(c, r.times)
+                for i, state in enumerate(r.states):
+                    target = targets[i] if targets and len(targets) == len(r.states) else None
+                    rows.append(dict(time=r.times[i], purity=purity(state), energy=None if H is None else energy_expectation(state, H),
+                                     **{("fidelity_exact" if reference == "exact" else "fidelity"): fidelity(state, target) if target is not None else None}))
+            curves.append(rows)
+    for position, key in enumerate(keys):
+        ax = fig.add_subplot(len(keys), 1, position + 1)
+        for i, (exp, rows) in enumerate(zip(experiments, curves)):
+            if not exp.result.states:
                 continue
-            H = None if c.circuit else _build_hamiltonian(c.system.num_qubits,c.system.hamiltonian,c.system.J,c.system.h,c.system.periodic)
-            if key == "energy" and H is None:
-                continue
-            indices = np.unique(np.linspace(0,len(r.states)-1,min(201,len(r.states)),dtype=int))
-            values = []
-            for k in indices:
-                if key == "fidelity":
-                    ideal = exact[i][k] if reference == "exact" else r.ideal_statevectors[k] if r.ideal_statevectors else (r.states[k] if not c.noise.enabled else None)
-                    value = None if ideal is None else fidelity(r.states[k], ideal)
-                elif key == "purity":
-                    value = purity(r.states[k])
-                else:
-                    value = energy_expectation(r.states[k], H)
-                values.append(float("nan") if value is None else value)
-            ax.plot([r.times[k] for k in indices],values, label=f"Execução {'AB'[i]}",color=COLORS[i],marker="." if len(indices)<30 else None)
-        ax.set_ylabel(labels[key])
-        ax.set_xlabel("Índice da porta" if experiments[0].config.circuit else "Tempo adimensional (ℏ=1)")
+            indices = np.unique(np.linspace(0, len(rows) - 1, min(MAX_PLOT_SNAPSHOTS, len(rows)), dtype=int)) if rows else []
+            points = [rows[k] for k in indices]
+            if any(row.get(key) is not None for row in points):
+                ax.plot([r['time'] for r in points], [np.nan if r.get(key) is None else r[key] for r in points], label=f"Execução {'AB'[i]}", color=colors[i], marker='.' if len(points) < 30 else None)
+        ax.set_ylabel(field_label(key))
+        ax.set_xlabel(axis_label('time', {'circuit': experiments[0].config.circuit}))
         ax.grid(alpha=.2)
         if ax.lines:
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=label_size)
         else:
-            ax.text(.5,.5,"Snapshots / referência indisponíveis",ha="center",transform=ax.transAxes)
+            ax.text(.5, .5, "Métrica indisponível para estes registros.", ha='center', va='center', transform=ax.transAxes)
     return fig
 
 
-def analysis_figure(data, key=None, fig=None):
-    rows, kind = data["rows"], data["kind"]
-    if fig is None:
-        fig = figure()
-    else:
-        fig.clear()
+def analysis_figure(data, key=None, fig=None, *, colors=COLORS, label_size=8):
+    from core.figure_labels import field_label, axis_label, STUDY_TITLES
+    rows, kind = data['rows'], data['kind']
+    fig = figure() if fig is None else fig
+    fig.clear()
     ax = fig.add_subplot(111)
-    if kind == "heatmap":
-        key = key or ("fidelity_exact" if any(r.get("fidelity_exact") is not None for r in rows) else "fidelity")
-        xs, ys = sorted({r["x"] for r in rows}), sorted({r["y"] for r in rows})
-        grid = np.full((len(ys),len(xs)),np.nan)
-        for r in rows:
-            if r.get(key) is not None:
-                grid[ys.index(r["y"]),xs.index(r["x"])] = r[key]
-        # Cell labels are actual coordinates; spacing is categorical, explicit.
-        artist = ax.imshow(grid,origin="lower",aspect="auto",cmap="viridis")
-        ax.set_xticks(range(len(xs)),[format(x,".5g") for x in xs])
-        ax.set_yticks(range(len(ys)),[format(y,".5g") for y in ys])
-        ax.set_xlabel(data["options"]["x_parameter"] + " · pontos calculados")
-        ax.set_ylabel(data["options"]["y_parameter"])
-        fig.colorbar(artist,ax=ax,label=key)
-    elif kind in ("zne_stability","equal_budget","mitigation_benchmark"):
-        key = key or ("absolute_error" if kind == "mitigation_benchmark" else "rmse")
-        selected = [r for r in rows if r.get(key) is not None]
-        ax.bar(range(len(selected)),[r[key] for r in selected],color=[COLORS[i%6] for i in range(len(selected))])
-        labels = [r.get("label",r["method"])+("\n"+str(r.get("factors",""))+" · "+str(r.get("shots_setting","")) if kind != "mitigation_benchmark" else "") for r in selected]
-        ax.set_xticks(range(len(selected)),labels,rotation=25,ha="right",fontsize=8)
-        ax.set_ylabel(key)
+    config = data.get('config', {})
+    if kind == 'heatmap':
+        key = key or ('fidelity_exact' if any(r.get('fidelity_exact') is not None for r in rows) else 'fidelity')
+        xs, ys = sorted({r['x'] for r in rows}), sorted({r['y'] for r in rows})
+        grid = np.full((len(ys), len(xs)), np.nan)
+        for row in rows:
+            if row.get(key) is not None:
+                grid[ys.index(row['y']), xs.index(row['x'])] = row[key]
+        artist = ax.imshow(grid, origin='lower', aspect='auto', cmap='viridis')
+        ax.set_xticks(range(len(xs)), [format(x, '.5g') for x in xs])
+        ax.set_yticks(range(len(ys)), [format(y, '.5g') for y in ys])
+        ax.set_xlabel(axis_label('x', parameter=data['options']['x_parameter']) + ' · pontos calculados')
+        ax.set_ylabel(axis_label('y', parameter=data['options']['y_parameter']))
+        fig.colorbar(artist, ax=ax, label=field_label(key))
+    elif kind in ('zne_stability', 'equal_budget', 'mitigation_benchmark'):
+        key = key or ('absolute_error' if kind == 'mitigation_benchmark' else 'rmse')
+        selected = [r for r in rows if r.get(key) is not None and (kind != 'mitigation_benchmark' or r.get('status') == 'available')]
+        xs = list(range(len(selected)))
+        ax.bar(xs, [r[key] for r in selected], color=[colors[i % len(colors)] for i in xs])
+        labels = [r.get('label', r['method']) + ('\n' + str(r.get('factors', '')) + ' · ' + str(r.get('shots_setting', '')) if kind != 'mitigation_benchmark' else '') for r in selected]
+        ax.set_xticks(xs, labels, rotation=25, ha='right', fontsize=label_size)
+        if key == 'estimate' and kind == 'mitigation_benchmark':
+            ax.errorbar(xs, [r[key] for r in selected], yerr=[r.get('stderr') or 0 for r in selected], fmt='none', color=colors[-1], capsize=5)
+            ax.axhline(data['ideal_observable'], color=colors[2], ls='--', label='Referência ideal')
+            ax.legend(fontsize=label_size)
+        ax.set_xlabel('Método · somente resultados disponíveis' if kind == 'mitigation_benchmark' else 'Método · fatores · shots configurados')
+        ax.set_ylabel(field_label(key))
     else:
-        xkey = {"temporal":"time","convergence":"steps","trotter_noise":"steps","sweep":"value"}[kind]
-        keys = [key] if key else (["ideal_infidelity","noisy_infidelity"] if kind == "trotter_noise" else ["infidelity"] if kind == "convergence" else ["fidelity","purity"])
-        for field in keys:
-            seeds = sorted({r.get("seed") for r in rows}) if kind == "sweep" else [None]
-            for seed in seeds:
-                selected = [r for r in rows if r.get(field) is not None and (kind != "sweep" or r.get("seed") == seed)]
-                if selected:
-                    ax.plot([r[xkey] for r in selected],[r[field] for r in selected],".-",label=field+(f" · seed {seed}" if seed is not None else ""))
-        if ax.lines:
-            ax.legend(fontsize=8)
-        ax.set_xlabel("Índice da porta" if xkey == "time" and data.get("config",{}).get("circuit") else xkey)
+        xkey = {'temporal': 'time', 'convergence': 'steps', 'trotter_noise': 'steps', 'sweep': 'value'}[kind]
+        fields = ['ideal_infidelity', 'noisy_infidelity'] if key == 'paired_infidelity' or (not key and kind == 'trotter_noise') else [key] if key else ['infidelity'] if kind == 'convergence' else ['fidelity', 'purity']
+        seeds = sorted({r.get('seed') for r in rows}, key=lambda value: -1 if value is None else value) if kind == 'sweep' else [None]
+        for field_index, field in enumerate(fields):
+            for seed_index, seed in enumerate(seeds):
+                selected = [r for r in rows if kind != 'sweep' or r.get('seed') == seed]
+                if any(row.get(field) is not None for row in selected):
+                    suffix = (f' · semente {seed}' if seed is not None else ' · semente não registrada') if kind == 'sweep' else ''
+                    ax.plot([r[xkey] for r in selected], [np.nan if r.get(field) is None else r[field] for r in selected], '.-', color=colors[(field_index * len(seeds) + seed_index) % len(colors)], label=field_label(field) + suffix)
+        ax.set_xlabel(axis_label(xkey, config, data.get('parameter') if xkey == 'value' else None))
+        ax.set_ylabel(field_label(key) if key else 'Métrica do estado' if len(fields) > 1 else field_label(fields[0]))
         ax.grid(alpha=.2)
-    ax.set_title(data.get("protocol",{}).get("fields",{}).get("title") or data["kind"],fontsize=11,parse_math=False)
+        if ax.lines:
+            ax.legend(fontsize=label_size)
+    if not ax.lines and not ax.patches and not ax.images:
+        ax.text(.5, .5, 'Não há valores disponíveis para esta métrica.', ha='center', transform=ax.transAxes)
+    ax.set_title(data.get('protocol', {}).get('fields', {}).get('title') or STUDY_TITLES.get(kind, kind), fontsize=11, parse_math=False)
     return fig
 
 
 def circuit_figure(experiment, limit=80, *, start=0, per_row=16):
-    operations = experiment.result.metadata.get("operations", [])
+    from core.circuit_inspection import inspect_circuit
+    inspected = inspect_circuit(experiment)
+    operations = inspected.operations
     # All operations remain in raw JSON; the presentation is explicitly bounded.
     ops = operations[start:start+limit]
     n = experiment.config.system.num_qubits
@@ -225,7 +255,8 @@ def circuit_figure(experiment, limit=80, *, start=0, per_row=16):
                     ax.text(i,q+.33,",".join(format(v,".3g") for v in op["parameters"][:2]),ha="center",fontsize=4.5)
         ax.set(xlim=(-.8,per_row-.1),ylim=(n-.5,-.6),yticks=range(n),yticklabels=[f"q{q}" for q in range(n)],xticks=[])
         ax.set_title(f"Operações {start+block*per_row+1}–{start+min(len(ops),(block+1)*per_row)}",fontsize=8)
-    fig.suptitle(f"Circuito · operações {start+1}–{start+len(ops)} de {len(operations)}; parâmetros completos no JSON",fontsize=10)
+    fig.suptitle(f"Circuito · operações {start+1}–{start+len(ops)} de {len(operations)}; parâmetros completos no JSON"
+                 + ("\nReconstruído da configuração com as bibliotecas atuais" if inspected.reconstructed else ""), fontsize=10)
     return fig
 
 

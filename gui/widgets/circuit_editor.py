@@ -114,6 +114,10 @@ class CircuitEditor(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._palette_layout_timer = QTimer(self)
+        self._palette_layout_timer.setSingleShot(True)
+        self._palette_layout_timer.setInterval(0)
+        self._palette_layout_timer.timeout.connect(self._resize_gate_palette)
         self.document = CircuitDocument()
         self.selected = -1
         self.selected_indices = []
@@ -611,7 +615,7 @@ class CircuitEditor(QWidget):
         self.revision_label.setText("Rascunho recuperado")
         self.revision_label.setToolTip("Recuperação automática. Salve uma revisão para preservar esta versão na biblioteca.")
         self.draft_changed.emit()
-        QTimer.singleShot(0, self._resize_gate_palette)
+        self._palette_layout_timer.start()
 
     def _resize_gate_palette(self):
         """Reserve actual styled button widths instead of clipping two columns."""
@@ -659,8 +663,8 @@ class CircuitEditor(QWidget):
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
-            QTimer.singleShot(0, self._resize_gate_palette)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, "_palette_layout_timer"):
+            self._palette_layout_timer.start()
 
     def set_storage_directory(self, path):
         """Keep reusable circuit revisions separate from immutable run records."""

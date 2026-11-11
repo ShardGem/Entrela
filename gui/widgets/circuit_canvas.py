@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QRectF, QSize, Signal
 from PySide6.QtGui import QColor, QPen, QBrush, QPainter, QFont
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QSizePolicy
 from gui.theme import PALETTE
+from core.circuit_document import GATE_HELP
 
 LEFT, TOP, WIRE, COLUMN = 110, 80, 68, 100
 
@@ -42,7 +43,9 @@ class GateItem(QGraphicsItem):
         self.low = TOP + min(qs) * WIRE
         self.high = TOP + max(qs) * WIRE
         self.setToolTip(
-            f"Porta {index + 1}: {operation['name'].upper()}\nQubits: {qs}\nParâmetros: {operation.get('parameters', [])}\n{operation.get('stage', '')} · passo {operation.get('step', '—')}\n"
+            f"Operação {index + 1}: {operation['name'].upper()}\n"
+            + GATE_HELP.get(operation['name'], "Operação sintetizada do circuito; consulte os parâmetros na inspeção.")
+            + f"\nQubits: {', '.join('q'+str(q) for q in qs)}\nParâmetros (rad): {operation.get('parameters', [])}\n"
             + (
                 "Arraste horizontalmente para reordenar."
                 if view.editable
@@ -165,7 +168,8 @@ class CircuitCanvas(QGraphicsView):
         self.setMinimumSize(260, 240)
         self.scene_model.selectionChanged.connect(self._selection)
         self.setToolTip(
-            "Clique: inspecionar · roda: zoom · arraste o fundo: mover · arraste uma porta no editor: reordenar"
+            "Clique ou use as setas: inspecionar · roda: zoom · arraste o fundo: navegar"
+            + (" · arraste uma porta: reordenar" if self.editable else " · consulta sem edição")
         )
         self.description = "Circuito Entrela"
         self.operations = []

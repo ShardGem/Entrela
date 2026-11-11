@@ -48,7 +48,7 @@ def test_comparison_ui_loads_new_mode_and_syncs_unfocus(window):
     page.btn_prepare.click()
     wait_until(lambda: window._current_worker is None)
     assert page.full_data["mode"] == "trotter"
-    assert page.curve_canvas.fig.axes[0].get_ylabel() == "F à evolução exata"
+    assert page.curve_canvas.fig.axes[0].get_ylabel() == "Fidelidade à evolução exata"
     assert not page.slider.isEnabled()
     assert "Estados finais" in page.frame_label.text()
     page.focus.setCurrentIndex(page.focus.findData(1))

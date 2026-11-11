@@ -12,6 +12,16 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Circuitos no histórico e caderno simplificado — 0.21
+
+- **Histórico → Visualizar → Circuito** apresenta o diagrama gráfico em modo de consulta: seleção de operações, explicações, parâmetros, zoom, navegação por teclado e exportação SVG.
+- **Ampliar detalhes** permite consultar o circuito sem a lista de experimentos ocupar a tela. As operações salvas e o experimento aberto no laboratório são preservados.
+- Registros antigos sem operações são identificados como reconstruídos com as bibliotecas atuais; a fase global não é inferida quando não foi registrada junto das operações.
+- Caderno com seções expansíveis e salvamento fora da rolagem; rascunhos e preferências de navegação continuam persistentes.
+- Renderizadores compartilhados para histogramas, métricas e estudos, com rótulos/unidades comuns. Varreduras mantêm sementes separadas e valores ausentes deixam lacunas.
+
+Consulte o [guia da versão](docs/interface-0.21.md) e o [plano de evolução atualizado](docs/plano-evolucao.md).
+
 ## Confiabilidade e interpretação dos resultados — 0.20
 
 - Histogramas comparados com escala comum e curvas temporais que preservam picos anteriores; seleção manual e soma dos estados omitidos em **Outros**.
@@ -155,7 +165,7 @@ Para construir e validar o wheel fora do checkout:
 
 ```bash
 python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.20.0-py3-none-any.whl
+python scripts/package_smoke.py dist/entrela-0.21.0-py3-none-any.whl
 ```
 
 O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.

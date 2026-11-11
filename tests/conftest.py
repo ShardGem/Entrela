@@ -1,3 +1,4 @@
+import gc
 import os,tempfile
 from pathlib import Path
 import pytest
@@ -34,5 +35,9 @@ def window(qt_app,tmp_path,monkeypatch):
         wait_until(lambda:widget._current_worker is None)
     widget._unsaved_result=False
     widget.close()
+    widget.deleteLater()
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
     qt_app.processEvents()
+    gc.collect()
     assert not errors,errors

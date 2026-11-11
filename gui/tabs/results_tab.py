@@ -61,24 +61,12 @@ class ResultsTab(QWidget):
         self._render_histogram()
 
     def _render_histogram(self, *_):
-        ax = self.canvas_hist.reset_axes()
-        total = sum(self._counts.values())
-        frequency = self.hist_measure.currentIndex() == 1
-        if self._counts:
-            keys = sorted(self._counts)
-            values = [self._counts[k] / total if total else 0 for k in keys] if frequency else [self._counts[k] for k in keys]
-            ax.bar(keys, values, color=PALETTE.primary)
-            ax.tick_params(axis="x", labelrotation=90 if len(keys) > 8 else 0)
-        else:
-            ax.text(.5, .5, "Sem contagens", color=PALETTE.text,
-                    ha="center", transform=ax.transAxes)
-        if frequency:
-            ax.set_ylim(0, 1.05)
-        else:
-            ax.set_ylim(bottom=0)
-        ax.set_title(self._hist_title)
-        ax.set_ylabel("Frequência observada (0–1)" if frequency else "Contagens")
-        ax.set_xlabel("Estado (q0 à direita)")
+        from core.figures import draw_histograms
+        from gui.widgets.plot_canvas import style_figure
+        draw_histograms(self.canvas_hist.fig, [self._counts],
+                        frequency=self.hist_measure.currentIndex() == 1,
+                        colors=(PALETTE.primary,), label_size=10, title=self._hist_title)
+        style_figure(self.canvas_hist.fig)
         self.canvas_hist.draw()
 
     def exibir_evolucao_temporal(self, states, times=None, time_unit="Tempo (adimensional, ℏ=1)"):

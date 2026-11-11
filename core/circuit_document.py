@@ -246,7 +246,7 @@ class CircuitDocument:
 
 
 GATE_HELP = {
-    "h": "Hadamard: cria superposição e troca as bases X/Z.",
+    "h": "Hadamard: transforma |0⟩ em |+⟩ e |1⟩ em |−⟩; troca as bases X/Z.",
     "x": "Pauli X: troca |0⟩ e |1⟩.",
     "y": "Pauli Y: inversão com fase.",
     "z": "Pauli Z: muda o sinal de |1⟩.",

@@ -83,6 +83,10 @@ class ConfigPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._section_scroll_timer = QTimer(self)
+        self._section_scroll_timer.setSingleShot(True)
+        self._section_scroll_timer.setInterval(0)
+        self._section_scroll_timer.timeout.connect(self._scroll_to_section)
         self.current_mode, self.current_section = "guided", "system"
         root = QVBoxLayout(self)
         root.setSpacing(12)
@@ -326,8 +330,12 @@ class ConfigPanel(QWidget):
         if self.current_mode == "guided":
             self.parameter_scroll.verticalScrollBar().setValue(0)
         else:
-            QTimer.singleShot(0,lambda:self.parameter_scroll.ensureWidgetVisible(self.sections[key]))
+            self._section_scroll_timer.start()
         self.section_changed.emit(key)
+
+    def _scroll_to_section(self):
+        if self.current_mode == "advanced":
+            self.parameter_scroll.ensureWidgetVisible(self.sections[self.current_section])
 
     def _step(self, delta):
         keys = [x[0] for x in SECTIONS]

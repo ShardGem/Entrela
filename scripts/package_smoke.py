@@ -49,6 +49,11 @@ window._show_page('results')
 window.page_results.tabs.setCurrentWidget(window.page_results.state_inspector)
 app.processEvents()
 assert abs(window.page_results.state_inspector.quantities['purity']-1)<1e-10
+window.page_history.load([exp])
+window.page_history.set_detail(exp,files=[])
+window.page_history.circuit.select_operation(0)
+assert not window.page_history.circuit.canvas.editable
+assert 'Hadamard' in window.page_history.circuit.details.text()
 from core.circuit_document import CircuitDocument,CircuitGate
 from core.types import ExperimentConfig,SystemConfig,SimulationProtocol,NoiseConfig
 custom=run_experiment(ExperimentConfig(SystemConfig(2,J=0,h=0),SimulationProtocol(2,2,True),NoiseConfig(False),64,42,CircuitDocument(2,(CircuitGate('h',(0,)),CircuitGate('cx',(0,1))),.3)))
@@ -69,7 +74,7 @@ reopened=MainWindow(window.repository,window.settings)
 assert reopened.page_circuit.editor.document==custom.config.circuit
 assert reopened.page_circuit.editor.circuit_name.text()=='Recovered packaged circuit'
 reopened.close();splash.close();app.processEvents()
-print('PASS: isolated wheel, assets, Qt workspace, scientific engine, state inspector, backup and persistence')
+print('PASS: isolated wheel, assets, Qt workspace, scientific engine, graphical history, state inspector, backup and persistence')
 """
 
 
