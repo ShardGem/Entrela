@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayou
 from gui.icons import get_icon
 from gui.theme import PALETTE
 from gui.branding import application_icon
-from gui.navigation import ROOT_ITEMS, PAGE_LABELS, ROOT_FOR_PAGE
+from gui.navigation import NAV_ITEMS, NAV_GROUPS, NAV_ACTIONS
 
 
 class NavButton(QPushButton):
@@ -34,18 +34,24 @@ class NavButton(QPushButton):
 class Sidebar(QFrame):
     navigate=Signal(str)
     compact_requested=Signal(bool)
-    ITEMS = ROOT_ITEMS
-    GROUPS = [('work', 'Trabalho', 'group-lab', ('dashboard', 'simulation', 'analysis', 'history')),
-              ('resources', 'Recursos', 'group-start', ('docs', 'settings'))]
-    DESCRIPTIONS={
-        'analysis':'Estudos e varreduras, mitigação ZNE e comparação de execuções. Escolha uma referência para investigar ruído e precisão.',
-        'history':'Reabra execuções, registre anotações e organize evidências e relatórios.',
-        'docs':'Exemplos prontos, conceitos, manual e referências para aprender com simulações.',
-        'settings':'Aparência, acessibilidade, exportação e backup do espaço de trabalho.',
-        'simulation':'Prepare uma evolução por Hamiltoniano ou um circuito de portas. Execute e consulte os resultados no laboratório.',
-        'library':'Anote a execução e agrupe resultados por projeto. Salve parâmetros do formulário Hamiltoniano para reutilizar; circuitos são salvos no editor.',
-        'comparison':'Compare métricas, curvas temporais e estados de duas execuções.',
-        'documentation':'Exporte dados, figuras, animações e relatórios científicos.',
+    ITEMS = NAV_ITEMS
+    GROUPS = NAV_GROUPS
+    DESCRIPTIONS = {
+        'dashboard': 'Retome uma execução recente ou comece um novo experimento.',
+        'simulation': 'Defina estado inicial, Hamiltoniano, evolução, ruído e medições para executar uma simulação.',
+        'circuit': 'Monte e edite portas, use modelos e salve revisões do circuito antes de executar.',
+        'results': 'Consulte gráficos, dados, métricas e reprodutibilidade da execução selecionada.',
+        'bloch': 'Inspecione esferas de Bloch, probabilidades e estado global nos snapshots ou no estado final calculado.',
+        'analysis': 'Faça estudos e varreduras de ruído, parâmetros e precisão de Trotter a partir de uma execução.',
+        'mitigation': 'Configure ZNE para extrapolar um observável e avaliar seu erro e sua incerteza.',
+        'comparison': 'Compare métricas, gráficos e estados de duas execuções compatíveis.',
+        'history': 'Pesquise, inspecione e reabra execuções salvas, ou selecione duas para comparar.',
+        'library': 'Registre identificação, projeto, hipóteses e interpretação da execução selecionada.',
+        'configurations': 'Reutilize parâmetros salvos do formulário Hamiltoniano. Abrir uma configuração não executa a simulação.',
+        'documentation': 'Organize evidências e exporte dados, figuras, animações e relatórios científicos.',
+        'examples': 'Explore modelos prontos e abra cópias editáveis para aprender e experimentar.',
+        'docs': 'Consulte conceitos, exemplos explicados, manual e referências científicas.',
+        'settings': 'Ajuste aparência, acessibilidade, exportação e backup do espaço de trabalho.',
     }
 
     def __init__(self,parent=None):
@@ -68,8 +74,8 @@ class Sidebar(QFrame):
 
     def _build(self):
         outer=QVBoxLayout(self)
-        outer.setContentsMargins(12,16,12,12)
-        outer.setSpacing(12)
+        outer.setContentsMargins(12,12,12,12)
+        outer.setSpacing(8)
         brand=QHBoxLayout()
         logo=QLabel()
         self.logo=logo
@@ -94,6 +100,8 @@ class Sidebar(QFrame):
         self.toggle.clicked.connect(lambda:self.compact_requested.emit(not self._compact))
         navigation.addWidget(self.toggle)
         outer.addLayout(navigation)
+        self.buttons['dashboard'] = self._make_button('dashboard')
+        outer.addWidget(self.buttons['dashboard'])
         self.scroll=QScrollArea()
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setWidgetResizable(True)
@@ -101,12 +109,11 @@ class Sidebar(QFrame):
         content=QWidget()
         layout=QVBoxLayout(content)
         layout.setContentsMargins(0,0,0,0)
-        layout.setSpacing(8)
-        labels=dict(self.ITEMS)
+        layout.setSpacing(4)
         for key,title,icon,items in self.GROUPS:
             header=QPushButton()
             header.setObjectName('NavGroup')
-            header.setMinimumHeight(44)
+            header.setMinimumHeight(30)
             header.setIconSize(QSize(22,22))
             header.setCursor(Qt.PointingHandCursor)
             header.setAccessibleName(title+' — expandir ou recolher grupo')
@@ -115,12 +122,10 @@ class Sidebar(QFrame):
             self.group_buttons[key]=header
             body=QWidget()
             children=QVBoxLayout(body)
-            children.setContentsMargins(8,0,0,6)
-            children.setSpacing(4)
+            children.setContentsMargins(8,0,0,0)
+            children.setSpacing(2)
             for page in items:
-                button=NavButton(page,labels[page])
-                button.setToolTip(f'{title} · {labels[page]}\n{self.DESCRIPTIONS.get(page,labels[page])}')
-                button.clicked.connect(lambda checked=False,page=page:self._on_click(page))
+                button = self._make_button(page, title)
                 children.addWidget(button)
                 self.buttons[page]=button
             self.group_bodies[key]=body
@@ -133,6 +138,20 @@ class Sidebar(QFrame):
         layout.addStretch()
         self.scroll.setWidget(content)
         outer.addWidget(self.scroll,1)
+        self.buttons['settings'] = self._make_button('settings')
+        outer.addWidget(self.buttons['settings'])
+
+    def _make_button(self, key, group=None):
+        label = dict(self.ITEMS)[key]
+        icon = {'library': 'annotations'}.get(key, key)
+        button = NavButton(icon, label)
+        if key in NAV_ACTIONS:
+            button.setCheckable(False)
+        context = f'{group} · {label}' if group else label
+        button.setToolTip(context + '\n' + self.DESCRIPTIONS[key])
+        button.setAccessibleDescription(self.DESCRIPTIONS[key])
+        button.clicked.connect(lambda checked=False, key=key: self._on_click(key))
+        return button
 
     def _expand(self,key):
         if key in self._expanded_groups:
@@ -167,7 +186,7 @@ class Sidebar(QFrame):
             else:
                 self._finish_animation(key)
             button=self.group_buttons[key]
-            button.setText(title+(' ' if self._compact else '   ')+('−' if expanded else '+'))
+            button.setText(title)
             button.setCheckable(True)
             button.setChecked(expanded)
             button.setToolTip(title+(' — recolher grupo' if expanded else ' — expandir grupo')+'\n'+' · '.join(dict(self.ITEMS)[page] for page in items))
@@ -177,15 +196,15 @@ class Sidebar(QFrame):
             button.setProperty('expanded',expanded)
             button.style().unpolish(button)
             button.style().polish(button)
-            button.setIcon(get_icon(icon,PALETTE.primary if self._active in items else PALETTE.text_muted))
-            button.setIconSize(QSize(24,24))
+            button.setIcon(get_icon('chevron-down' if expanded else 'next', PALETTE.primary if self._active in items else PALETTE.text_muted))
+            button.setIconSize(QSize(16,16))
 
     def _on_click(self,key):
-        self.set_active(key)
+        if key not in NAV_ACTIONS:
+            self.set_active(key)
         self.navigate.emit(key)
 
     def set_active(self,key):
-        key = ROOT_FOR_PAGE.get(key, key)
         self._active=key
         for page,button in self.buttons.items():
             button.setChecked(page==key)
@@ -194,7 +213,8 @@ class Sidebar(QFrame):
             self._expanded_groups.add(group)
         self._refresh_groups()
         if key in self.buttons:
-            self.scroll.ensureWidgetVisible(self.buttons[key]) if key!='settings' else None
+            if self.scroll.isAncestorOf(self.buttons[key]):
+                self.scroll.ensureWidgetVisible(self.buttons[key])
 
     def set_compact(self,compact):
         self._compact=bool(compact)
@@ -211,7 +231,7 @@ class Sidebar(QFrame):
             button.style().unpolish(button)
             button.style().polish(button)
         for body in self.group_bodies.values():
-            body.layout().setContentsMargins(0 if compact else 8,0,0,6)
+            body.layout().setContentsMargins(0 if compact else 8,0,0,0)
         self._refresh_groups()
         self._fit_width()
 

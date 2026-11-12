@@ -2,7 +2,7 @@
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
 <p>O Laboratório reúne Preparar e Resultados. Em Preparar, escolha evolução por Hamiltoniano ou circuito de portas; em Resultados, selecione gráficos, estados quânticos, circuito executado e dados.
-Investigar reúne estudos, mitigação e comparações. Execuções reúne histórico, anotações e evidências; Aprender reúne exemplos, conceitos e manual.
+O menu lateral mantém os acessos diretos: Laboratório agrupa configuração, editor, resultados e estados 3D; Investigação reúne estudos, ZNE e comparações; Registros reúne histórico, anotações, configurações salvas e relatórios; Aprendizado contém exemplos, conceitos e manual. Início e Preferências permanecem fixos.
 Escolha uma configuração salva ou edite um circuito, execute e consulte os resultados no mesmo ambiente.
 Configurar prepara evoluções por Hamiltoniano; o editor de portas tem seu próprio rascunho e parâmetros.
 Resultados e anotações acompanham a execução selecionada, sem modificar o que você está editando.</p>
@@ -14,7 +14,7 @@ Use os botões ? ou a ajuda de cada campo para consultar significado, unidades e
 <p>Em janelas menores, alterne entre Parâmetros e Prévia e revisão. A barra de execução permanece acessível.
 Configurações inválidas indicam o campo a revisar. O menu Exemplos carrega configurações da galeria sem executá-las.</p>
 <h2 id="Circuitos">Criar e consultar circuitos</h2>
-<p>Em Preparar → Construir circuito, escolha um modelo ou adicione portas pela paleta. q0 identifica o primeiro qubit; controle e alvo são linhas distintas nas operações controladas. Ângulos de rotação são expressos em radianos. A ajuda de cada porta explica a operação. Desfazer e Refazer recuperam alterações; Salvar revisão guarda o circuito na biblioteca. Arquivo e desenho permite importar e exportar formatos compatíveis. O circuito executado, em Resultados, é uma consulta somente de leitura: modificar o rascunho não recalcula a execução selecionada.</p>
+<p>No menu Editor de circuitos, escolha um modelo ou adicione portas pela paleta. q0 identifica o primeiro qubit; controle e alvo são linhas distintas nas operações controladas. Ângulos de rotação são expressos em radianos. A ajuda de cada porta explica a operação. Desfazer e Refazer recuperam alterações; Salvar revisão guarda o circuito na biblioteca. Arquivo e desenho permite importar e exportar formatos compatíveis. O circuito executado, em Resultados, é uma consulta somente de leitura: modificar o rascunho não recalcula a execução selecionada.</p>
 <h2 id="Esfera de Bloch">Estados quânticos e esfera de Bloch</h2>
 <p>A esfera representa o estado reduzido de cada qubit, não o estado global. Selecione uma esfera e use Focar selecionado; clique novamente ou escolha Todos os qubits para desfocar. O inspetor reúne câmera, etapa, estados locais e métricas. O cursor percorre somente snapshots realmente armazenados. Sem snapshots, mostra-se apenas o estado final calculado; não há evolução reconstruída. O Estado global permite distinguir mistura de emaranhamento.</p>
 <h2 id="Configurações">Preferências do espaço de trabalho</h2>
@@ -82,5 +82,5 @@ PNG/SVG/PDF, tabelas LaTeX, protocolos, manifesto e hashes. GIF usa snapshots re
 reprodução única e tempo didático. O pacote inclui a sequência PNG selecionada. Na página 3D, exporte
 a vista atual com câmera e snapshot. JSON/CSV mantêm os dados de precisão integral. Relatórios PDF usam páginas A4 de 210 × 297 mm, texto vetorial e resolução configurável para imagens rasterizadas (padrão de 300 DPI).</p>
 <h2 id="Conceitos">Conceitos e exemplos executáveis</h2>
-<p>Em Aprender, pesquise os conceitos e abra seus detalhes. Circuitos demonstrativos abrem no editor e precisam ser executados para gerar dados; as previsões do material são analíticas e ideais. Shor e teletransporte são explicados conceitualmente: a plataforma não apresenta protocolos completos desses algoritmos como executados. Referências bibliográficas identificam as fontes; esta biblioteca não inclui links externos sem verificação.</p>
+<p>Em Aprendizado → Conceitos e manual, pesquise os conceitos e abra seus detalhes. Circuitos demonstrativos abrem no editor e precisam ser executados para gerar dados; as previsões do material são analíticas e ideais. Shor e teletransporte são explicados conceitualmente: a plataforma não apresenta protocolos completos desses algoritmos como executados. Referências bibliográficas identificam as fontes; esta biblioteca não inclui links externos sem verificação.</p>
 """

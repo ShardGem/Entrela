@@ -25,6 +25,7 @@ class SectionWorkspace(QWidget):
         for key, title in entries:
             self.selector.addItem(title, key)
         tools.addWidget(self.selector)
+        self.selector.hide()  # Os acessos completos ficam no menu lateral.
         self.context = QLabel()
         self.context.setWordWrap(True)
         self.context.setObjectName('FieldHint')

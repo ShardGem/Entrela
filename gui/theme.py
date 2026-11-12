@@ -147,12 +147,12 @@ QLabel#SidebarLogo {{
 }}
 
 QPushButton#NavGroup {{
-    background: transparent; color: {p.text}; border: none; qproperty-iconSize: 24px 24px;
+    background: transparent; color: {p.text_muted}; border: none; qproperty-iconSize: 16px 16px;
     padding: 6px 10px; text-align: left; font-weight: 600; font-size: 13px;
 }}
 QPushButton#NavGroup:hover {{ background: {p.surface}; }}
 QPushButton#NavGroup[compact="true"] {{ padding: 6px; text-align: left; }}
-QPushButton#NavGroup[activeGroup="true"] {{ color: {p.primary}; background: {p.primary_faint}; }}
+QPushButton#NavGroup[activeGroup="true"] {{ color: {p.primary}; background: transparent; }}
 QToolButton#SidebarToggle {{ background: transparent; border: none; border-radius: 4px; padding: 4px; color: {p.text_muted}; font-size: 12px; }}
 QToolButton#SidebarToggle:hover {{ background: {p.surface_hover}; color: {p.text}; }}
 QToolButton#SidebarToggle:focus {{ border: 1px solid {p.primary}; }}
@@ -162,6 +162,7 @@ QPushButton#NavButton {{
     background: transparent;
     color: {p.text_muted};
     border: none;
+    border-left: 3px solid transparent;
     border-radius: {RADIUS.md}px;
     padding: 8px 10px;
     text-align: left;

@@ -9,7 +9,7 @@ from core.examples import create_example_config
 from core.simulation import run_experiment
 from core.figures import probability_figure
 from gui.main_window import MainWindow
-from gui.navigation import ROOT_ITEMS
+from gui.navigation import NAV_ITEMS
 from gui.controllers.appearance import apply_appearance
 from gui.formatting import quantity, timestamp
 from gui.manual import WELCOME_HTML
@@ -32,8 +32,8 @@ def load(window, *, snapshots=True, seed=42):
     return record
 
 
-def test_six_destinations_resume_internal_activity_without_replacing_drafts(window):
-    assert list(window.sidebar.buttons) == [key for key, _ in ROOT_ITEMS]
+def test_visible_functions_and_internal_activities_keep_independent_drafts(window):
+    assert list(window.sidebar.buttons) == [key for key, _ in NAV_ITEMS]
     form = window.page_simulation.config_panel.get_config()
     window.page_circuit.editor._bell()
     circuit = window.page_circuit.editor.document

@@ -95,9 +95,9 @@ PAGE_META = {
     "dashboard": ("Início", "Seu laboratório quântico"),
     "examples": ("Exemplos", "Aprenda a partir de experimentos reais"),
     "simulation": ("Experimento", "Configure e execute"),
-    "circuit": ("Circuito", "Preparação, evolução e medição"),
+    "circuit": ("Editor de circuitos", "Preparação, portas, modelos e execução de circuitos"),
     "results": ("Resultados", "Dados da execução selecionada"),
-    "bloch": ("Evolução 3D", "Estados efetivamente simulados"),
+    "bloch": ("Estados quânticos 3D", "Esferas de Bloch, estado global e snapshots reais"),
     "mitigation": ("Mitigação", "Extrapolação de observáveis"),
     "comparison": ("Comparações", "Experimentos compatíveis"),
     "history": ("Histórico", "Resultados preservados"),
@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
     def _wire_signals(self):
         self.job_monitor.cancel_requested.connect(self._cancel_simulation)
         self.sidebar.compact_requested.connect(self._toggle_sidebar)
-        self.sidebar.navigate.connect(self.navigation.open_root)
+        self.sidebar.navigate.connect(self.navigation.open_page)
         self.topbar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
         self.topbar.commands_requested.connect(self._open_commands)
         self.page_workspace.page_selected.connect(self._show_page)
@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
         elif identifier == "saved-configurations":
             self._show_saved_configurations()
         elif identifier.startswith("page:"):
-            self._show_page(identifier[5:])
+            self.navigation.open_page(identifier[5:])
         elif identifier.startswith("example:"):
             self._load_example(identifier[8:])
         elif identifier.startswith("run:"):

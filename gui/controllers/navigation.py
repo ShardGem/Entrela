@@ -1,12 +1,26 @@
 """Coordena a navegação visual; não executa nem substitui experimentos."""
 
-from gui.navigation import ROOT_FOR_PAGE, PAGE_LABELS
+from gui.navigation import ROOT_FOR_PAGE, PAGE_LABELS, NAV_LABELS
 
 
 class NavigationController:
     def __init__(self, window):
         self.window = window
         self.last_for_root = dict(dashboard='dashboard', simulation='simulation', analysis='analysis', history='history', docs='examples', settings='settings')
+
+    def open_page(self, key):
+        """Um item visível abre sua função exata, independente da última área."""
+        w = self.window
+        if key == 'configurations':
+            w._show_saved_configurations()
+            return
+        if key not in w.pages:
+            return
+        if key == 'circuit':
+            w.page_workspace._apply_route('circuit:edit')
+        elif key == 'results':
+            w.page_workspace._apply_route('results:graphs')
+        self.show(key)
 
     def open_root(self, root):
         key = self.last_for_root.get(root, root)
@@ -40,13 +54,21 @@ class NavigationController:
             w.stack.setCurrentWidget(section)
         else:
             w.stack.setCurrentWidget(w.pages[key])
-        w.sidebar.set_active(root)
+        selected = key
+        circuit_inspection = key == 'circuit' and w.page_workspace._route == 'circuit:inspect'
+        if circuit_inspection:
+            selected = 'results'
+        w.sidebar.set_active(selected)
         detail = PAGE_LABELS[key]
         if root == 'simulation':
             detail = w.page_workspace.view_selector.currentText()
         elif root in w.section_workspaces:
             detail = w.section_workspaces[root].selector.currentText()
-        w.topbar.set_context(PAGE_LABELS[root], detail if detail != PAGE_LABELS[root] else 'Entrela · simulação científica')
+        title = 'Circuito executado' if circuit_inspection else NAV_LABELS[key]
+        breadcrumb = PAGE_LABELS[root]
+        if detail != title and detail != breadcrumb:
+            breadcrumb += ' · ' + detail
+        w.topbar.set_context(title, breadcrumb)
         if hasattr(w, 'layout_controller'):
             w.layout_controller.timer.start()
         w._update_tutorial()

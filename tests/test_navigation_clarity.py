@@ -8,12 +8,12 @@ from tests.qt_helpers import wait_until
 def test_groups_start_open_and_navigation_preserves_independent_choices(window, qt_app):
     sidebar = window.sidebar
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
-    sidebar.group_buttons['resources'].click()
-    wait_until(lambda: sidebar.group_bodies['resources'].isHidden())
-    assert all(not sidebar.group_bodies[key].isHidden() for key in ('work',))
+    sidebar.group_buttons['learning'].click()
+    wait_until(lambda: sidebar.group_bodies['learning'].isHidden())
+    assert all(not sidebar.group_bodies[key].isHidden() for key in ('lab', 'research', 'records'))
     window._show_page('comparison')
-    assert sidebar.group_bodies['resources'].isHidden()
-    assert not sidebar.group_bodies['work'].isHidden()
+    assert sidebar.group_bodies['learning'].isHidden()
+    assert not sidebar.group_bodies['research'].isHidden()
     window._show_page('examples')
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
 

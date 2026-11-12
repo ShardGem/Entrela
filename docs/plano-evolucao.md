@@ -12,6 +12,8 @@ Na versão 0.23, o dimensionamento das abas passa a considerar o conteúdo abert
 
 Na versão 0.24, a navegação passa a seis destinos, com duas etapas no laboratório e atividades reunidas por contexto. Configurações reutilizáveis se separam das anotações, exportações recebem preparação contextual, o histórico permite comparar duas linhas e a área 3D passa a usar um inspetor lateral. A disposição de painéis e as atividades recentes são persistidas. As curvas de probabilidades têm renderizador comum para tela, HTML, PDF e pacote científico, com seleção pelos maiores picos e massa omitida identificada. A [entrega e os limites](interface-0.24.md) e a [galeria atual](screenshots/0.24.0/README.md) documentam os 30 pontos da revisão. Validação manual nativa no Windows e ampliação das escolhas de séries nos relatórios permanecem pendentes.
 
+Na versão 0.24.1, os acessos diretos às funcionalidades são restaurados no menu lateral, com grupos por finalidade e nomes explícitos. Início e Preferências ficam fixos; editor, estados 3D, estudos, ZNE, comparações, histórico e relatórios voltam a ter entradas próprias. Cabeçalhos de grupo são discretos e a seleção identifica a função exata. As áreas de trabalho integradas e os rascunhos independentes permanecem. O [guia de navegação](interface-0.24.1.md) e a [galeria atual](screenshots/0.24.1/README.md) registram a organização vigente.
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |
