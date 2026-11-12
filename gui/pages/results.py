@@ -1,6 +1,5 @@
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
-    QGridLayout,
     QLabel,
     QTabWidget,
     QTableWidget,
@@ -9,7 +8,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
 )
 from gui.pages.base import PageBase
-from gui.widgets.card import MetricCard
+from gui.widgets.card import MetricCard, MetricGrid
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.tabs.results_tab import ResultsTab
 from gui.widgets.state_inspector import StateInspector
@@ -35,17 +34,13 @@ class ResultsPage(PageBase):
         self.details = QLabel("Execute ou abra um experimento.")
         self.details.setWordWrap(True)
         self.body().addWidget(self.details)
-        grid = QGridLayout()
         self.card_fid = MetricCard("Fidelidade ao circuito sem ruído")
         self.card_pur = MetricCard("Pureza global")
         self.card_erg = MetricCard("Energia ⟨H⟩")
         self.card_err = MetricCard("Infidelidade (1−F)")
-        for i, card in enumerate(
-            [self.card_fid, self.card_pur, self.card_erg, self.card_err]
-        ):
-            grid.addWidget(card, i // 2, i % 2)
-            grid.setColumnStretch(i % 2, 1)
-        self.body().addLayout(grid)
+        self.metric_grid = MetricGrid([self.card_fid, self.card_pur, self.card_erg, self.card_err])
+        self.body().addWidget(self.metric_grid)
+        self.body().setSpacing(12)
         self.science_note = QLabel()
         self.science_note.setWordWrap(True)
         self.science_note.setTextFormat(Qt.PlainText)

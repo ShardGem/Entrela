@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBo
 from gui.pages.base import PageBase
 from gui.widgets.card import Card
 from gui.widgets.button import SecondaryButton
+from gui.palettes import THEME_CHOICES, THEME_DESCRIPTIONS
 
 
 class SettingsPage(PageBase):
@@ -13,7 +14,7 @@ class SettingsPage(PageBase):
     backup_requested = Signal()
     restore_backup_requested = Signal()
     DEFAULTS = {
-        "theme": "dark", "font_size": 15, "accent": "cyan",
+        "theme": "dark", "font_size": 15, "accent": "theme",
         "density": "comfortable", "reduce_motion": False,
         "high_contrast": False, "completion_notifications": True,
         "export_dpi": 300, "presentation": False, "compact": False,
@@ -21,19 +22,24 @@ class SettingsPage(PageBase):
 
     def __init__(self, parent=None):
         super().__init__("Preferências", "Adapte a área de trabalho sem alterar os resultados dos experimentos.", parent)
-        self.theme = self._combo((('Escuro', 'dark'), ('Claro', 'light'), ('Automático · acompanhar o sistema', 'auto')))
-        self.accent = self._combo((('Ciano · Entrela', 'cyan'), ('Azul', 'blue'), ('Violeta', 'violet'), ('Verde', 'green')))
+        self.theme = self._combo(THEME_CHOICES)
+        self.accent = self._combo((('Padrão do tema', 'theme'), ('Ciano · Entrela', 'cyan'), ('Azul', 'blue'), ('Violeta', 'violet'), ('Verde', 'green')))
+        self.theme_description = QLabel()
+        self.theme_description.setWordWrap(True)
+        self.theme_description.setObjectName('FieldHint')
+        self.theme.currentIndexChanged.connect(self._describe_theme)
         self.density = self._combo((('Compacta', 'compact'), ('Confortável', 'comfortable'), ('Ampla', 'spacious')))
         self.font_size = QSpinBox()
         self.font_size.setRange(11, 24)
         self.font_size.setSuffix(' px')
         self.font_size.setToolTip('Tamanho base da interface. Títulos e textos auxiliares acompanham esta escala.')
         self.theme.setToolTip('O modo automático acompanha a preferência de cores informada pelo sistema operacional.')
+        self.accent.setToolTip('Padrão do tema usa o ciano do Grafite ou o azul dos temas Claro científico e Azul escuro. As demais opções personalizam o destaque.')
         self.density.setToolTip('Ajusta os espaços de botões, formulários e tabelas. Não altera a escala dos dados.')
         self.presentation = QCheckBox('Fonte maior e navegação compacta · F11 para tela cheia')
         self.compact = QCheckBox('Usar menu mais estreito, mantendo os nomes dos itens')
         self._card('Aparência', [
-            ('Tema', self.theme), ('Cor de destaque', self.accent),
+            ('Tema', self.theme), ('Sobre o tema', self.theme_description), ('Cor de destaque', self.accent),
             ('Tamanho do texto', self.font_size), ('Densidade', self.density),
             ('Navegação', self.compact), ('Apresentação', self.presentation),
         ])
@@ -82,6 +88,9 @@ class SettingsPage(PageBase):
             signal = widget.currentIndexChanged if isinstance(widget, QComboBox) else widget.valueChanged if isinstance(widget, QSpinBox) else widget.toggled
             signal.connect(lambda *_: self.appearance_changed.emit())
 
+    def _describe_theme(self, *_):
+        self.theme_description.setText(THEME_DESCRIPTIONS.get(self.theme.currentData(), THEME_DESCRIPTIONS['dark']))
+
     @staticmethod
     def _combo(items):
         combo = QComboBox()
@@ -124,3 +133,4 @@ class SettingsPage(PageBase):
             else:
                 widget.setChecked(value.lower() in ('true', '1', 'yes') if isinstance(value, str) else bool(value))
         del blockers
+        self._describe_theme()

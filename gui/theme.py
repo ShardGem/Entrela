@@ -10,29 +10,29 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Palette:
     # Superfícies
-    bg: str = "#0c1420"
-    bg_elevated: str = "#101b29"
-    surface: str = "#142131"
-    surface_hover: str = "#1c2d40"
-    surface_active: str = "#243a50"
+    bg: str = "#12171e"
+    bg_elevated: str = "#181f28"
+    surface: str = "#202a36"
+    surface_hover: str = "#293644"
+    surface_active: str = "#304451"
 
     # Bordas
-    border: str = "#293b50"
-    border_strong: str = "#61758c"
+    border: str = "#2e3b4b"
+    border_strong: str = "#62758a"
 
     # Acento
-    primary: str = "#58d6ff"
-    primary_hover: str = "#7ee0ff"
-    primary_pressed: str = "#3fb8e6"
-    primary_muted: str = "#0d2933"
-    primary_faint: str = "#0d2933"
+    primary: str = "#7ad7dd"
+    primary_hover: str = "#a3e6e9"
+    primary_pressed: str = "#59b9c3"
+    primary_muted: str = "#1b3940"
+    primary_faint: str = "#1b3940"
     primary_on: str = "#0a0a0b"
     text_on_primary: str = "#0a0a0b"
 
     # Texto
-    text: str = "#e7eef7"
-    text_muted: str = "#a0afc2"
-    text_dim: str = "#91a3ba"
+    text: str = "#e9eff6"
+    text_muted: str = "#b0bfd0"
+    text_dim: str = "#a2b4c7"
 
     # Semânticas
     success: str = "#4ade80"
@@ -41,11 +41,11 @@ class Palette:
     warning_bg: str = "#2a1e05"
     danger: str = "#fb7185"
     danger_bg: str = "#2a0e0c"
-    info: str = "#58d6ff"
-    info_bg: str = "#0d2933"
+    info: str = "#7ad7dd"
+    info_bg: str = "#1b3940"
 
     # Paleta quântica (compat)
-    q1: str = "#58d6ff"
+    q1: str = "#7ad7dd"
     q2: str = "#a78bfa"
     q3: str = "#22c55e"
     q4: str = "#f59e0b"
@@ -101,9 +101,10 @@ QLabel#HeroTitle {{ font-size: 32px; font-weight: 600; padding: 12px 0; }}
 QLabel#LeadText {{ color: {p.text_muted}; font-size: 14px; padding: 6px 0; }}
 QPushButton#HelpButton {{ padding: 0; min-width: 20px; min-height: 20px; }}
 QPushButton:focus, QPushButton#NavButton:focus, QPushButton#PrimaryButton:focus {{ border: 2px solid {p.text}; }}
-QTabWidget::pane {{ border: 1px solid {p.border}; }}
+QTabWidget::pane {{ border: none; }}
 QTabWidget#WorkbenchTabs::pane {{ border: none; }}
-QTabBar::tab {{ background: {p.surface}; padding: 10px 16px; color: {p.text_muted}; }}
+QTabBar::tab {{ background: transparent; padding: 10px 16px; color: {p.text_muted}; }}
+QTabBar::tab:hover {{ background: {p.surface_hover}; }}
 QTabBar::tab:selected {{ color: {p.primary}; border-bottom: 2px solid {p.primary}; }}
 QListWidget {{ background: {p.surface}; border: 1px solid {p.border}; padding: 8px; }}
 QListWidget::item {{ padding: 10px; }}
@@ -187,7 +188,7 @@ QFrame#Topbar {{
 
 QLabel#TopbarTitle {{
     color: {p.text};
-    font-size: 14px;
+    font-size: 18px;
     font-weight: 600;
 }}
 
@@ -213,13 +214,16 @@ QLabel#PageSubtitle {{
 
 /* ============ CARD ============ */
 QFrame#Card {{
-    background-color: {p.surface};
-    border: 1px solid {p.border};
-    border-radius: {RADIUS.lg}px;
+    background-color: {p.bg_elevated};
+    border: none;
+    border-radius: {RADIUS.md}px;
 }}
 
-QFrame#IdentityCard, QFrame#SectionCard {{
-    background-color: {p.surface}; border: 1px solid {p.border}; border-radius: {RADIUS.md}px;
+QFrame#SectionCard {{
+    background-color: {p.bg_elevated}; border: none; border-radius: {RADIUS.md}px;
+}}
+QFrame#IdentityCard {{
+    background: transparent; border: none; border-bottom: 1px solid {p.border}; border-radius: 0;
 }}
 QToolButton#SectionToggle {{
     background: transparent; border: none; text-align: left; font-weight: 600; font-size: 14px;
@@ -531,4 +535,9 @@ QProgressBar::chunk {{
     background-color: {p.primary};
     border-radius: 2px;
 }}
+
+/* Após os estilos específicos para o foco não ser ocultado por eles. */
+QPushButton:focus, QPushButton#PrimaryButton:focus, QPushButton#GhostButton:focus,
+QPushButton#SecondaryButton:focus, QPushButton#NavButton:focus,
+QPushButton#NavGroup:focus, QPushButton#ConfigStep:focus {{ border: 2px solid {p.text}; }}
 """

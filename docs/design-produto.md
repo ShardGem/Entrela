@@ -47,7 +47,7 @@ Animações de 120–180 ms, respeitando redução de movimento. Contraste deve 
 | CircuitInspector | Porta selecionável, qubits, camada, parâmetros e origem quando conhecida |
 | EmptyState | Explicação da área e ação útil; não inventa registros |
 | ErrorPanel | Causa conhecida, correção concreta e detalhes técnicos expansíveis sem credenciais |
-| CommandPalette | Ctrl+K; comandos e glossário pesquisáveis; Esc fecha e devolve foco |
+| Busca de recursos | Botão Buscar; comandos e glossário pesquisáveis; Esc fecha e devolve foco |
 
 ## Mapa de telas
 

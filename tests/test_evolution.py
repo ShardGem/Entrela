@@ -233,7 +233,7 @@ def test_preferences_theme_and_restart(window, qt_app):
     window.page_settings.font_size.setValue(15)
     window.page_bloch.speed_combo.setCurrentText("2x")
     window.page_bloch.loop.setChecked(True)
-    assert PALETTE.bg == "#f3f6fb"
+    assert PALETTE.bg == "#f2f5f8"
     repo, settings = window.repository, window.settings
     window.close()
     other = MainWindow(repo, settings)

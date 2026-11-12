@@ -37,7 +37,7 @@ def test_live_appearance_roundtrip_has_no_accumulated_typographic_scaling(qt_app
         assert 'font-size: 18px' in label.styleSheet()
         apply_appearance(window, 'dark', 15)
         assert 'font-size: 15px' in label.styleSheet()
-        assert PALETTE.primary == '#58d6ff'
+        assert PALETTE.primary == '#7ad7dd'
         assert resolve_theme('auto') in ('dark', 'light')
     finally:
         apply_appearance(window)
@@ -100,7 +100,7 @@ def test_rendered_table_alternate_rows_keep_readable_contrast(qt_app):
     window.resize(400, 240)
     window.show()
     try:
-        for theme, high_contrast in [('dark', False), ('light', False), ('dark', True), ('light', True)]:
+        for theme, high_contrast in [(theme, contrast) for theme in ('dark', 'light', 'navy') for contrast in (False, True)]:
             apply_appearance(window, theme, high_contrast=high_contrast)
             qt_app.processEvents()
             image = table.viewport().grab().toImage()

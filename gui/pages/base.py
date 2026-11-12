@@ -69,6 +69,11 @@ class PageBase(QWidget):
     def body(self) -> QVBoxLayout:
         return self._body
 
+    def use_window_heading(self):
+        """O título fica na barra comum; preserva descrição e ações locais."""
+        self._title.hide()
+        self._header.layout().setContentsMargins(20, 10, 20, 8)
+
     def set_title(self, title: str, subtitle: str = ""):
         self._title.setText(title)
         self._subtitle.setText(subtitle)

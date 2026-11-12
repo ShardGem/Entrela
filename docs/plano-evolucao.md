@@ -6,6 +6,8 @@ Não é necessário refazer o que já existe. O Entrela já possui simulação i
 
 Na versão 0.21, o histórico ganhou consulta gráfica de circuitos sem edição, compartilhando o componente do laboratório. O item 16 foi concluído, e o item 17 passou a utilizar renderizadores científicos comuns para distribuições, estudos e métricas. As escolhas de séries dos relatórios continuam seguindo o perfil de exportação; ampliar essa personalização permanece no plano.
 
+Na versão 0.22, a revisão visual contínua ganha três estilos compartilhados: Grafite (padrão), Claro científico e Azul escuro. Títulos repetidos e contornos foram reduzidos, e as métricas de Resultados se adaptam ao espaço e à escala de texto. A [galeria comparativa](galeria-interface.html) e o [guia da interface](interface-0.22.md) registram o que foi implementado e a sequência de organização da simulação, área 3D, gráficos e preferências. Essa etapa não conclui a reorganização de todos os fluxos.
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |

@@ -7,46 +7,10 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget, QAbstractButton, QTextBrowser, QTableView, QLayout
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.colors import to_hex
-from gui.theme import PALETTE, Palette, build_qss
+from gui.theme import PALETTE, build_qss
+from gui.palettes import DARK, LIGHT, NAVY, THEMES
 from gui.icons import get_icon
 from gui.widgets.data_table import table_row_height
-
-DARK = asdict(Palette())
-LIGHT = {
-    **DARK,
-    "bg": "#f3f6fb",
-    "bg_elevated": "#ffffff",
-    "surface": "#ffffff",
-    "surface_hover": "#e7eef7",
-    "surface_active": "#dce8f5",
-    "border": "#d1dce9",
-    "border_strong": "#8093ac",
-    "primary": "#006e96",
-    "primary_hover": "#005779",
-    "primary_pressed": "#00415c",
-    "primary_muted": "#d8eff9",
-    "primary_faint": "#d8eff9",
-    "primary_on": "#ffffff",
-    "text_on_primary": "#ffffff",
-    "text": "#172b46",
-    "text_muted": "#49617d",
-    "text_dim": "#526b88",
-    "success": "#11763f",
-    "success_bg": "#e0f4e8",
-    "warning": "#925400",
-    "warning_bg": "#fff0ce",
-    "danger": "#bb293e",
-    "danger_bg": "#ffe7eb",
-    "info": "#006e96",
-    "info_bg": "#d8eff9",
-    "q1": "#006e96",
-    "q2": "#7043c5",
-    "q3": "#11763f",
-    "q4": "#925400",
-    "q5": "#bb293e",
-    "q6": "#2258bc",
-}
-
 
 ACCENTS = {
     "cyan": (("#58d6ff", "#7ee0ff", "#3fb8e6", "#0d2933"), ("#006e96", "#005779", "#00415c", "#d8eff9")),
@@ -59,7 +23,7 @@ ACCENTS = {
 def resolve_theme(theme):
     """Resolve the system preference without changing experiment data."""
     if theme != "auto":
-        return "light" if theme == "light" else "dark"
+        return theme if theme in THEMES else "dark"
     app = QApplication.instance()
     return "light" if app and app.styleHints().colorScheme() == Qt.ColorScheme.Light else "dark"
 
@@ -90,19 +54,20 @@ def _rich_text_template(html, default_font, dpi, names):
     return re.sub(r'#[0-9a-fA-F]{6}', lambda match: '@' + names[match[0].lower()] + '@' if match[0].lower() in names else '@primary@' if match[0].lower() == '#0000ff' else match[0], html)
 
 
-def apply_appearance(window, theme="dark", font_size=15, *, accent="cyan", density="comfortable", reduce_motion=False, high_contrast=False):
+def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", density="comfortable", reduce_motion=False, high_contrast=False):
     theme = resolve_theme(theme)
     before = asdict(PALETTE)
-    after = dict(LIGHT if theme == "light" else DARK)
-    primary, hover, pressed, muted = ACCENTS.get(accent, ACCENTS["cyan"])[theme == "light"]
-    after.update(primary=primary, primary_hover=hover, primary_pressed=pressed,
-                 primary_muted=muted, primary_faint=muted)
+    after = dict(THEMES[theme])
+    if accent in ACCENTS:
+        primary, hover, pressed, muted = ACCENTS[accent][theme == "light"]
+        after.update(primary=primary, primary_hover=hover, primary_pressed=pressed,
+                     primary_muted=muted, primary_faint=muted)
     if high_contrast:
-        after.update(text="#ffffff" if theme == "dark" else "#000000",
-                     text_muted="#d7e0ed" if theme == "dark" else "#263b53",
-                     text_dim="#c1d0e1" if theme == "dark" else "#334d69",
-                     border="#8295ad" if theme == "dark" else "#657a92",
-                     border_strong="#b6c6da" if theme == "dark" else "#3d536e")
+        after.update(text="#ffffff" if theme != "light" else "#000000",
+                     text_muted="#d7e0ed" if theme != "light" else "#263b53",
+                     text_dim="#c1d0e1" if theme != "light" else "#334d69",
+                     border="#8295ad" if theme != "light" else "#657a92",
+                     border_strong="#b6c6da" if theme != "light" else "#3d536e")
     app = QApplication.instance()
     if app:
         app.setProperty("entrelaReduceMotion", bool(reduce_motion))

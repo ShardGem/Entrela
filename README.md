@@ -12,6 +12,16 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Três estilos e base visual compartilhada — 0.22
+
+- **Preferências → Aparência → Tema** oferece Grafite, Claro científico e Azul escuro. Grafite é o padrão; o modo automático alterna entre Grafite e Claro conforme o sistema.
+- **Padrão do tema** aplica a cor de destaque de cada estilo. As personalizações e preferências anteriores continuam válidas.
+- Painéis com contornos mais discretos, abas mais leves e título concentrado na barra superior, preservando descrições e ações locais.
+- Métricas de Resultados em quatro, duas ou uma coluna conforme o espaço e o tamanho do texto.
+- Splash, navegação com nomes e funções científicas preservadas.
+
+Consulte a [galeria dos três estilos](docs/galeria-interface.html) e o [guia com capturas, limites e próximos refinamentos](docs/interface-0.22.md). Para usar a galeria localmente, abra o arquivo HTML da pasta `docs` no navegador.
+
 ## Circuitos no histórico e caderno simplificado — 0.21
 
 - **Histórico → Visualizar → Circuito** apresenta o diagrama gráfico em modo de consulta: seleção de operações, explicações, parâmetros, zoom, navegação por teclado e exportação SVG.

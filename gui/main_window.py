@@ -226,6 +226,7 @@ class MainWindow(QMainWindow):
         self.page_simulation._header.hide()
         self.stack.addWidget(self.page_workspace)
         for key, page in self.pages.items():
+            page.use_window_heading()
             if key not in WORKSPACE_PAGES:
                 self.stack.addWidget(page)
         self.setStatusBar(QStatusBar())

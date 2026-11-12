@@ -1,9 +1,9 @@
 """Card e componentes relacionados."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent, QTimer
 from PySide6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget, QPushButton
+    QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QWidget, QPushButton
 )
 
 from gui.icons import get_pixmap
@@ -53,7 +53,7 @@ class MetricCard(QFrame):
         self._accent = accent
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(6)
 
         self._label = QLabel(label.upper())
@@ -87,6 +87,48 @@ class MetricCard(QFrame):
     def set_value(self, value: str, unit: str = ""):
         self._value.setText(value)
         self._unit.setText(unit)
+
+
+class MetricGrid(QWidget):
+    """Distribui métricas em 4, 2 ou 1 colunas conforme espaço e tipografia."""
+
+    def __init__(self, cards, parent=None):
+        super().__init__(parent)
+        self.cards = tuple(cards)
+        self._columns = 0
+        self._grid = QGridLayout(self)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setSpacing(16)
+        self._reflow_timer = QTimer(self)
+        self._reflow_timer.setSingleShot(True)
+        self._reflow_timer.setInterval(0)
+        self._reflow_timer.timeout.connect(self._reflow)
+        self._reflow()
+
+    def _reflow(self):
+        card_width = max(200, self.fontMetrics().horizontalAdvance('Fidelidade ao circuito') + 48)
+        gap = self._grid.spacing()
+        columns = next((n for n in (4, 2, 1)
+                        if self.width() >= n * card_width + (n - 1) * gap), 1)
+        if columns == self._columns:
+            return
+        while self._grid.count():
+            self._grid.takeAt(0)
+        for column in range(4):
+            self._grid.setColumnStretch(column, 1 if column < columns else 0)
+        for index, card in enumerate(self.cards):
+            self._grid.addWidget(card, index // columns, index % columns)
+        self._columns = columns
+        self.updateGeometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow_timer.start()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, '_reflow_timer'):
+            self._reflow_timer.start()
 
 
 class EmptyState(QWidget):

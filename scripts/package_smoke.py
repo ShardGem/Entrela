@@ -34,6 +34,12 @@ assert not splash.logo.pixmap.isNull()
 assert not splash.text.pixmap().isNull()
 window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
 window.show();app.processEvents()
+for theme in ('dark','light','navy'):
+    choice=window.page_settings.theme.findData(theme)
+    assert choice>=0
+    window.page_settings.theme.setCurrentIndex(choice)
+    app.processEvents()
+    assert window.property('entrelaTheme')==theme
 for key in window.page_workspace.KEYS:
     window._show_page(key)
     assert window.stack.currentWidget() is window.page_workspace
@@ -71,6 +77,7 @@ assert prepared.preview.experiments==2
 assert prepared.commit()=={'appearance/theme':'dark'}
 assert ExperimentRepository('restored-data').load(exp.id).result.counts==exp.result.counts
 reopened=MainWindow(window.repository,window.settings)
+assert reopened.page_settings.theme.currentData()=='navy'
 assert reopened.page_circuit.editor.document==custom.config.circuit
 assert reopened.page_circuit.editor.circuit_name.text()=='Recovered packaged circuit'
 reopened.close();splash.close();app.processEvents()
