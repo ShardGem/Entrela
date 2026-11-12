@@ -12,6 +12,41 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Interface e galeria em alta resolução — 0.23
+
+- Gráficos dimensionados pela aba aberta, com organização vertical em janelas menores.
+- Configuração guiada com menos cabeçalhos repetidos e mais espaço para preencher os parâmetros.
+- Cena 3D com câmera recolhível e detalhes de etapa, qubits e métricas em uma seção expansível. As escolhas dos painéis são lembradas entre sessões.
+- Capturas PNG nativas em **3840 × 2160**, organizadas por módulo, com índice, hashes e cenários realmente executados.
+
+**[Abrir a galeria completa das 14 áreas](docs/screenshots/0.23.0/README.md)** · [Ajustes, validação e limites](docs/interface-0.23.md)
+
+[![Simulação de quatro qubits e referência ideal na esfera de Bloch](docs/screenshots/0.23.0/04-resultados/bloch-cena.png)](docs/screenshots/0.23.0/04-resultados/bloch-cena.png)
+
+<details>
+<summary>Configuração, circuitos e resultados</summary>
+
+![Configuração da simulação com prévia e parâmetros](docs/screenshots/0.23.0/03-laboratorio/04-configurar-ruido.png)
+
+![Editor de circuitos e biblioteca de portas](docs/screenshots/0.23.0/03-laboratorio/08-editor.png)
+
+![Distribuições e evolução da simulação](docs/screenshots/0.23.0/04-resultados/resultados-graficos.png)
+
+</details>
+
+<details>
+<summary>Pesquisa, comparações e histórico</summary>
+
+![Mapa de calor calculado a partir da varredura de parâmetros](docs/screenshots/0.23.0/05-pesquisa/resultado-mapa-calor.png)
+
+![Comparação de estados de Bloch de duas execuções](docs/screenshots/0.23.0/05-pesquisa/comparacao-bloch.png)
+
+![Consulta gráfica do circuito no histórico](docs/screenshots/0.23.0/06-acervo/historico-circuito.png)
+
+</details>
+
+As imagens documentam simulações computacionais para demonstrar a interface. As configurações, sementes e estudos utilizados estão na pasta da galeria; não constituem resultados experimentais do TCC.
+
 ## Três estilos e base visual compartilhada — 0.22
 
 - **Preferências → Aparência → Tema** oferece Grafite, Claro científico e Azul escuro. Grafite é o padrão; o modo automático alterna entre Grafite e Claro conforme o sistema.

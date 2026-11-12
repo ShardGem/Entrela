@@ -362,6 +362,8 @@ class ConfigPanel(QWidget):
                 self.current_mode == "advanced" or key == self.current_section
             )
             widget.set_collapsible(not guided)
+            # A etapa já é identificada pelo seletor do modo guiado.
+            widget.header.setVisible(not guided)
             if guided and key == self.current_section:
                 widget.set_expanded(True,animate=False)
             widget.summary.setVisible(not guided and bool(widget.summary.text()))

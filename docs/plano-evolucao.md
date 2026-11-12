@@ -8,6 +8,8 @@ Na versão 0.21, o histórico ganhou consulta gráfica de circuitos sem edição
 
 Na versão 0.22, a revisão visual contínua ganha três estilos compartilhados: Grafite (padrão), Claro científico e Azul escuro. Títulos repetidos e contornos foram reduzidos, e as métricas de Resultados se adaptam ao espaço e à escala de texto. A [galeria comparativa](galeria-interface.html) e o [guia da interface](interface-0.22.md) registram o que foi implementado e a sequência de organização da simulação, área 3D, gráficos e preferências. Essa etapa não conclui a reorganização de todos os fluxos.
 
+Na versão 0.23, o dimensionamento das abas passa a considerar o conteúdo aberto, os gráficos se empilham em janelas menores e o modo guiado recupera espaço para os campos. A área 3D agrupa detalhes e permite recolher a câmera, preservando a etapa e a disposição escolhida. A [galeria em alta resolução](screenshots/0.23.0/README.md) documenta as 14 áreas e as principais abas com simulações executadas. A revisão visual continua; preferências de disposição dos demais painéis e melhorias de tabelas extensas permanecem no plano.
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |

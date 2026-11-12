@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QLabel, QMenu, QTabWidget, QVBoxLayout, QWidget
 
 from gui.widgets.button import SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
+from gui.widgets.content_tabs import ContentTabs
 
 
 class ExperimentWorkspace(QWidget):
@@ -104,7 +105,7 @@ class ExperimentWorkspace(QWidget):
         tools.addWidget(self.selected_label)
         root.addWidget(self.toolbar)
 
-        self.tabs = QTabWidget()
+        self.tabs = ContentTabs()
         self.tabs.setObjectName("WorkbenchTabs")
         self.tabs.setDocumentMode(True)
         self.tabs.setUsesScrollButtons(True)

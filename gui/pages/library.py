@@ -7,6 +7,7 @@ from gui.pages.base import PageBase
 from gui.widgets.button import SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.collapsible import CollapsibleSection
+from gui.widgets.content_tabs import ContentTabs
 
 
 class LibraryPage(PageBase):
@@ -33,7 +34,7 @@ class LibraryPage(PageBase):
         self.select_execution.setToolTip("Abra uma execução do histórico para nomear seus resultados e registrar sua interpretação.")
         self.select_execution.clicked.connect(lambda: self.navigation_requested.emit("history"))
         self.add_action(self.select_execution)
-        self.tabs = QTabWidget()
+        self.tabs = ContentTabs()
         self.body().addWidget(self.tabs, 1)
 
         self.annotation_group = QWidget()

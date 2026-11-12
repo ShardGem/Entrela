@@ -1575,6 +1575,10 @@ class MainWindow(QMainWindow):
         page.loop.setChecked(self.settings.value("bloch/loop", False, type=bool))
         page.trails.setChecked(self.settings.value("bloch/trails", True, type=bool))
         del blockers
+        try:
+            page.apply_view_preferences(json.loads(self.settings.value('bloch/view', '{}')))
+        except (ValueError, TypeError):
+            page.apply_view_preferences({})
         blocker = QSignalBlocker(page)
         page._update_speed(page.speed_combo.currentText())
         del blocker
@@ -1599,6 +1603,7 @@ class MainWindow(QMainWindow):
         self.settings.setValue("bloch/speed", page.speed_combo.currentText())
         self.settings.setValue("bloch/loop", page.loop.isChecked())
         self.settings.setValue("bloch/trails", page.trails.isChecked())
+        self.settings.setValue('bloch/view', json.dumps(page.collect_view_preferences()))
         if page.precomputed_bloch:
             self.settings.setValue("bloch/focus", page.focus_combo.currentData())
 

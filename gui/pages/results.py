@@ -12,6 +12,7 @@ from gui.widgets.card import MetricCard, MetricGrid
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.tabs.results_tab import ResultsTab
 from gui.widgets.state_inspector import StateInspector
+from gui.widgets.content_tabs import ContentTabs
 from core.export import result_interpretation
 from core.reproduction import scientific_context
 from data.workspace import experiment_title
@@ -48,7 +49,7 @@ class ResultsPage(PageBase):
         self.reproduction_status = QLabel()
         self.reproduction_status.setWordWrap(True)
         self.body().addWidget(self.reproduction_status)
-        self.tabs = QTabWidget()
+        self.tabs = ContentTabs()
         self.results_tab = ResultsTab()
         self.interpretation = QLabel("A interpretação aparecerá após uma execução.")
         self.interpretation.setWordWrap(True)

@@ -14,6 +14,7 @@ from gui.pages.base import PageBase
 from gui.widgets.plot_canvas import MplCanvas,style_axes
 from gui.theme import PALETTE
 from gui.widgets.data_table import configure_table
+from gui.widgets.content_tabs import ContentTabs
 
 
 from core.comparison import incompatibility
@@ -64,7 +65,7 @@ class ComparisonPage(PageBase):
         self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         configure_table(self.metrics_table)
         self.body().addWidget(self.metrics_table)
-        self.tabs=QTabWidget()
+        self.tabs=ContentTabs()
         self.canvas = MplCanvas()
         hist=QWidget()
         layout=QVBoxLayout(hist)

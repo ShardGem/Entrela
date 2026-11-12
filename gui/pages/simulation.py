@@ -303,6 +303,7 @@ class SimulationPage(PageBase):
     def _update_actions(self):
         self.btn_run.setEnabled(not self._running and self._valid)
         self.btn_cancel.setEnabled(self._running)
+        self.configuration_feedback.setVisible(not (self._compact and self._valid and not self._running))
 
     def _review_error(self):
         if self._compact:
@@ -357,6 +358,7 @@ class SimulationPage(PageBase):
         if compact == self._compact:
             return
         self._compact = compact
+        self._update_actions()
         if compact:
             self.splitter.hide()
             self.compact_tabs.addTab(self.config_panel,"Parâmetros")

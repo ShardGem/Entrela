@@ -103,6 +103,7 @@ QPushButton#HelpButton {{ padding: 0; min-width: 20px; min-height: 20px; }}
 QPushButton:focus, QPushButton#NavButton:focus, QPushButton#PrimaryButton:focus {{ border: 2px solid {p.text}; }}
 QTabWidget::pane {{ border: none; }}
 QTabWidget#WorkbenchTabs::pane {{ border: none; }}
+QTabBar {{ qproperty-drawBase: false; }}
 QTabBar::tab {{ background: transparent; padding: 10px 16px; color: {p.text_muted}; }}
 QTabBar::tab:hover {{ background: {p.surface_hover}; }}
 QTabBar::tab:selected {{ color: {p.primary}; border-bottom: 2px solid {p.primary}; }}

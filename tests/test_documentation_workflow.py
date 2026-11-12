@@ -86,6 +86,8 @@ def test_comparison_disables_timeline_when_one_source_has_no_snapshots(window):
 
 def test_gif_export_worker_keeps_event_loop_responsive(window,tmp_path,monkeypatch):
     from gui.main_window import QFileDialog
+    from gui.workers import documentation_worker
+    from threading import Event
     window.page_simulation.config_panel.load_config(replace(create_example_config("bell"),shots=32))
     source=execute(window)
     page=window.page_documentation
@@ -93,14 +95,32 @@ def test_gif_export_worker_keeps_event_loop_responsive(window,tmp_path,monkeypat
     page.frame_ms.setValue(200)
     destination=tmp_path/"evolution.gif"
     monkeypatch.setattr(QFileDialog,"getSaveFileName",lambda *a:(str(destination),"GIF (*.gif)"))
+    # A exportação pode terminar em menos de três intervalos. Mantenha o
+    # trabalho pendente até a própria interface confirmar três eventos.
+    started, release = Event(), Event()
+    export = documentation_worker.export_animation
+    def controlled_export(*args, **kwargs):
+        started.set()
+        if not release.wait(5):
+            raise RuntimeError('A interface deixou de processar eventos durante a exportação.')
+        return export(*args, **kwargs)
+    monkeypatch.setattr(documentation_worker, 'export_animation', controlled_export)
     ticks=[]
     timer=QTimer(window)
     timer.setInterval(20)
-    timer.timeout.connect(lambda:ticks.append(1))
+    def tick():
+        if started.is_set():
+            ticks.append(1)
+            if len(ticks) >= 3:
+                release.set()
+    timer.timeout.connect(tick)
     timer.start()
     window._export_documentation("gif")
-    wait_until(lambda:window._current_worker is None,timeout=30000)
-    timer.stop()
+    try:
+        wait_until(lambda:window._current_worker is None,timeout=30000)
+    finally:
+        release.set()
+        timer.stop()
     assert destination.read_bytes().startswith(b"GIF")
     assert len(ticks)>2
     assert window._current_experiment is source

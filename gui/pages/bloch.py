@@ -31,6 +31,8 @@ from gui.widgets.bloch_controls import BlochCameraPanel
 from gui.widgets.snapshot_metrics import SnapshotMetrics
 from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.state_inspector import StateInspector
+from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.collapsible import CollapsibleSection
 from PySide6.QtGui import QShortcut, QKeySequence
 
 
@@ -103,6 +105,7 @@ class BlochPage(PageBase):
         self.times = None
         self._refreshing = False
         self._maximized = False
+        self._camera_auto = True
         self.time_unit = "adimensional (ℏ=1)"
         self.timer = QTimer(self)
         self.timer.setInterval(350)
@@ -116,14 +119,15 @@ class BlochPage(PageBase):
         self._content = QWidget()
         layout = QVBoxLayout(self._content)
         controls = FlowLayout()
-        self.btn_play = PrimaryButton("Iniciar")
+        self.btn_play = PrimaryButton("Reproduzir")
         self.btn_play.clicked.connect(self._toggle_play)
-        self.btn_stop = GhostButton("Parar")
+        self.btn_stop = GhostButton("Reiniciar")
+        self.btn_stop.setToolTip("Volta ao primeiro snapshot; a câmera mantém sua posição.")
         self.btn_stop.clicked.connect(self._stop)
-        self.btn_prev = GhostButton("‹")
+        self.btn_prev = GhostButton("Anterior")
         self.btn_prev.setToolTip("Snapshot anterior")
         self.btn_prev.clicked.connect(self._prev)
-        self.btn_next = GhostButton("›")
+        self.btn_next = GhostButton("Próximo")
         self.btn_next.setToolTip("Próximo snapshot")
         self.btn_next.clicked.connect(self._next)
         self.speed_combo = QComboBox()
@@ -148,6 +152,14 @@ class BlochPage(PageBase):
         self.maximize_button.setCheckable(True)
         self.maximize_button.toggled.connect(self.set_maximized)
         controls.addWidget(self.maximize_button)
+        self.camera_toggle = GhostButton("Câmera e visualização")
+        self.camera_toggle.setCheckable(True)
+        self.camera_toggle.setChecked(True)
+        self.camera_toggle.setToolTip("Mostrar ou recolher zoom, foco dos qubits, projeção e opções de visualização.")
+        self.camera_toggle.setAccessibleName("Mostrar controles da câmera e visualização")
+        self.camera_toggle.clicked.connect(self._camera_chosen)
+        self.camera_toggle.toggled.connect(lambda *_: self._visual_mode_changed(self.visual_tabs.currentIndex()))
+        controls.addWidget(self.camera_toggle)
         controls.add_group(QLabel("Velocidade"), self.speed_combo)
         controls.addWidget(self.loop)
         layout.addLayout(controls)
@@ -172,7 +184,7 @@ class BlochPage(PageBase):
         self.probabilities_canvas = MplCanvas(height=4)
         self.probabilities_canvas.mpl_connect("motion_notify_event", self._hover_probability)
         self.probabilities_canvas.mpl_connect("figure_leave_event", self._hover_probability)
-        self.visual_tabs = QTabWidget()
+        self.visual_tabs = ContentTabs()
         self.visual_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.visual_tabs.setUsesScrollButtons(True)
         self.visual_tabs.setElideMode(Qt.ElideRight)
@@ -214,7 +226,10 @@ class BlochPage(PageBase):
         self.timeline_detail.setMaximumHeight(115)
         self.timeline_detail.setAccessibleName("Transformação e estados do snapshot")
         self.timeline_detail.setPlaceholderText("Carregue um experimento para inspecionar as etapas.")
-        layout.addWidget(self.timeline_detail)
+        self.details_section = CollapsibleSection("Etapa, qubits e métricas", expanded=False)
+        self.details_section.set_summary("Consulte a transformação, os estados locais e as métricas do instante selecionado.")
+        self.details_section.expanded_changed.connect(lambda *_: self.preferences_changed.emit())
+        self.details_section.content_layout.addWidget(self.timeline_detail)
         self._info_container = QWidget()
         QGridLayout(self._info_container)
         self._qubit_panels = []
@@ -223,17 +238,18 @@ class BlochPage(PageBase):
         info_scroll.setWidgetResizable(True)
         info_scroll.setWidget(self._info_container)
         info_scroll.setFixedHeight(145)
-        layout.addWidget(info_scroll)
+        self.details_section.content_layout.addWidget(info_scroll)
         note = QLabel(
             "Pureza local baixa pode indicar correlações/emaranhamento: em Bell ideal, cada qubit tem pureza ½. A linha tracejada representa o mesmo circuito sem ruído."
         )
         note.setWordWrap(True)
-        layout.addWidget(note)
+        self.details_section.content_layout.addWidget(note)
         self.scene_note = note
         self.metrics = SnapshotMetrics()
         self.metrics.analyze_requested.connect(self.temporal_requested.emit)
         self.metrics.snapshot_selected.connect(self.slider.setValue)
-        layout.addWidget(self.metrics)
+        self.details_section.content_layout.addWidget(self.metrics)
+        layout.addWidget(self.details_section)
         escape = QShortcut(QKeySequence("Esc"), self)
         escape.setContext(Qt.WidgetWithChildrenShortcut)
         escape.activated.connect(lambda: self.set_maximized(False))
@@ -247,7 +263,8 @@ class BlochPage(PageBase):
 
     def _visual_mode_changed(self, index):
         global_state = self.visual_tabs.widget(index) is self.state_inspector
-        self.camera_scroll.setVisible(not global_state and not self._maximized)
+        self.camera_scroll.setVisible(not global_state and not self._maximized and self.camera_toggle.isChecked())
+        self.camera_toggle.setVisible(not global_state and not self._maximized)
         self.selection_label.setVisible(not global_state)
         self.maximize_button.setText("Restaurar painéis" if self._maximized else
                                      "Ampliar visualização" if global_state else "Ampliar área 3D")
@@ -262,6 +279,32 @@ class BlochPage(PageBase):
         width = max(235, self.camera_panel.minimumSizeHint().width()+24)
         self.camera_scroll.setMinimumWidth(width)
         self.camera_scroll.setMaximumWidth(width)
+        if self._camera_auto:
+            self.camera_toggle.setChecked(self.width() >= 1100 * max(1, self.font().pixelSize() / 15))
+        self._visual_mode_changed(self.visual_tabs.currentIndex())
+
+    def _camera_chosen(self, *_):
+        self._camera_auto = False
+        self.preferences_changed.emit()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_camera_layout_timer'):
+            self._camera_layout_timer.start()
+
+    def collect_view_preferences(self):
+        return {'camera': 'auto' if self._camera_auto else self.camera_toggle.isChecked(),
+                'details': self.details_section.is_expanded}
+
+    def apply_view_preferences(self, mapping):
+        mapping = mapping if isinstance(mapping, dict) else {}
+        camera = mapping.get('camera', 'auto')
+        self._camera_auto = type(camera) is not bool
+        blockers = [QSignalBlocker(self.camera_toggle), QSignalBlocker(self.details_section)]
+        self.camera_toggle.setChecked(camera if type(camera) is bool else True)
+        self.details_section.set_expanded(mapping.get('details') is True, animate=False)
+        del blockers
+        self.refresh_theme()
 
     def load_statevectors(
         self,
@@ -566,7 +609,7 @@ class BlochPage(PageBase):
     def _pause(self):
         self.timer.stop()
         self.playing = False
-        self.btn_play.setText("Iniciar")
+        self.btn_play.setText("Reproduzir")
 
     def _toggle_play(self):
         if self.playing:
@@ -625,6 +668,7 @@ class BlochPage(PageBase):
         )
         for widget in (
             self._header,
+            self.details_section,
             self.camera_scroll,
             self.info_scroll,
             self.scene_note,

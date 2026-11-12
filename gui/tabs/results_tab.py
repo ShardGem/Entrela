@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
+from PySide6.QtCore import QEvent, QTimer
 
 
 class ResultsTab(QWidget):
@@ -18,6 +19,11 @@ class ResultsTab(QWidget):
         self._time_unit = "Tempo (adimensional, ℏ=1)"
         self._manual_states = set()
         layout = QHBoxLayout(self)
+        self._panes = layout
+        self._layout_timer = QTimer(self)
+        self._layout_timer.setSingleShot(True)
+        self._layout_timer.setInterval(0)
+        self._layout_timer.timeout.connect(self._arrange_panes)
         self.canvas_hist = MplCanvas(self)
         self.canvas_evol = MplCanvas(self)
         self.hist_measure = QComboBox()
@@ -54,6 +60,23 @@ class ResultsTab(QWidget):
             layout.addWidget(pane, 1)
         self.canvas_hist.set_value_lookup(self._histogram_value)
         self.canvas_evol.set_value_lookup(self._evolution_value)
+
+    def _arrange_panes(self):
+        # Uma coluna preserva a leitura dos eixos quando o texto é ampliado.
+        wide = self.width() >= 860 * max(1, self.font().pixelSize() / 15)
+        direction = QHBoxLayout.LeftToRight if wide else QHBoxLayout.TopToBottom
+        if self._panes.direction() != direction:
+            self._panes.setDirection(direction)
+            self.updateGeometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._layout_timer.start()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, '_layout_timer'):
+            self._layout_timer.start()
 
     def exibir_histograma(self, counts, titulo="Distribuição observada"):
         self._counts = dict(counts or {})
