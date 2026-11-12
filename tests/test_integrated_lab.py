@@ -29,7 +29,8 @@ def test_navigation_uses_existing_pages_and_keeps_independent_drafts(window, qt_
     workspace.tabs.setCurrentIndex(0)
     assert window._current_page == 'simulation'
     window._show_page('history')
-    assert window.stack.currentWidget() is window.page_history
+    assert window.stack.currentWidget() is window.section_workspaces['history']
+    assert window.is_page_active('history')
     window._show_page('circuit')
     assert workspace.tabs.currentWidget() is window.page_circuit
     assert window.page_circuit.editor.document == document
@@ -100,8 +101,11 @@ def test_saved_configuration_menu_uses_existing_draft_protection(window, monkeyp
     assert window.is_page_active('simulation')
     assert window._current_worker is None
     window.page_workspace.templates_menu.actions()[-1].trigger()
-    assert window.is_page_active('library')
-    assert window.page_library.tabs.currentWidget() is window.page_library.templates_group
+    assert window.is_page_active('simulation')
+    assert window.configuration_dialog.isVisible()
+    assert window.page_library.templates_group.isVisible()
+    assert window.configuration_dialog.isAncestorOf(window.page_library.templates_group)
+    window.configuration_dialog.close()
 
 
 def test_recent_execution_menu_preserves_identity_and_notebook_link(window):

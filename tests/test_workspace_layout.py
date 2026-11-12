@@ -123,10 +123,10 @@ def test_bloch_folding_and_saved_layout_keep_snapshot_and_camera(window, qt_app)
     page.camera_toggle.click()
     page.details_section.header.click()
     settle(qt_app)
-    assert page.camera_scroll.isHidden()
+    assert not page.camera_scroll.isVisible()
     assert page.details_section.is_expanded
     stored = json.loads(window.settings.value('bloch/view'))
-    assert stored == {'camera': False, 'details': True}
+    assert stored == {'camera': False, 'details': True, 'inspector': 0}
     page.set_maximized(True)
     page.set_maximized(False)
     window.resize(1024, 768)
@@ -135,7 +135,7 @@ def test_bloch_folding_and_saved_layout_keep_snapshot_and_camera(window, qt_app)
     assert page.current_frame == 2
     assert page.canvas.camera_state() == before_camera
     np.testing.assert_array_equal(experiment.result.states[2].data, before_state)
-    assert page.camera_scroll.isHidden()
+    assert not page.camera_scroll.isVisible()
     window.close()
     other = MainWindow(window.repository, window.settings)
     try:

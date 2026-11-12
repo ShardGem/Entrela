@@ -8,9 +8,11 @@ from gui.widgets.button import SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.collapsible import CollapsibleSection
 from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.dialogs import FeedbackLabel
 
 
 class LibraryPage(PageBase):
+    configurations_requested = Signal()
     draft_changed = Signal()
     loaded = Signal(str)
     template_save_requested = Signal(str)
@@ -164,7 +166,7 @@ class LibraryPage(PageBase):
         templates_layout.addWidget(self.open_circuits)
         templates_layout.addStretch()
         self.tabs.addTab(templates_group, "Configurações salvas")
-        self.message = QLabel()
+        self.message = FeedbackLabel()
         self.message.setWordWrap(True)
         self.body().addWidget(self.message)
         self.identifier = None
@@ -211,7 +213,9 @@ class LibraryPage(PageBase):
         self.tabs.setCurrentWidget(self.annotation_group)
 
     def show_configurations(self):
-        self.tabs.setCurrentWidget(self.templates_group)
+        if self.tabs.indexOf(self.templates_group) >= 0:
+            self.tabs.setCurrentWidget(self.templates_group)
+        self.configurations_requested.emit()
 
     def set_configuration_context(self, text):
         """Describe the SAME simulation form used by the existing save signal."""
@@ -235,7 +239,7 @@ class LibraryPage(PageBase):
         elif self.identifier:
             self.context.setText("Caderno: " + self._notebook_title)
         else:
-            self.context.setText("Selecione uma execução para abrir seu caderno. As configurações salvas ficam na outra aba.")
+            self.context.setText("Selecione uma execução salva para registrar identificação, plano e anotações.")
 
     def _update_actions(self, *_):
         self.save_annotation.setEnabled(bool(self.identifier) and self.annotation_group.isEnabled())

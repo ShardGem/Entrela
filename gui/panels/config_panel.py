@@ -110,6 +110,7 @@ class ConfigPanel(QWidget):
         self.section_selector.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         for index,(key,label,_) in enumerate(SECTIONS,1):
             self.section_selector.addItem(f"{index} · {label}",key)
+            self.section_selector.setItemData(index-1, SECTIONS[index-1][2], Qt.ToolTipRole)
         heading.addWidget(self.section_selector,1)
         self.section_selector.hide()
         self._compact_sections = False
@@ -350,6 +351,7 @@ class ConfigPanel(QWidget):
         self.parameter_title.setVisible(not (guided and self._compact_sections))
         blocker = QSignalBlocker(self.section_selector)
         self.section_selector.setCurrentIndex(self.section_selector.findData(self.current_section))
+        self.section_selector.setToolTip(self.section_selector.currentData(Qt.ToolTipRole) or "Etapa da configuração guiada")
         del blocker
         self.mode_explanation.setText(
             "Sistema → modelo → evolução → ruído → medições."
@@ -369,7 +371,7 @@ class ConfigPanel(QWidget):
             widget.summary.setVisible(not guided and bool(widget.summary.text()))
             self.section_buttons[key].setChecked(key == self.current_section)
         for label in self.descriptions:
-            label.setVisible(self.current_mode == "guided")
+            label.setVisible(self.current_mode == "guided" and not self._compact_sections)
         self.btn_back.setVisible(self.current_mode == "guided")
         self.btn_next.setVisible(self.current_mode == "guided")
         self.btn_back.setEnabled(self.current_section != "system")

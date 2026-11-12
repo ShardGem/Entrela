@@ -6,7 +6,7 @@ import json
 
 from core.types import system_label
 from data.workspace import experiment_title
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QTimer
 from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSplitter, QWidget, QVBoxLayout,
@@ -22,6 +22,7 @@ from gui.theme import PALETTE
 
 
 class HistoryPage(PageBase):
+    compare_requested = Signal(str, str)
     experiment_selected = Signal(str)
     experiment_deleted = Signal(str)
     detail_requested = Signal(str)
@@ -75,6 +76,14 @@ class HistoryPage(PageBase):
             "Fidelidade", "Estado", "Projeto", "Etiquetas", "Ação",
         ])
         configure_table(self.table, sortable=True)
+        self.table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.table.horizontalHeader().moveSection(1, 0)
+        self.compare_selected = SecondaryButton('Comparar selecionadas', icon='comparison')
+        self.compare_selected.setToolTip('Selecione duas linhas com Ctrl ou Shift para comparar as execuções.')
+        self.compare_selected.setEnabled(False)
+        self.compare_selected.clicked.connect(self._compare_selected)
+        self.table.itemSelectionChanged.connect(self._selection_changed)
+        self.add_action(self.compare_selected)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(False)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -98,6 +107,7 @@ class HistoryPage(PageBase):
         splitter.addWidget(self.table)
 
         details = QWidget()
+        self.detail_panel = details
         detail_layout = QVBoxLayout(details)
         detail_layout.setContentsMargins(0, 8, 0, 0)
         bar = FlowLayout()
@@ -136,6 +146,14 @@ class HistoryPage(PageBase):
         self.body().addWidget(splitter, 1)
         self.selected_identifier = None
         self._detail_experiment = None
+        self.detail_panel.hide()
+        self._auto_detail_focus = False
+        self._was_wide = False
+        self._layout_timer = QTimer(self)
+        self._layout_timer.setSingleShot(True)
+        self._layout_timer.setInterval(0)
+        self._layout_timer.timeout.connect(self._arrange_details)
+        self.expand_details.clicked.connect(lambda *_: setattr(self, '_auto_detail_focus', False))
         self.open_result.setEnabled(False)
         self.edit_annotation.setEnabled(False)
         self.open_result.clicked.connect(lambda: self.experiment_selected.emit(self.selected_identifier) if self.selected_identifier else None)
@@ -222,7 +240,7 @@ class HistoryPage(PageBase):
             for col, value in enumerate(values):
                 item = DataTableItem(value, sort_values.get(col))
                 item.setData(Qt.UserRole, exp.id)
-                item.setToolTip(f"{value}\nIdentificador técnico: {exp.id}")
+                item.setToolTip(str(value))
                 if col in (3, 5):
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.table.setItem(row, col, item)
@@ -260,6 +278,31 @@ class HistoryPage(PageBase):
         self.set_detail(record)
         self.detail_requested.emit(identifier)
 
+    def _selection_changed(self):
+        self.compare_selected.setEnabled(len(self.table.selectionModel().selectedRows()) == 2)
+
+    def _compare_selected(self):
+        rows = self.table.selectionModel().selectedRows()
+        if len(rows) == 2:
+            ids = [self.table.item(index.row(), 0).data(Qt.UserRole) for index in rows]
+            self.compare_requested.emit(*ids)
+
+    def _arrange_details(self):
+        wide = self.width() >= 1050 * max(1, self.font().pixelSize() / 15)
+        self.splitter.setOrientation(Qt.Horizontal if wide else Qt.Vertical)
+        if wide and self._auto_detail_focus:
+            self.expand_details.setChecked(False)
+            self._auto_detail_focus = False
+        elif not wide and self._was_wide and self._detail_experiment is not None:
+            self._auto_detail_focus = True
+            self.expand_details.setChecked(True)
+        self._was_wide = wide
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_layout_timer'):
+            self._layout_timer.start()
+
     def _set_detail_expanded(self, expanded):
         for widget in (self._header, self.table, self.search, self.status_filter, self.columns,
                        self.previous, self.next, self.page_label):
@@ -273,6 +316,10 @@ class HistoryPage(PageBase):
             return
         self.selected_identifier = experiment.id
         self._detail_experiment = experiment
+        self.detail_panel.show()
+        if self.width() < 1050 * max(1, self.font().pixelSize() / 15):
+            self._auto_detail_focus = True
+            self.expand_details.setChecked(True)
         name = experiment_title(experiment, self.annotations)
         self.detail_title.setText(name)
         self.open_result.setEnabled(True)

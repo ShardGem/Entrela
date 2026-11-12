@@ -86,7 +86,15 @@ print('PASS: isolated wheel, assets, Qt workspace, scientific engine, graphical 
 
 
 def main():
-    wheel = Path(sys.argv[1]).resolve()
+    if len(sys.argv) > 1:
+        wheel = Path(sys.argv[1]).resolve()
+    else:
+        import tomllib
+        root = Path(__file__).resolve().parents[1]
+        version = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))['project']['version']
+        wheel = root / 'dist' / f'entrela-{version}-py3-none-any.whl'
+    if not wheel.is_file():
+        raise FileNotFoundError(f'Gere o wheel da versão atual antes de validar: {wheel}')
     with TemporaryDirectory(prefix="entrela-wheel-") as temp:
         target = Path(temp) / "installed"
         with ZipFile(wheel) as archive:

@@ -74,6 +74,14 @@ class PageBase(QWidget):
         self._title.hide()
         self._header.layout().setContentsMargins(20, 10, 20, 8)
 
+    def use_workspace_context(self):
+        """A seção fornece título e contexto; aqui ficam somente ações locais."""
+        self._title.hide()
+        self._subtitle.hide()
+        self._header.layout().setContentsMargins(20, 0, 20, 6)
+        self._header.setVisible(self._actions_slot.count() > 0)
+        self._embedded_heading = True
+
     def set_title(self, title: str, subtitle: str = ""):
         self._title.setText(title)
         self._subtitle.setText(subtitle)
@@ -100,5 +108,5 @@ class PageBase(QWidget):
         self._header.layout().setDirection(
             QHBoxLayout.TopToBottom if narrow else QHBoxLayout.LeftToRight
         )
-        self._header.layout().setContentsMargins(20, 16, 20, 12)
+        self._header.layout().setContentsMargins(20, 0 if getattr(self, '_embedded_heading', False) else 16, 20, 6 if getattr(self, '_embedded_heading', False) else 12)
         self._body.setContentsMargins(20, 8, 20, 24)

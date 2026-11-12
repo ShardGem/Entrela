@@ -6,9 +6,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QPlainTextEdit,
     QHeaderView,
+    QToolButton, QMenu,
 )
 from gui.pages.base import PageBase
-from gui.widgets.card import MetricCard, MetricGrid
+from gui.widgets.card import MetricCard, MetricGrid, EmptyState
 from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.tabs.results_tab import ResultsTab
 from gui.widgets.state_inspector import StateInspector
@@ -18,9 +19,11 @@ from core.reproduction import scientific_context
 from data.workspace import experiment_title
 from gui.widgets.data_table import configure_table
 import json, numpy as np
+from gui.formatting import quantity
 
 
 class ResultsPage(PageBase):
+    history_requested = Signal()
     report_requested = Signal()
     rerun_requested = Signal()
     save_requested = Signal()
@@ -33,13 +36,19 @@ class ResultsPage(PageBase):
             "Resultados", "Dados e interpretações da execução selecionada.", parent
         )
         self.details = QLabel("Execute ou abra um experimento.")
+        self.empty = EmptyState('results', 'Escolha uma execução para explorar',
+                                'Abra um resultado salvo ou prepare uma nova simulação no laboratório.',
+                                'Abrir execuções salvas')
+        self.empty.action_button.clicked.connect(self.history_requested.emit)
+        self.body().addWidget(self.empty)
         self.details.setWordWrap(True)
         self.body().addWidget(self.details)
         self.card_fid = MetricCard("Fidelidade ao circuito sem ruído")
         self.card_pur = MetricCard("Pureza global")
         self.card_erg = MetricCard("Energia ⟨H⟩")
-        self.card_err = MetricCard("Infidelidade (1−F)")
-        self.metric_grid = MetricGrid([self.card_fid, self.card_pur, self.card_erg, self.card_err])
+        self.card_err = MetricCard("Infidelidade (1−F)", parent=self)
+        self.card_err.hide()
+        self.metric_grid = MetricGrid([self.card_fid, self.card_pur, self.card_erg])
         self.body().addWidget(self.metric_grid)
         self.body().setSpacing(12)
         self.science_note = QLabel()
@@ -72,16 +81,49 @@ class ResultsPage(PageBase):
         for name, text, signal in [
             ("btn_rerun", "Reexecutar", self.rerun_requested),
             ("btn_report", "Relatório", self.report_requested),
-            ("btn_save", "Salvar", self.save_requested),
+            ("btn_save", "Salvar execução", self.save_requested),
             ("btn_export", "CSV", self.export_requested),
             ("btn_export_full", "JSON / pacote", self.export_experiment_requested),
             ("btn_figures", "Figuras PNG", self.export_figures_requested),
         ]:
-            button = SecondaryButton(text)
+            button = SecondaryButton(text, parent=self)
             button.clicked.connect(signal.emit)
             button.setEnabled(False)
             setattr(self, name, button)
-            self.add_action(button)
+            if name in ('btn_rerun', 'btn_save'):
+                self.add_action(button)
+            else:
+                button.hide()
+        self.export_menu = QMenu(self)
+        self.export_button = QToolButton()
+        self.export_button.setText('Exportar')
+        self.export_button.setAccessibleName('Exportar a execução selecionada')
+        self.export_button.setPopupMode(QToolButton.InstantPopup)
+        self.export_button.setMenu(self.export_menu)
+        for text, button in [('Relatório científico PDF…', self.btn_report), ('Dados das medições CSV…', self.btn_export),
+                             ('Execução completa JSON / pacote ZIP…', self.btn_export_full), ('Figuras da execução PNG…', self.btn_figures)]:
+            self.export_menu.addAction(text, button.click)
+        self.add_action(self.export_button)
+        self.tabs.currentChanged.connect(self._arrange_result_view)
+        self._available = False
+        self._set_available(False)
+
+    def _set_available(self, available):
+        self._available = available
+        self.empty.setVisible(not available)
+        for widget in (self.details, self.tabs, self.metric_grid, self.science_note, self.reproduction_status):
+            widget.setVisible(available)
+        self.export_button.setEnabled(available)
+
+    def _arrange_result_view(self, *_):
+        summary = self.tabs.currentWidget() in (self.results_tab, self.interpretation)
+        self.metric_grid.setVisible(summary)
+        self.science_note.setVisible(summary)
+
+    def set_saved(self, saved):
+        self.btn_save.setText('Execução salva' if saved else 'Salvar execução')
+        self.btn_save.setEnabled(not saved)
+        self.btn_save.setToolTip('Resultados preservados no histórico.' if saved else 'Guardar os resultados disponíveis no histórico.')
 
     def update_metrics(self, fid=None, pur=None, erg=None):
         for card, value in [
@@ -90,7 +132,10 @@ class ResultsPage(PageBase):
             (self.card_erg, erg),
             (self.card_err, None if fid is None else 1 - fid),
         ]:
-            card.set_value("—" if value is None else f"{value:.4f}")
+            card.set_value(quantity(value))
+            card.setToolTip('Indisponível neste registro' if value is None else 'Valor completo: ' + repr(float(value)))
+        if fid is not None:
+            self.card_fid.setToolTip(self.card_fid.toolTip() + '\nInfidelidade (1−F): ' + quantity(1 - fid))
 
     def set_experiment_title(self, title):
         self._display_title = title
@@ -120,6 +165,7 @@ class ResultsPage(PageBase):
         )
 
     def show_experiment(self, experiment):
+        self._set_available(True)
         self._experiment = experiment
         self.state_inspector.set_state(experiment.result.final_state,
                                        experiment.result.ideal_final_state,
@@ -182,3 +228,4 @@ class ResultsPage(PageBase):
         ]:
             button.setEnabled(True)
         self.btn_export.setEnabled(bool(r.counts))
+        self._arrange_result_view()

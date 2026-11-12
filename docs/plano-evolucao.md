@@ -10,6 +10,8 @@ Na versão 0.22, a revisão visual contínua ganha três estilos compartilhados:
 
 Na versão 0.23, o dimensionamento das abas passa a considerar o conteúdo aberto, os gráficos se empilham em janelas menores e o modo guiado recupera espaço para os campos. A área 3D agrupa detalhes e permite recolher a câmera, preservando a etapa e a disposição escolhida. A [galeria em alta resolução](screenshots/0.23.0/README.md) documenta as 14 áreas e as principais abas com simulações executadas. A revisão visual continua; preferências de disposição dos demais painéis e melhorias de tabelas extensas permanecem no plano.
 
+Na versão 0.24, a navegação passa a seis destinos, com duas etapas no laboratório e atividades reunidas por contexto. Configurações reutilizáveis se separam das anotações, exportações recebem preparação contextual, o histórico permite comparar duas linhas e a área 3D passa a usar um inspetor lateral. A disposição de painéis e as atividades recentes são persistidas. As curvas de probabilidades têm renderizador comum para tela, HTML, PDF e pacote científico, com seleção pelos maiores picos e massa omitida identificada. A [entrega e os limites](interface-0.24.md) e a [galeria atual](screenshots/0.24.0/README.md) documentam os 30 pontos da revisão. Validação manual nativa no Windows e ampliação das escolhas de séries nos relatórios permanecem pendentes.
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |

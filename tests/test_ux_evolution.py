@@ -94,7 +94,8 @@ def test_dashboard_names_preserve_technical_selection(qt_app):
     button = page.recent.body().itemAt(1).widget()
     assert "Bell · referência da pesquisa" in button.text()
     assert source.id not in button.text()
-    assert source.id in button.toolTip()
+    assert source.id not in button.toolTip()
+    assert "Executado em" in button.toolTip()
     selected = []
     page.experiment_selected.connect(selected.append)
     button.click()

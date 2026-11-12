@@ -83,6 +83,9 @@ def test_profiles_restore_legacy_choices_and_keep_scientific_data(window, qt_app
 
 @pytest.mark.parametrize('size,font', [((1440, 960), 15), ((1024, 768), 15), ((1024, 768), 24)])
 def test_metric_layout_adapts_without_losing_values(window, qt_app, size, font):
+    experiment = run_experiment(create_example_config('bell'))
+    window._current_experiment = experiment
+    window._display_experiment(experiment)
     window._show_page('results')
     apply_appearance(window, 'navy', font)
     window.resize(*size)
@@ -97,7 +100,7 @@ def test_metric_layout_adapts_without_losing_values(window, qt_app, size, font):
         assert rect.right() < window.page_results.metric_grid.width()
     if size[0] == 1440:
         assert len({rect.y() for rect in rects}) == 1
-    else:
+    elif font >= 24:
         assert len({rect.y() for rect in rects}) >= 2
     assert window.page_results._scroll.horizontalScrollBar().maximum() == 0
 
@@ -109,6 +112,7 @@ def test_window_uses_one_page_heading_and_keeps_explanations(window, qt_app):
         page = window.pages[key]
         assert not page._title.isVisible()
         assert window.topbar.title.text()
-    assert not window.page_results.btn_report.isHidden()
+    actions = [a.text() for a in window.page_results.export_button.menu().actions()]
+    assert 'Relatório científico PDF…' in actions
     assert window.page_settings._subtitle.text()
     assert SettingsPage.DEFAULTS['theme'] == 'dark'

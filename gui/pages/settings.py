@@ -1,16 +1,18 @@
 """Workspace preferences, independent of scientific experiment parameters."""
 
 from PySide6.QtCore import Signal, QSignalBlocker, Qt
-from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBox
+from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBox, QScrollArea, QWidget, QVBoxLayout, QFrame
 from gui.pages.base import PageBase
 from gui.widgets.card import Card
 from gui.widgets.button import SecondaryButton
+from gui.widgets.content_tabs import ContentTabs
 from gui.palettes import THEME_CHOICES, THEME_DESCRIPTIONS
 
 
 class SettingsPage(PageBase):
     appearance_changed = Signal()
     restore_requested = Signal()
+    layout_reset_requested = Signal()
     backup_requested = Signal()
     restore_backup_requested = Signal()
     DEFAULTS = {
@@ -22,6 +24,13 @@ class SettingsPage(PageBase):
 
     def __init__(self, parent=None):
         super().__init__("Preferências", "Adapte a área de trabalho sem alterar os resultados dos experimentos.", parent)
+        self.category = QComboBox()
+        self.category.setAccessibleName('Categoria das preferências')
+        self.sections = ContentTabs()
+        self.sections.tabBar().hide()
+        self.body().addWidget(self.category)
+        self.body().addWidget(self.sections, 1)
+        self.category.currentIndexChanged.connect(self.sections.setCurrentIndex)
         self.theme = self._combo(THEME_CHOICES)
         self.accent = self._combo((('Padrão do tema', 'theme'), ('Ciano · Entrela', 'cyan'), ('Azul', 'blue'), ('Violeta', 'violet'), ('Verde', 'green')))
         self.theme_description = QLabel()
@@ -73,15 +82,18 @@ class SettingsPage(PageBase):
         self.backup_message.setWordWrap(True)
         self.backup_message.setTextFormat(Qt.PlainText)
         backup.add(self.backup_message)
-        self.body().addWidget(backup)
+        self._add_category(backup, "Dados e backup")
         note = QLabel('Velocidade, repetição, rastros e foco dos qubits ficam nos controles de Estados em 3D e são lembrados entre sessões. As preferências são salvas automaticamente.')
         note.setWordWrap(True)
-        self.body().addWidget(note)
+        backup.add(note)
         reset = SecondaryButton('Restaurar preferências padrão')
         reset.setToolTip('Restaura a aparência e a visualização. Os experimentos salvos são preservados.')
         reset.clicked.connect(self.restore_requested.emit)
-        self.body().addWidget(reset)
-        self.body().addStretch()
+        self.add_action(reset)
+        self.reset_layout_button = SecondaryButton('Restaurar disposição dos painéis')
+        self.reset_layout_button.setToolTip('Restaura os tamanhos dos painéis e as categorias de navegação. Mantém parâmetros, circuitos e execuções.')
+        self.reset_layout_button.clicked.connect(self.layout_reset_requested.emit)
+        self.add_action(self.reset_layout_button)
         self.apply_values(self.DEFAULTS)
         for name in self.DEFAULTS:
             widget = getattr(self, name)
@@ -107,7 +119,22 @@ class SettingsPage(PageBase):
             widget.setAccessibleName(label)
             form.addRow(label, widget)
         card.add_layout(form)
-        self.body().addWidget(card)
+        self._add_category(card, title)
+
+    def _add_category(self, content, title):
+        content.setMaximumWidth(920)
+        area = QScrollArea()
+        area.setFrameShape(QFrame.NoFrame)
+        area.setWidgetResizable(True)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        holder = QWidget()
+        layout = QVBoxLayout(holder)
+        layout.setContentsMargins(0, 0, 8, 0)
+        layout.addWidget(content)
+        layout.addStretch()
+        area.setWidget(holder)
+        self.sections.addTab(area, title)
+        self.category.addItem(title)
 
     def collect_values(self):
         values = {}

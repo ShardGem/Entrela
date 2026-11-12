@@ -22,10 +22,13 @@ def test_complete_ui_pipeline(window,noisy,snapshots):
     assert sum(exp.result.counts.values())==128
     assert window.page_history.table.rowCount()==1
     assert window.page_dashboard.card_sims._value.text()=="1"
+    assert window.page_results.btn_save.text()=="Execução salva"
+    assert not window.page_results.btn_save.isEnabled()
     assert window.page_results.card_pur._value.text()!="—"
     bars=window.page_results.results_tab.canvas_hist.fig.axes[0].patches
     assert sum(bar.get_height() for bar in bars)==128
-    assert len(window.page_bloch.precomputed_bloch)==(5 if snapshots else 0)
+    assert len(window.page_bloch.precomputed_bloch)==(5 if snapshots else 1)
+    assert window.page_bloch.final_only is (not snapshots)
     np.testing.assert_allclose(window.repository.load(exp.id).result.final_state.data,exp.result.final_state.data)
 def test_modes_share_widgets_and_values(window):
     p=window.page_simulation.config_panel

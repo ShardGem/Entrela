@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QTabWidget, QWidget, QVBoxLayout, QSlider, QCheckBox, QPushButton, QPlainTextEdit,
 )
 from gui.pages.base import PageBase
+from gui.widgets.flow_layout import FlowLayout
+from gui.formatting import quantity, timestamp
 from gui.widgets.plot_canvas import MplCanvas,style_axes
 from gui.theme import PALETTE
 from gui.widgets.data_table import configure_table
@@ -29,7 +31,7 @@ class ComparisonPage(PageBase):
             "Compare execuções com o mesmo sistema e protocolo, variando ruído e amostragem.",
             parent,
         )
-        row = QHBoxLayout()
+        row = FlowLayout()
         self.first_run, self.second_run = QComboBox(), QComboBox()
         self.first_run.setAccessibleName("Execução A")
         self.second_run.setAccessibleName("Execução B")
@@ -46,11 +48,15 @@ class ComparisonPage(PageBase):
         self.comparison_mode.addItem("Comparação controlada · mesmo circuito e protocolo","controlled")
         self.comparison_mode.addItem("Convergência · variar passos ou ordem de Trotter","trotter")
         self.comparison_mode.setAccessibleName("Critério científico da comparação")
-        self.body().addWidget(self.comparison_mode)
+        row.add_group(QLabel("Critério"), self.comparison_mode)
         self.comparison_mode.currentIndexChanged.connect(self._compare)
         self.message = QLabel("São necessárias duas execuções.")
         self.message.setWordWrap(True)
         self.body().addWidget(self.message)
+        self.summary = QLabel()
+        self.summary.setWordWrap(True)
+        self.summary.setObjectName('SectionSubtitle')
+        self.body().addWidget(self.summary)
         tools=QHBoxLayout()
         self.btn_prepare=QPushButton("Carregar estados e curvas")
         self.btn_prepare.clicked.connect(self._request_prepare)
@@ -64,7 +70,7 @@ class ComparisonPage(PageBase):
         self.metrics_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         configure_table(self.metrics_table)
-        self.body().addWidget(self.metrics_table)
+
         self.tabs=ContentTabs()
         self.canvas = MplCanvas()
         hist=QWidget()
@@ -125,7 +131,16 @@ class ComparisonPage(PageBase):
         self.tabs.addTab(self.differences,"Configurações e referências")
         self.observable_canvas=MplCanvas()
         self.tabs.addTab(self.observable_canvas,"Observáveis ZNE")
-        self.tabs.setMinimumHeight(420)
+        self.tabs.addTab(self.metrics_table, "Métricas numéricas")
+        self.view_selector = QComboBox()
+        self.view_selector.setAccessibleName("Visualização da comparação")
+        for i in range(self.tabs.count()):
+            self.view_selector.addItem(self.tabs.tabText(i), i)
+        self.tabs.tabBar().hide()
+        self.view_selector.currentIndexChanged.connect(self.tabs.setCurrentIndex)
+        self.tabs.currentChanged.connect(self.view_selector.setCurrentIndex)
+        self.body().addWidget(self.view_selector)
+        self.tabs.setMinimumHeight(340)
         self.body().addWidget(self.tabs,1)
         self.full_data=None
         self._running = False
@@ -159,7 +174,7 @@ class ComparisonPage(PageBase):
                     else (e.config.noise.kind if e.config.noise.enabled else "Ideal")
                 )
                 combo.addItem(label, e.id)
-                combo.setItemData(combo.count() - 1, f"{e.id} · {e.created_at.isoformat()} · {system_label(e.config)}", Qt.ToolTipRole)
+                combo.setItemData(combo.count() - 1, f"{timestamp(e.created_at)} · {system_label(e.config)}", Qt.ToolTipRole)
         self.first_run.setCurrentIndex(max(0, self.first_run.findData(selected[0])))
         fallback = min(1, len(experiments) - 1)
         self.second_run.setCurrentIndex(
@@ -200,6 +215,7 @@ class ComparisonPage(PageBase):
             else incompatibility(a, b, mode=self.comparison_mode.currentData())
         )
         if error:
+            self.summary.clear()
             self._placeholder(self.observable_canvas, "A comparação precisa de duas execuções compatíveis.")
             self.differences.setPlainText(error)
             self.btn_prepare.setEnabled(False)
@@ -245,14 +261,22 @@ class ComparisonPage(PageBase):
             self.metrics_table.insertRow(row)
             values = [
                 label,
-                "—" if x is None else f"{x:.6f}",
-                "—" if y is None else f"{y:.6f}",
-                "—" if x is None or y is None else f"{y - x:+.6f}",
+                "—" if x is None else quantity(x),
+                "—" if y is None else quantity(y),
+                "—" if x is None or y is None else quantity(y-x),
             ]
             for col, text in enumerate(values):
-                self.metrics_table.setItem(row, col, QTableWidgetItem(text))
+                item = QTableWidgetItem(text)
+                raw = (label, x, y, None if x is None or y is None else y-x)[col]
+                item.setToolTip(str(raw) if raw is not None else "Não disponível")
+                self.metrics_table.setItem(row, col, item)
+        deltas = []
+        for name, key in [('Fidelidade', 'fidelity'), ('Pureza', 'purity'), ('Energia', 'energy')]:
+            x, y = getattr(a.result, key), getattr(b.result, key)
+            deltas.append(f"Δ {name}: {quantity(None if x is None or y is None else y-x)}")
+        self.summary.setText("B − A · " + " · ".join(deltas))
         self.metrics_table.resizeRowsToContents()
-        self.metrics_table.setFixedHeight(self.metrics_table.horizontalHeader().height()+sum(self.metrics_table.rowHeight(i) for i in range(3))+6)
+
         from core.figures import histogram_figure
         from gui.widgets.plot_canvas import style_figure
         histogram_figure((a, b), side_by_side=self.hist_layout.currentIndex() == 1,
@@ -432,6 +456,9 @@ class ComparisonPage(PageBase):
         if index >= 0:
             self.focus.setCurrentIndex(index)
         del blockers
+        selector_block = QSignalBlocker(self.view_selector)
+        self.view_selector.setCurrentIndex(self.tabs.currentIndex())
+        del selector_block
         self._suppress_load = True
         try:
             self._compare()

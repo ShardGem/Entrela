@@ -117,7 +117,7 @@ def test_four_qubits_per_row_and_unfocus_resets_every_control(qt_app,qubits):
         if qubits > 4:
             assert centers[4,2] != centers[3,2]
         for q in range(4):
-            assert page._info_container.layout().getItemPosition(q)[:2] == (0,q)
+            assert page._info_container.layout().getItemPosition(q)[:2] == (q,0)
         page.focus_combo.setCurrentIndex(page.focus_combo.findData(2))
         canvas.draw()
         x,y,_ = proj3d.proj_transform(*centers[2],canvas.ax.get_proj())

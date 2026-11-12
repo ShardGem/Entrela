@@ -2,14 +2,14 @@
 
 import numpy as np
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QComboBox, QToolButton, QMenu,
+    QWidget, QScrollArea, QFrame, QHBoxLayout, QVBoxLayout, QComboBox, QToolButton, QMenu,
 )
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
 from PySide6.QtCore import QEvent, QTimer
 
 
-class ResultsTab(QWidget):
+class ResultsTab(QScrollArea):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._counts = {}
@@ -18,7 +18,11 @@ class ResultsTab(QWidget):
         self._times = None
         self._time_unit = "Tempo (adimensional, ℏ=1)"
         self._manual_states = set()
-        layout = QHBoxLayout(self)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.NoFrame)
+        host = QWidget()
+        self.setWidget(host)
+        layout = QHBoxLayout(host)
         self._panes = layout
         self._layout_timer = QTimer(self)
         self._layout_timer.setSingleShot(True)
@@ -103,9 +107,8 @@ class ResultsTab(QWidget):
         self._render_evolution()
 
     def _rank_states(self, criterion):
-        scores = (self._probabilities.max(axis=0) if criterion == "peak" else self._probabilities[-1])
-        # Deterministic ties prefer the lower bitstring; no final-only bias.
-        return np.lexsort((np.arange(len(scores)), -scores))[:4].tolist()
+        from core.figures import probability_indices
+        return probability_indices(self._probabilities, criterion)
 
     def _rebuild_state_menu(self):
         self.state_menu.clear()
@@ -128,30 +131,16 @@ class ResultsTab(QWidget):
         self._render_evolution()
 
     def _render_evolution(self, *_):
-        ax = self.canvas_evol.reset_axes()
+        from core.figures import draw_probabilities
+        from gui.widgets.plot_canvas import style_figure
         criterion = self.state_criterion.currentIndex()
         self.state_picker.setVisible(criterion == 2)
         self.state_picker.setEnabled(self._probabilities is not None)
-        if self._probabilities is not None:
-            probabilities = self._probabilities
-            indices = sorted(self._manual_states if criterion == 2 else self._rank_states("final" if criterion == 1 else "peak"))
-            width = int(np.log2(probabilities.shape[1]))
-            for index in indices:
-                ax.plot(self._times, probabilities[:, index], ".-", label=f"|{index:0{width}b}⟩")
-            omitted = sorted(set(range(probabilities.shape[1])) - set(indices))
-            if omitted:
-                ax.plot(self._times, probabilities[:, omitted].sum(axis=1), "--",
-                        color=PALETTE.text_muted, label=f"Outros ({len(omitted)} estados)")
-            ax.legend(facecolor=PALETTE.surface, edgecolor=PALETTE.border, labelcolor=PALETTE.text)
-            ax.set_ylim(-.03, 1.03)
-            description = (f"{len(indices)} maiores picos", f"{len(indices)} maiores no final", f"{len(indices)} selecionados")[criterion]
-            ax.set_title(f"Evolução · {description}")
-        else:
-            ax.text(.5, .5, "Ative snapshots para registrar a evolução", color=PALETTE.text,
-                    ha="center", transform=ax.transAxes)
-            ax.set_title("Evolução das probabilidades")
-        ax.set_xlabel(self._time_unit)
-        ax.set_ylabel("Probabilidade do estado (0–1)")
+        draw_probabilities(self.canvas_evol.fig, self._probabilities, self._times,
+                           indices=self._manual_states if criterion == 2 else None,
+                           criterion=("peak", "final", "manual")[criterion], time_unit=self._time_unit,
+                           colors=(PALETTE.q1, PALETTE.q2, PALETTE.q3, PALETTE.q4, PALETTE.text_muted))
+        style_figure(self.canvas_evol.fig)
         self.canvas_evol.draw()
 
     def _histogram_value(self, event):

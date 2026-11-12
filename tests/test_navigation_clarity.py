@@ -8,12 +8,12 @@ from tests.qt_helpers import wait_until
 def test_groups_start_open_and_navigation_preserves_independent_choices(window, qt_app):
     sidebar = window.sidebar
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
-    sidebar.group_buttons['start'].click()
-    wait_until(lambda: sidebar.group_bodies['start'].isHidden())
-    assert all(not sidebar.group_bodies[key].isHidden() for key in ('lab', 'research', 'organize'))
+    sidebar.group_buttons['resources'].click()
+    wait_until(lambda: sidebar.group_bodies['resources'].isHidden())
+    assert all(not sidebar.group_bodies[key].isHidden() for key in ('work',))
     window._show_page('comparison')
-    assert sidebar.group_bodies['start'].isHidden()
-    assert not sidebar.group_bodies['lab'].isHidden()
+    assert sidebar.group_bodies['resources'].isHidden()
+    assert not sidebar.group_bodies['work'].isHidden()
     window._show_page('examples')
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
 
@@ -31,8 +31,8 @@ def test_narrow_menu_preserves_visible_names_and_destinations(window, qt_app):
         assert ' '.join(button.text().split()) == expected[page]
         assert not button.icon().isNull()
     requested = QSignalSpy(sidebar.navigate)
-    sidebar.buttons['circuit'].click()
-    assert requested.count() == 1 and requested.at(0) == ['circuit']
+    sidebar.buttons['simulation'].click()
+    assert requested.count() == 1 and requested.at(0) == ['simulation']
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
     sidebar.set_compact(False)
     assert all(button.text() == expected[key] for key, button in sidebar.buttons.items())

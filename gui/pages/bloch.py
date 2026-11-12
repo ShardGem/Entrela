@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QCheckBox,
     QScrollArea,
+    QSplitter,
     QGridLayout,
     QTabWidget,
     QSpinBox,
@@ -152,10 +153,10 @@ class BlochPage(PageBase):
         self.maximize_button.setCheckable(True)
         self.maximize_button.toggled.connect(self.set_maximized)
         controls.addWidget(self.maximize_button)
-        self.camera_toggle = GhostButton("Câmera e visualização")
+        self.camera_toggle = GhostButton("Inspetor")
         self.camera_toggle.setCheckable(True)
         self.camera_toggle.setChecked(True)
-        self.camera_toggle.setToolTip("Mostrar ou recolher zoom, foco dos qubits, projeção e opções de visualização.")
+        self.camera_toggle.setToolTip("Mostrar ou recolher o painel de câmera, etapas, qubits e métricas.")
         self.camera_toggle.setAccessibleName("Mostrar controles da câmera e visualização")
         self.camera_toggle.clicked.connect(self._camera_chosen)
         self.camera_toggle.toggled.connect(lambda *_: self._visual_mode_changed(self.visual_tabs.currentIndex()))
@@ -194,15 +195,32 @@ class BlochPage(PageBase):
         self.visual_tabs.addTab(self.state_inspector, "Estado global")
         self.visual_tabs.currentChanged.connect(self._refresh_ui)
         self.visual_tabs.currentChanged.connect(self._visual_mode_changed)
-        stage = QHBoxLayout()
-        stage.addWidget(self.visual_tabs, 1)
+        self.stage_splitter = QSplitter(Qt.Horizontal)
+        self.stage_splitter.setChildrenCollapsible(False)
+        self.stage_splitter.setHandleWidth(3)
+        self.stage_splitter.addWidget(self.visual_tabs)
+        self.inspector = QWidget()
+        inspector_layout = QVBoxLayout(self.inspector)
+        inspector_layout.setContentsMargins(8, 0, 0, 0)
+        self.inspector_selector = QComboBox()
+        self.inspector_selector.setAccessibleName("Conteúdo do inspetor da visualização")
+        inspector_layout.addWidget(self.inspector_selector)
+        self.inspector_tabs = ContentTabs()
+        self.inspector_tabs.tabBar().hide()
+        inspector_layout.addWidget(self.inspector_tabs, 1)
+        self.inspector.setMinimumWidth(280)
+        self.inspector.setMaximumWidth(430)
         self.camera_scroll = QScrollArea()
         self.camera_scroll.setWidgetResizable(True)
         self.camera_scroll.setMinimumWidth(235)
-        self.camera_scroll.setMaximumWidth(260)
+
         self.camera_scroll.setWidget(self.camera_panel)
-        stage.addWidget(self.camera_scroll)
-        layout.addLayout(stage, 1)
+        self.inspector_tabs.addTab(self.camera_scroll, "Câmera e visualização")
+        self.stage_splitter.addWidget(self.inspector)
+        self.stage_splitter.setStretchFactor(0, 1)
+        self.stage_splitter.setStretchFactor(1, 0)
+        self.stage_splitter.setSizes([900, 320])
+        layout.addWidget(self.stage_splitter, 1)
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setMaximum(0)
         self.slider.valueChanged.connect(self._on_slider)
@@ -223,7 +241,7 @@ class BlochPage(PageBase):
         layout.addLayout(frame_row)
         self.timeline_detail = QPlainTextEdit()
         self.timeline_detail.setReadOnly(True)
-        self.timeline_detail.setMaximumHeight(115)
+        self.timeline_detail.setMinimumHeight(150)
         self.timeline_detail.setAccessibleName("Transformação e estados do snapshot")
         self.timeline_detail.setPlaceholderText("Carregue um experimento para inspecionar as etapas.")
         self.details_section = CollapsibleSection("Etapa, qubits e métricas", expanded=False)
@@ -238,7 +256,7 @@ class BlochPage(PageBase):
         info_scroll.setWidgetResizable(True)
         info_scroll.setWidget(self._info_container)
         info_scroll.setFixedHeight(145)
-        self.details_section.content_layout.addWidget(info_scroll)
+
         note = QLabel(
             "Pureza local baixa pode indicar correlações/emaranhamento: em Bell ideal, cada qubit tem pureza ½. A linha tracejada representa o mesmo circuito sem ruído."
         )
@@ -248,8 +266,15 @@ class BlochPage(PageBase):
         self.metrics = SnapshotMetrics()
         self.metrics.analyze_requested.connect(self.temporal_requested.emit)
         self.metrics.snapshot_selected.connect(self.slider.setValue)
-        self.details_section.content_layout.addWidget(self.metrics)
-        layout.addWidget(self.details_section)
+        self.inspector_tabs.addTab(self.details_section, "Etape selecionada")
+        self.inspector_tabs.setTabText(1, "Etapa selecionada")
+        self.inspector_tabs.addTab(info_scroll, "Estados locais dos qubits")
+        self.inspector_tabs.addTab(self.metrics, "Métricas temporais")
+        info_scroll.setMinimumHeight(150)
+        info_scroll.setMaximumHeight(16777215)
+        for i in range(self.inspector_tabs.count()):
+            self.inspector_selector.addItem(self.inspector_tabs.tabText(i))
+        self.inspector_selector.currentIndexChanged.connect(self._inspector_changed)
         escape = QShortcut(QKeySequence("Esc"), self)
         escape.setContext(Qt.WidgetWithChildrenShortcut)
         escape.activated.connect(lambda: self.set_maximized(False))
@@ -263,11 +288,16 @@ class BlochPage(PageBase):
 
     def _visual_mode_changed(self, index):
         global_state = self.visual_tabs.widget(index) is self.state_inspector
-        self.camera_scroll.setVisible(not global_state and not self._maximized and self.camera_toggle.isChecked())
-        self.camera_toggle.setVisible(not global_state and not self._maximized)
+        self.inspector.setVisible(not self._maximized and self.camera_toggle.isChecked())
+        self.camera_toggle.setVisible(not self._maximized)
         self.selection_label.setVisible(not global_state)
-        self.maximize_button.setText("Restaurar painéis" if self._maximized else
-                                     "Ampliar visualização" if global_state else "Ampliar área 3D")
+        self.maximize_button.setText("Restaurar painéis" if self._maximized else "Ampliar visualização")
+
+    def _inspector_changed(self, index):
+        self.inspector_tabs.setCurrentIndex(index)
+        if index == 1:
+            self.details_section.set_expanded(True, animate=False)
+        self.preferences_changed.emit()
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -278,7 +308,7 @@ class BlochPage(PageBase):
         self.camera_panel.ensurePolished()
         width = max(235, self.camera_panel.minimumSizeHint().width()+24)
         self.camera_scroll.setMinimumWidth(width)
-        self.camera_scroll.setMaximumWidth(width)
+        self.inspector.setMinimumWidth(min(430, max(280, width + 8)))
         if self._camera_auto:
             self.camera_toggle.setChecked(self.width() >= 1100 * max(1, self.font().pixelSize() / 15))
         self._visual_mode_changed(self.visual_tabs.currentIndex())
@@ -294,7 +324,7 @@ class BlochPage(PageBase):
 
     def collect_view_preferences(self):
         return {'camera': 'auto' if self._camera_auto else self.camera_toggle.isChecked(),
-                'details': self.details_section.is_expanded}
+                'details': self.details_section.is_expanded, 'inspector': self.inspector_selector.currentIndex()}
 
     def apply_view_preferences(self, mapping):
         mapping = mapping if isinstance(mapping, dict) else {}
@@ -304,6 +334,12 @@ class BlochPage(PageBase):
         self.camera_toggle.setChecked(camera if type(camera) is bool else True)
         self.details_section.set_expanded(mapping.get('details') is True, animate=False)
         del blockers
+        index = mapping.get("inspector", 0)
+        if type(index) is int and 0 <= index < self.inspector_tabs.count():
+            blocker = QSignalBlocker(self.inspector_selector)
+            self.inspector_selector.setCurrentIndex(index)
+            self.inspector_tabs.setCurrentIndex(index)
+            del blocker
         self.refresh_theme()
 
     def load_statevectors(
@@ -315,6 +351,7 @@ class BlochPage(PageBase):
     ):
         self._pause()
         self._experiment = None
+        self.final_only = False
         self.timeline_detail.clear()
         self.time_unit = time_unit
         self.metrics.clear("Índice da porta" if "porta" in time_unit else "Tempo (ℏ=1)")
@@ -371,7 +408,7 @@ class BlochPage(PageBase):
         self._qubit_panels = []
         for q in range(self.num_qubits):
             panel = QubitInfoPanel(q)
-            layout.addWidget(panel, q // self.canvas.MAX_QUBITS_PER_ROW, q % self.canvas.MAX_QUBITS_PER_ROW)
+            layout.addWidget(panel, q, 0)
             self._qubit_panels.append(panel)
         self.slider.blockSignals(True)
         self.slider.setMaximum(len(self.precomputed_bloch) - 1)
@@ -428,7 +465,15 @@ class BlochPage(PageBase):
     def set_experiment(self, experiment):
         """Describe actual stored transitions, never interpolate invented states."""
         self._experiment = experiment
-        self._render_timeline()
+        final_only = not experiment.result.states and bool(self.original_svs)
+        self.final_only = final_only
+        for control in (self.btn_play, self.btn_prev, self.btn_next, self.btn_stop, self.slider, self.snapshot_spin, self.speed_combo, self.loop):
+            control.setEnabled(not final_only)
+        if final_only:
+            self.frame_label.setText("Estado final · esta execução não armazenou etapas intermediárias")
+            self.timeline_detail.setPlainText("Estado final calculado da execução selecionada. Não há snapshots intermediários armazenados; nenhuma trajetória é inferida.")
+        else:
+            self._render_timeline()
 
     @staticmethod
     def _state_description(state):
@@ -444,6 +489,9 @@ class BlochPage(PageBase):
     def _render_timeline(self):
         experiment = self._experiment
         if experiment is None or not self.original_svs:
+            return
+        if getattr(self, 'final_only', False):
+            self.timeline_detail.setPlainText("Estado final calculado. Esta execução não armazenou etapas intermediárias; nenhuma trajetória é inferida.\n" + self._state_description(self.original_svs[0]))
             return
         index = self.current_frame
         config = experiment.config
@@ -499,6 +547,8 @@ class BlochPage(PageBase):
             )
             + " · reprodução didática"
         )
+        if getattr(self, "final_only", False):
+            self.frame_label.setText("Estado final · sem etapas intermediárias armazenadas")
         self.slider.blockSignals(True)
         self.slider.setValue(idx)
         self.slider.blockSignals(False)
@@ -666,16 +716,7 @@ class BlochPage(PageBase):
         self.maximize_button.setText(
             "Restaurar painéis" if enabled else "Ampliar área 3D"
         )
-        for widget in (
-            self._header,
-            self.details_section,
-            self.camera_scroll,
-            self.info_scroll,
-            self.scene_note,
-            self.timeline_detail,
-            self.metrics,
-        ):
-            widget.setVisible(not enabled)
+        self._header.setVisible(not enabled and not getattr(self, "_embedded_heading", False))
         self._visual_mode_changed(self.visual_tabs.currentIndex())
 
     def _select_qubit(self, index):

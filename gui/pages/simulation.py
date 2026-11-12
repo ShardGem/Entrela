@@ -67,6 +67,7 @@ class SimulationStatus(QFrame):
 
 
 class SimulationPage(PageBase):
+    workbench_changed = Signal()
     run_requested = Signal(dict)
     cancel_requested = Signal()
     example_requested = Signal(str)
@@ -311,7 +312,7 @@ class SimulationPage(PageBase):
         self.config_panel.set_section(self._error_section)
 
     def set_experiment(self, experiment, title):
-        self.last_result_row.show()
+        self.last_result_row.setVisible(not getattr(self, "_embedded_heading", False))
         self.last_result_label.setText("Execução selecionada disponível")
         self.last_result_label.setToolTip(title)
         self.last_bloch.setEnabled(bool(experiment.result.states))
@@ -336,6 +337,8 @@ class SimulationPage(PageBase):
 
     def _arrange_header(self):
         super()._arrange_header()
+        if getattr(self, "_embedded_heading", False):
+            self._header.hide()
         self.body().setContentsMargins(20, 4, 20, 12)
         # O menu estreito mantém os nomes; use o espaço real antes de empilhar
         # o único botão desta página e criar outra rolagem com fonte ampliada.
@@ -374,3 +377,4 @@ class SimulationPage(PageBase):
             self.summary_scroll.show()
             self.splitter.setSizes([640,380])
             self.splitter.show()
+        self.workbench_changed.emit()

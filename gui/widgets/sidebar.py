@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayou
 from gui.icons import get_icon
 from gui.theme import PALETTE
 from gui.branding import application_icon
+from gui.navigation import ROOT_ITEMS, PAGE_LABELS, ROOT_FOR_PAGE
 
 
 class NavButton(QPushButton):
@@ -33,18 +34,15 @@ class NavButton(QPushButton):
 class Sidebar(QFrame):
     navigate=Signal(str)
     compact_requested=Signal(bool)
-    ITEMS=[('dashboard','Visão geral'),('examples','Exemplos prontos'),('simulation','Laboratório de simulação'),
-           ('circuit','Editor de circuitos'),('results','Resultados'),('bloch','Estados em 3D'),
-           ('mitigation','Mitigação de ruído'),('comparison','Comparar execuções'),('history','Histórico'),
-           ('analysis','Estudos e varreduras'),('library','Caderno e configurações'),('documentation','Exportar e documentar'),
-           ('docs','Conceitos e tutoriais'),('settings','Preferências')]
-    GROUPS=[('start','Começar','group-start',('dashboard','examples','docs')),
-            ('lab','Laboratório','group-lab',('simulation','circuit','results','bloch')),
-            ('research','Pesquisa','group-research',('analysis','mitigation','comparison')),
-            ('organize','Acervo','group-organize',('history','library','documentation'))]
+    ITEMS = ROOT_ITEMS
+    GROUPS = [('work', 'Trabalho', 'group-lab', ('dashboard', 'simulation', 'analysis', 'history')),
+              ('resources', 'Recursos', 'group-start', ('docs', 'settings'))]
     DESCRIPTIONS={
-        'analysis':'Use uma execução como referência para estudar ruído, precisão de Trotter e mitigação. Requer uma fonte selecionada.',
-        'simulation':'Configure a evolução, edite circuitos e consulte resultados nas abas do mesmo laboratório.',
+        'analysis':'Estudos e varreduras, mitigação ZNE e comparação de execuções. Escolha uma referência para investigar ruído e precisão.',
+        'history':'Reabra execuções, registre anotações e organize evidências e relatórios.',
+        'docs':'Exemplos prontos, conceitos, manual e referências para aprender com simulações.',
+        'settings':'Aparência, acessibilidade, exportação e backup do espaço de trabalho.',
+        'simulation':'Prepare uma evolução por Hamiltoniano ou um circuito de portas. Execute e consulte os resultados no laboratório.',
         'library':'Anote a execução e agrupe resultados por projeto. Salve parâmetros do formulário Hamiltoniano para reutilizar; circuitos são salvos no editor.',
         'comparison':'Compare métricas, curvas temporais e estados de duas execuções.',
         'documentation':'Exporte dados, figuras, animações e relatórios científicos.',
@@ -135,9 +133,6 @@ class Sidebar(QFrame):
         layout.addStretch()
         self.scroll.setWidget(content)
         outer.addWidget(self.scroll,1)
-        self.buttons['settings']=NavButton('settings',labels['settings'])
-        self.buttons['settings'].clicked.connect(lambda:self._on_click('settings'))
-        outer.addWidget(self.buttons['settings'])
 
     def _expand(self,key):
         if key in self._expanded_groups:
@@ -190,6 +185,7 @@ class Sidebar(QFrame):
         self.navigate.emit(key)
 
     def set_active(self,key):
+        key = ROOT_FOR_PAGE.get(key, key)
         self._active=key
         for page,button in self.buttons.items():
             button.setChecked(page==key)

@@ -20,7 +20,7 @@ class DashboardPage(PageBase):
             "Investigue como o ruído afeta simulações quânticas e avalie a mitigação com dados reproduzíveis.",
             parent,
         )
-        hero = QLabel("Uma pergunta científica.\nUm experimento que você pode reproduzir.")
+        hero = QLabel("Prepare, investigue e reproduza.")
         hero.setObjectName("HeroTitle")
         hero.setWordWrap(True)
         self.body().addWidget(hero)
@@ -47,7 +47,7 @@ class DashboardPage(PageBase):
             label = QLabel(description)
             label.setWordWrap(True)
             card.add(label)
-            button = PrimaryButton(text)
+            button = PrimaryButton(text) if text == "Criar experimento" else SecondaryButton(text)
             button.clicked.connect(signal.emit)
             card.add(button)
             actions.addWidget(card, 1)
@@ -109,7 +109,7 @@ class DashboardPage(PageBase):
         grid.setColumnStretch(1, 1)
         self.body().addLayout(grid)
         self.recent = Card("Continue de onde parou")
-        self.body().addWidget(self.recent)
+        self.body().insertWidget(1, self.recent)
         history = SecondaryButton("Abrir histórico completo")
         history.clicked.connect(self.open_history.emit)
         self.body().addWidget(history)
@@ -144,7 +144,7 @@ class DashboardPage(PageBase):
                 else ("ZNE" if exp.result.mitigation else "Concluído")
             )
             button = QPushButton(f"{experiment_title(exp, self.annotations)} · {state}")
-            button.setToolTip(f"Executado em {exp.created_at.astimezone().strftime('%d/%m/%Y às %H:%M')} · identificador técnico {exp.id}")
+            button.setToolTip(f"Executado em {exp.created_at.astimezone().strftime('%d/%m/%Y às %H:%M')}")
             button.clicked.connect(lambda _, i=exp.id: self.experiment_selected.emit(i))
             self.recent.add(button)
 

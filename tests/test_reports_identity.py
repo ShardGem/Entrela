@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import pytest
+from PySide6.QtCore import Qt
 
 from core.examples import create_example_config
 from core.report import report_html, export_report, hamiltonian_description
@@ -37,7 +38,8 @@ def test_history_name_and_id_both_searchable(qt_app, run):
     page.annotations = {run.id: {"title": "Bell de referência", "notes": "Hipótese da pesquisa"}}
     page.load([run])
     assert page.table.item(0, 1).text() == "Bell de referência"
-    assert run.id in page.table.item(0, 1).toolTip()
+    assert run.id not in page.table.item(0, 1).toolTip()
+    assert page.table.item(0, 0).data(Qt.UserRole) == run.id
     page.search.setText(run.id)
     assert page.table.rowCount() == 1
     page.search.setText("referência")
@@ -80,7 +82,7 @@ def test_report_embeds_actual_curves_identity_and_provenance(qt_app, tmp_path, r
     assert run.created_at.isoformat() in html
     assert "effective_seed" in html
     assert "qiskit-aer" in html
-    assert html.count("data:image/png;base64,") == 3
+    assert html.count("data:image/png;base64,") == 4
     assert "Esferas de Bloch dos estados locais finais" in html
     assert "snapshots reais" in html
     pdf = export_report(run, tmp_path / "report.pdf", annotation=annotation)
@@ -98,7 +100,7 @@ def test_benchmark_report_preserves_null_state_metrics(run):
     assert "ZNE linear" in html
     assert "aquisição compartilhada" in html
     assert "não reconstrói um estado mitigado" in html
-    assert html.count("data:image/png;base64,") == 4
+    assert html.count("data:image/png;base64,") == 5
     assert analysis["rows"][0]["fidelity"] is None
 
 
@@ -113,7 +115,7 @@ def test_study_report_plots_calculated_errors_and_keeps_run_index(run):
         {"steps": 2, "ideal_infidelity": .01, "noisy_infidelity": .3},
     ], "runs": [{"id": "paired-reference", "condition": "ideal", "steps": 1, "metadata": {"operations": "very-large-record"}}]}
     html = report_html(run, analysis=analysis)
-    assert html.count("data:image/png;base64,") == 4
+    assert html.count("data:image/png;base64,") == 5
     assert "paired-reference" in html
     assert "very-large-record" not in html
     assert "very-large-record" == analysis["runs"][0]["metadata"]["operations"]

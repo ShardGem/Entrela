@@ -1,7 +1,9 @@
 """Shared table behavior; scientific row order remains opt-in for sorting."""
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QHeaderView, QTableWidgetItem
+from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QHeaderView, QTableWidgetItem, QMenu, QFileDialog, QMessageBox
+import csv
 
 
 class DataTableItem(QTableWidgetItem):
@@ -38,7 +40,8 @@ def configure_table(table, sortable=False, numeric_columns=()):
     table.setWordWrap(False)
     table.setEditTriggers(QAbstractItemView.NoEditTriggers)
     table.setSelectionBehavior(QAbstractItemView.SelectRows)
-    table.setSelectionMode(QAbstractItemView.SingleSelection)
+    if first_configuration:
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
     table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
     table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
     table.verticalHeader().setVisible(False)
@@ -50,6 +53,11 @@ def configure_table(table, sortable=False, numeric_columns=()):
     # no histórico, o nome usa o espaço livre e Visualizar mantém sua largura.
     if first_configuration:
         header.setStretchLastSection(True)
+        shortcut = QShortcut(QKeySequence(QKeySequence.Copy), table)
+        shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+        shortcut.activated.connect(lambda: copy_table(table))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(lambda point: _menu(table, point))
     header.setHighlightSections(False)
     table.setSortingEnabled(sortable)
     for row in range(table.rowCount()):
@@ -58,3 +66,33 @@ def configure_table(table, sortable=False, numeric_columns=()):
             if item:
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
     return table
+
+
+def table_rows(table, selected=False):
+    header_view = table.horizontalHeader()
+    columns = [header_view.logicalIndex(i) for i in range(table.columnCount()) if not table.isColumnHidden(header_view.logicalIndex(i))]
+    rows = sorted({index.row() for index in table.selectedIndexes()}) if selected else list(range(table.rowCount()))
+    header = [table.horizontalHeaderItem(c).text() if table.horizontalHeaderItem(c) else '' for c in columns]
+    return [header] + [[table.item(r, c).text() if table.item(r, c) else '' for c in columns] for r in rows]
+
+
+def copy_table(table):
+    rows = table_rows(table, selected=True)
+    if len(rows) > 1:
+        QApplication.clipboard().setText('\n'.join('\t'.join(row) for row in rows))
+
+
+def _menu(table, point):
+    menu = QMenu(table)
+    copy = menu.addAction('Copiar linhas selecionadas', lambda: copy_table(table))
+    copy.setEnabled(bool(table.selectedIndexes()))
+    def export():
+        path, _ = QFileDialog.getSaveFileName(table, 'Exportar a tabela exibida', 'tabela.csv', 'CSV (*.csv)')
+        if path:
+            try:
+                with open(path, 'w', newline='', encoding='utf-8-sig') as stream:
+                    csv.writer(stream).writerows(table_rows(table))
+            except OSError as exc:
+                QMessageBox.warning(table, 'Não foi possível exportar', f'Escolha uma pasta gravável e tente novamente.\n{exc}')
+    menu.addAction('Exportar tabela exibida CSV…', export)
+    menu.exec(table.viewport().mapToGlobal(point))

@@ -89,14 +89,16 @@ def test_expanded_scene_restores_panels_camera_and_snapshot(populated, qt_app):
     page.set_maximized(True)
     qt_app.processEvents()
     assert (
-        page.camera_scroll.isHidden()
-        and page.info_scroll.isHidden()
-        and page.metrics.isHidden()
+        not page.camera_scroll.isVisible()
+        and not page.info_scroll.isVisible()
+        and not page.metrics.isVisible()
     )
     assert page.current_frame == 2 and page.canvas.camera_state() == before
     page.set_maximized(False)
     qt_app.processEvents()
-    assert not page.camera_scroll.isHidden() and not page.info_scroll.isHidden()
+    assert page.inspector.isVisible() and page.camera_scroll.isVisible()
+    page.inspector_selector.setCurrentIndex(2)
+    assert page.info_scroll.isVisible()
     assert page.current_frame == 2 and page.canvas.camera_state() == before
 
 

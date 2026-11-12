@@ -107,14 +107,14 @@ def _distribution(experiment):
 
 
 def _temporal_plot(experiment):
-    from core.figures import temporal_figure
+    from core.figures import temporal_figure, probability_figure
     r = experiment.result
     if not r.states or not r.times:
         return "<p>Snapshots não foram registrados nesta execução; não há curva temporal a reconstruir.</p>"
     count = min(len(r.states), len(r.times))
     selected = min(count, MAX_PLOT_SNAPSHOTS)
     note = f"Curvas derivadas de {selected} dos {count} snapshots reais; sem interpolação física."
-    return _image(temporal_figure([experiment]), "Métricas dos snapshots da execução") + "<p class=caption>" + note + "</p>"
+    return _image(temporal_figure([experiment]), "Métricas dos snapshots da execução") + _image(probability_figure(experiment), "Probabilidades dos estados; seleção pelos maiores picos na trajetória e massa omitida em Outros") + "<p class=caption>" + note + "</p>"
 
 
 def _analysis_section(analysis):

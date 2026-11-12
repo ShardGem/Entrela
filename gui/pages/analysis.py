@@ -1,6 +1,6 @@
 """Scientific tools operate on the selected run, preserving its result."""
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QSignalBlocker
 from PySide6.QtWidgets import (
     QLabel,
     QComboBox,
@@ -22,6 +22,7 @@ from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
 from gui.widgets.research_protocol import ProtocolPanel
 from gui.widgets.analysis_guidance import PARAMETERS, STUDIES, ParameterCombo, artifact_options
+from gui.formatting import quantity
 
 
 class AnalysisPage(PageBase):
@@ -78,14 +79,24 @@ class AnalysisPage(PageBase):
         self.tabs.addTab(self.results_tab, "Resultados")
         self.tabs.addTab(self.planning_tab, "Planejamento")
         self.body().addWidget(self.tabs, 1)
-        form = QFormLayout()
+        form_widget = QWidget()
+        form_widget.setMaximumWidth(960)
+        form = QFormLayout(form_widget)
+        self._form_widget = form_widget
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.form = form
         self.kind = QComboBox()
+        self.family = QComboBox()
+        self.family.addItem('Evolução e precisão', 'evolution')
+        self.family.addItem('Ruído e parâmetros', 'noise')
+        self.family.addItem('Avaliar mitigação', 'mitigation')
+        self.family.setAccessibleName('O que deseja investigar')
+        form.addRow('O que investigar', self.family)
         self.kind.setAccessibleName("Objetivo do estudo")
         for key, (name, _) in STUDIES.items():
             self.kind.addItem(name, key)
             self.kind.setItemData(self.kind.count()-1, STUDIES[key][1], Qt.ToolTipRole)
+        self.family.currentIndexChanged.connect(self._filter_studies)
         self.parameter = ParameterCombo(["p1", "p2", "J", "h", "t1_us", "t2_us", "trotter_steps"])
         self.parameter.setAccessibleName("Parâmetro a variar")
         self.values = QLineEdit("0, 0.01, 0.03, 0.05, 0.1")
@@ -152,7 +163,7 @@ class AnalysisPage(PageBase):
         form.addRow(self.parameter_hint)
         form.addRow(self.use_example)
         form.addRow(self.use_axis_examples)
-        setup.addLayout(form)
+        setup.addWidget(form_widget)
         setup.addWidget(self.help)
         setup.addStretch()
         self.protocol=ProtocolPanel()
@@ -220,8 +231,27 @@ class AnalysisPage(PageBase):
         self._update_controls()
         self.set_running(False)
 
+    @staticmethod
+    def _family_for(kind):
+        return ('evolution' if kind in ('temporal', 'convergence', 'trotter_noise') else
+                'noise' if kind in ('sweep', 'heatmap') else 'mitigation')
+
+    def _filter_studies(self, *_, keep_current=False):
+        family = self.family.currentData()
+        for i in range(self.kind.count()):
+            self.kind.view().setRowHidden(i, self._family_for(self.kind.itemData(i)) != family)
+        if not keep_current and self._family_for(self.kind.currentData()) != family:
+            index = next(i for i in range(self.kind.count()) if self._family_for(self.kind.itemData(i)) == family)
+            self.kind.setCurrentIndex(index)
+
     def _update_controls(self, *_):
         kind = self.kind.currentData()
+        family = self._family_for(kind)
+        if self.family.currentData() != family:
+            blocker = QSignalBlocker(self.family)
+            self.family.setCurrentIndex(self.family.findData(family))
+            del blocker
+        self._filter_studies(keep_current=True)
         for w in (self.parameter, self.values, self.seeds):
             self.form.setRowVisible(w, kind == "sweep")
         self.form.setRowVisible(self.steps, kind in ("convergence", "trotter_noise"))
@@ -456,7 +486,7 @@ class AnalysisPage(PageBase):
                         "—"
                         if value is None
                         else (
-                            format(value, ".9g")
+                            quantity(value)
                             if isinstance(value, float)
                             else str(value)
                         )

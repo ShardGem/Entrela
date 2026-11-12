@@ -57,4 +57,7 @@ def test_notebook_save_stays_accessible_at_small_resolution(window, qt_app, font
     assert not page.save_annotation.isEnabled()
     assert page._scroll.horizontalScrollBar().maximum() == 0
     page.show_configurations()
-    assert page.notebook_actions_bar.isHidden()
+    assert window.configuration_dialog.isVisible()
+    assert page.templates_group.isVisible()
+    assert window.configuration_dialog.isAncestorOf(page.templates_group)
+    window.configuration_dialog.close()

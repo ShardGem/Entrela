@@ -114,10 +114,14 @@ def test_toolbar_stays_inside_a_narrow_workspace(qt_app, font_size):
         workspace.show()
         for _ in range(4):
             qt_app.processEvents()
-        for button in (workspace.templates_button, workspace.recent_button):
-            assert workspace.toolbar.rect().contains(button.geometry())
-        assert not workspace.templates_button.geometry().intersects(workspace.recent_button.geometry())
+        assert workspace.templates_button.isVisible() and not workspace.recent_button.isVisible()
+        assert workspace.toolbar.rect().contains(workspace.templates_button.geometry())
         assert workspace.tabs.currentWidget() is pages["simulation"]
+        workspace.select_page('results')
+        for _ in range(4):
+            qt_app.processEvents()
+        assert workspace.recent_button.isVisible() and not workspace.templates_button.isVisible()
+        assert workspace.toolbar.rect().contains(workspace.recent_button.geometry())
     finally:
         apply_appearance(workspace)
         workspace.close()

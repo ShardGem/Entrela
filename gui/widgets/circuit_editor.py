@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QCheckBox,
     QToolButton,
+    QMenu,
     QScrollArea,
     QFileDialog,
     QApplication,
@@ -183,7 +184,16 @@ class CircuitEditor(QWidget):
         phase_button.clicked.connect(self._apply_phase)
         phase_label = QLabel("Fase global (rad)")
         phase_label.setToolTip(PHASE_HELP)
-        toolbar.add_group(phase_label, self.phase, phase_button)
+        self.advanced_section = CollapsibleSection("Parâmetros avançados")
+        phase_row = QHBoxLayout()
+        phase_row.addWidget(phase_label)
+        phase_row.addWidget(self.phase)
+        phase_row.addWidget(phase_button)
+        phase_row.addStretch()
+        self.advanced_section.content_layout.addLayout(phase_row)
+        phase_hint = QLabel(PHASE_HELP)
+        phase_hint.setWordWrap(True)
+        self.advanced_section.content_layout.addWidget(phase_hint)
         for title, key in [
             ("Desfazer", QKeySequence.Undo),
             ("Refazer", QKeySequence.Redo),
@@ -204,8 +214,13 @@ class CircuitEditor(QWidget):
             button.setToolButtonStyle(Qt.ToolButtonIconOnly)
             button.setAccessibleName(title)
             toolbar.addWidget(button)
-        root.addLayout(toolbar)
-        files = FlowLayout()
+        files = toolbar
+        self.file_menu = QToolButton()
+        self.file_menu.setText("Arquivo e desenho")
+        self.file_menu.setPopupMode(QToolButton.InstantPopup)
+        self.file_menu.setAccessibleName("Operações de arquivo e visualização do circuito")
+        file_menu = QMenu(self.file_menu)
+        self.file_menu.setMenu(file_menu)
         self.zoom = QSpinBox()
         self.zoom.setRange(35, 250)
         self.zoom.setValue(100)
@@ -228,9 +243,21 @@ class CircuitEditor(QWidget):
                 button.setToolTip("JSON guarda portas e parâmetros. OpenQASM é um formato de código para circuitos quânticos.")
             elif callback == self._export_svg:
                 button.setToolTip("Exporta o trecho visível como imagem vetorial SVG, que pode ser ampliada sem perder nitidez.")
-            files.addWidget(button)
+            button.hide()
+            button.setParent(self)
+            action = file_menu.addAction(text, button.click)
+            action.setToolTip(button.toolTip())
+        files.addWidget(self.file_menu)
         files.addWidget(self.zoom)
+        self.advanced_section.layout().removeWidget(self.advanced_section.header)
+        self.advanced_section.header.setParent(self)
+        self.advanced_section.header.setText("Avançado")
+        self.advanced_section.header.setToolTip("Fase global do circuito, em radianos. Não altera probabilidades de medição isoladamente.")
+        files.addWidget(self.advanced_section.header)
+        self.advanced_section.hide()
+        self.advanced_section.expanded_changed.connect(self.advanced_section.setVisible)
         root.addLayout(files)
+        root.addWidget(self.advanced_section)
         library_row = QHBoxLayout()
         self.circuit_name = QLineEdit()
         self.circuit_name.setMaxLength(120)
@@ -247,7 +274,7 @@ class CircuitEditor(QWidget):
         self.revision_label = QLabel("Rascunho independente")
         self.revision_label.setWordWrap(True)
         library_row.addWidget(self.revision_label)
-        root.addLayout(library_row)
+        root.insertLayout(0, library_row)
         self.library_panel = QWidget()
         library_body = QFormLayout(self.library_panel)
         self.circuit_description = QLineEdit()
@@ -406,7 +433,7 @@ class CircuitEditor(QWidget):
             form.addRow(name, field)
         self.gate_form = form
         form_body.addLayout(form)
-        apply = PrimaryButton("Aplicar alterações")
+        apply = SecondaryButton("Aplicar alterações")
         apply.setToolTip("Atualiza a porta selecionada com os qubits e ângulos dos campos.")
         apply.clicked.connect(self._apply_gate)
         form_body.addWidget(apply)

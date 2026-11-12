@@ -140,7 +140,7 @@ class Gallery:
                  f'Janela principal: {self.args.width} × {self.args.height} pixels lógicos, escala {self.args.scale:g}×, fonte {self.args.font_size} px.', '',
                  'Os cenários foram executados em armazenamento temporário, com sementes registradas. '
                  'São demonstrações do aplicativo; não substituem os experimentos do TCC. '
-                 'A captura da splash conserva seu tamanho nativo, também na escala declarada.', '',
+                 'A splash e as janelas de configurações/exportação conservam seus tamanhos próprios, também na escala declarada.', '',
                  'Clique nos nomes para abrir os arquivos originais. '
                  '[Manifesto e hashes](manifesto.json) · [Configurações e resultados dos cenários](cenarios.json) · [Estudos calculados](estudos.json).', '']
         for folder, label in CATEGORIES.items():
@@ -282,6 +282,9 @@ def main():
         window.page_circuit.editor.operation_views.setCurrentIndex(1)
         gallery.capture('03-laboratorio/10-editor-operacoes.png', 'Lista de operações acessível por teclado', 'circuit')
         window.page_circuit.editor.operation_views.setCurrentIndex(0)
+        window.page_circuit.editor.advanced_section.set_expanded(True, animate=False)
+        gallery.capture('03-laboratorio/11-editor-avancado.png', 'Fase global e parâmetros avançados do circuito', 'circuit')
+        window.page_circuit.editor.advanced_section.set_expanded(False, animate=False)
         select(noisy)
         gallery.show('results')
         results = window.page_results
@@ -309,10 +312,14 @@ def main():
         bloch.visual_tabs.setCurrentIndex(2)
         gallery.capture('04-resultados/bloch-estado-global.png', 'Estado global no instante selecionado', 'bloch')
         bloch.visual_tabs.setCurrentIndex(0)
+        bloch.camera_toggle.setChecked(True)
+        bloch.inspector_selector.setCurrentIndex(1)
         bloch.details_section.set_expanded(True, animate=False)
         gallery.settle()
         bloch._scroll.ensureWidgetVisible(bloch.timeline_detail)
         gallery.capture('04-resultados/bloch-detalhes.png', 'Transformação da etapa e estados locais', 'bloch')
+        bloch.inspector_selector.setCurrentIndex(2)
+        gallery.capture('04-resultados/bloch-estados-locais.png', 'Estados locais dos qubits', 'bloch')
         bloch.details_section.set_expanded(False, animate=False)
         gallery.show('analysis')
         for key, (title, _) in STUDIES.items():
@@ -329,6 +336,8 @@ def main():
             gallery.capture(f'05-pesquisa/resultado-{STUDY_SLUGS[kind]}.png', STUDIES[kind][0] + ' · resultado calculado', 'analysis')
             if kind == 'temporal':
                 gallery.show('bloch')
+                bloch.camera_toggle.setChecked(True)
+                bloch.inspector_selector.setCurrentIndex(3)
                 bloch.details_section.set_expanded(True, animate=False)
                 gallery.settle()
                 bloch._scroll.ensureWidgetVisible(bloch.metrics)
@@ -362,6 +371,8 @@ def main():
             comparison.tabs.setCurrentIndex(i)
             gallery.capture(f'05-pesquisa/comparacao-{key}.png', comparison.tabs.tabText(i), 'comparison')
         comparison.set_runs(noisy.id, mitigated.id)
+        comparison.tabs.setCurrentIndex(5)
+        gallery.capture('05-pesquisa/comparacao-metricas.png', 'Métricas numéricas da comparação', 'comparison')
         comparison.tabs.setCurrentIndex(4)
         gallery.capture('05-pesquisa/comparacao-observaveis-zne.png', 'Comparação dos observáveis ZNE', 'comparison')
         select(noisy)
@@ -378,15 +389,21 @@ def main():
         window.page_library.sections['planning'].set_expanded(True, animate=False)
         gallery.capture('06-acervo/caderno.png', 'Caderno e plano científico', 'library')
         window.page_library.show_configurations()
-        gallery.capture('06-acervo/configuracoes-salvas.png', 'Biblioteca de configurações reutilizáveis', 'library')
+        gallery.capture('06-acervo/configuracoes-salvas.png', 'Biblioteca de configurações reutilizáveis', 'library', window.configuration_dialog)
+        window.configuration_dialog.close()
         gallery.show('documentation')
-        gallery.capture('06-acervo/documentacao.png', 'Conteúdo dos relatórios e pacote científico', 'documentation')
-        window.page_documentation._scroll.verticalScrollBar().setValue(window.page_documentation._scroll.verticalScrollBar().maximum())
-        gallery.capture('06-acervo/evidencias.png', 'Evidências e ações de exportação', 'documentation')
+        gallery.capture('06-acervo/evidencias.png', 'Evidências do estudo', 'documentation')
+        window.page_documentation.open_export('pdf')
+        gallery.capture('06-acervo/documentacao.png', 'Preparar relatório científico', 'documentation', window.page_documentation.export_dialog)
+        window.page_documentation.export_dialog.close()
+        for kind, title in [('zip', 'Pacote científico completo'), ('gif', 'Animação com snapshots reais')]:
+            window.page_documentation.open_export(kind)
+            gallery.capture(f'06-acervo/exportacao-{kind}.png', title, 'documentation', window.page_documentation.export_dialog)
+            window.page_documentation.export_dialog.close()
         gallery.show('settings')
-        gallery.capture('07-preferencias/aparencia.png', 'Aparência e acessibilidade', 'settings')
-        window.page_settings._scroll.verticalScrollBar().setValue(window.page_settings._scroll.verticalScrollBar().maximum())
-        gallery.capture('07-preferencias/backup-exportacao.png', 'Preferências de exportação e backup', 'settings')
+        for index, (slug, title) in enumerate([('aparencia', 'Aparência e tipografia'), ('acessibilidade', 'Acessibilidade e notificações'), ('exportacao', 'Preferências de exportação'), ('backup-exportacao', 'Dados e backup')]):
+            window.page_settings.category.setCurrentIndex(index)
+            gallery.capture(f'07-preferencias/{slug}.png', title, 'settings')
         for theme, label in [('light', 'claro'), ('navy', 'azul-escuro')]:
             window.page_settings.theme.setCurrentIndex(window.page_settings.theme.findData(theme))
             gallery.show('results')

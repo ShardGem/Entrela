@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from gui.widgets.button import SecondaryButton
+from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
 
@@ -30,12 +31,12 @@ class SnapshotMetrics(QFrame):
         self._busy = False
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 8, 10, 8)
-        tools = QHBoxLayout()
+        tools = FlowLayout()
         self.summary = QLabel(
             "Métricas do snapshot: calcule a análise para inspecionar."
         )
         self.summary.setWordWrap(True)
-        tools.addWidget(self.summary, 1)
+        root.addWidget(self.summary)
         self.calculate = SecondaryButton("Calcular métricas")
         self.calculate.clicked.connect(self.analyze_requested.emit)
         tools.addWidget(self.calculate)

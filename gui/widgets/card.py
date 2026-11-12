@@ -56,7 +56,7 @@ class MetricCard(QFrame):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(6)
 
-        self._label = QLabel(label.upper())
+        self._label = QLabel(label)
         self._label.setWordWrap(True)
         self._label.setObjectName("MetricLabel")
 
@@ -108,7 +108,7 @@ class MetricGrid(QWidget):
     def _reflow(self):
         card_width = max(200, self.fontMetrics().horizontalAdvance('Fidelidade ao circuito') + 48)
         gap = self._grid.spacing()
-        columns = next((n for n in (4, 2, 1)
+        columns = next((n for n in (len(self.cards), 2, 1)
                         if self.width() >= n * card_width + (n - 1) * gap), 1)
         if columns == self._columns:
             return

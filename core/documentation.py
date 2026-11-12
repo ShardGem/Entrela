@@ -18,7 +18,7 @@ from matplotlib import rc_context
 from core import __version__
 from core.analysis import checkpoint
 from core.export import export_experiment_json, export_experiment_csv, export_analysis, _atomic_text
-from core.figures import (figure, snapshot, bloch_figure, histogram_figure, temporal_figure,
+from core.figures import (figure, snapshot, bloch_figure, histogram_figure, temporal_figure, probability_figure,
                           analysis_figure, circuit_figure)
 from core.figures import analysis_table_figures
 from core.figures import zne_comparison_figure
@@ -241,6 +241,9 @@ def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=No
                         page(temporal_figure([e]),"Evolução · "+"AB"[i]+" · eixos incompatíveis exibidos separadamente")
                 else:
                     page(temporal_figure(experiments,reference="exact" if comparison_mode == "trotter" else "circuit"),"Evolução dos snapshots registrados")
+                for i, experiment in enumerate(experiments):
+                    if experiment.result.states:
+                        page(probability_figure(experiment), "Probabilidades · " + "AB"[i] + " · maiores picos da trajetória; Outros soma os estados omitidos")
             if any(e.result.mitigation for e in experiments):
                 page(zne_comparison_figure(experiments),"Mitigação de observáveis ZNE")
             if selected.include_bloch and all(e.result.final_state is not None or e.result.states for e in experiments):
@@ -309,6 +312,8 @@ def export_documentation(experiments, filepath, analyses=(), annotations=None, p
                 _save_formats(bloch_figure([exp]),target,"bloch_final",raster_dpi)
             _save_formats(histogram_figure([exp]),target,"distribution",raster_dpi)
             _save_formats(temporal_figure([exp]),target,"temporal",raster_dpi)
+            if exp.result.states:
+                _save_formats(probability_figure(exp),target,"state_probabilities",raster_dpi)
             _save_formats(circuit_figure(exp),target,"circuit_preview",raster_dpi)
             if exp.result.mitigation:
                 _save_formats(zne_comparison_figure([exp]),target,"zne_observable",raster_dpi)

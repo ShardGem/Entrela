@@ -101,6 +101,49 @@ def draw_histograms(fig, counts_by_run, *, side_by_side=False, frequency=True,
     return fig
 
 
+def probability_indices(probabilities, criterion="peak", limit=4):
+    scores = probabilities[-1] if criterion == "final" else probabilities.max(axis=0)
+    return np.lexsort((np.arange(len(scores)), -scores))[:limit].tolist()
+
+
+def draw_probabilities(fig, probabilities, times, *, indices=None, criterion="peak",
+                       time_unit="Tempo (adimensional, ℏ=1)", colors=COLORS):
+    """Mesmos estados, massa omitida e unidades na tela e nos relatórios."""
+    fig.clear()
+    ax = fig.add_subplot(111)
+    if probabilities is not None and len(probabilities):
+        probabilities = np.asarray(probabilities)
+        indices = sorted(probability_indices(probabilities, criterion) if indices is None else indices)
+        width = int(np.log2(probabilities.shape[1]))
+        for offset, index in enumerate(indices):
+            ax.plot(times, probabilities[:, index], ".-", label=f"|{index:0{width}b}⟩", color=colors[offset % len(colors)])
+        omitted = sorted(set(range(probabilities.shape[1])) - set(indices))
+        if omitted:
+            ax.plot(times, probabilities[:, omitted].sum(axis=1), "--", color=colors[-1], label=f"Outros ({len(omitted)} estados)")
+        description = {"peak": "maiores picos", "final": "maiores no final", "manual": "selecionados"}[criterion]
+        ax.set_title(f"Evolução · {len(indices)} {description}")
+        if ax.lines:
+            ax.legend()
+        ax.set_ylim(-.03, 1.03)
+    else:
+        ax.text(.5, .5, "Ative snapshots para registrar a evolução", ha="center", transform=ax.transAxes)
+        ax.set_title("Evolução das probabilidades")
+    ax.set_xlabel(time_unit)
+    ax.set_ylabel("Probabilidade do estado (0–1)")
+    return fig
+
+
+def probability_figure(experiment):
+    states = experiment.result.states
+    probabilities = np.asarray([state.probabilities() for state in states]) if states else None
+    times = experiment.result.times
+    if times is None or len(times) != len(states):
+        times = np.arange(len(states))
+    unit = experiment.result.metadata.get("time_unit", "adimensional (ℏ=1)")
+    label = "Índice da porta lógica (sem tempo físico)" if experiment.config.circuit is not None else f"Tempo ({unit})"
+    return draw_probabilities(figure(), probabilities, times, time_unit=label)
+
+
 def histogram_figure(experiments, side_by_side=False, *, fig=None, colors=COLORS, label_size=8):
     fig = figure() if fig is None else fig
     draw_histograms(fig, [exp.result.counts for exp in experiments], side_by_side=side_by_side,
