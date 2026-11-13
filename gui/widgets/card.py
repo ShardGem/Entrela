@@ -49,7 +49,7 @@ class MetricCard(QFrame):
     def __init__(self, label: str, value: str = "—", unit: str = "",
                  accent: str | None = None, parent=None):
         super().__init__(parent)
-        self.setObjectName("Card")
+        self.setObjectName("MetricTile")
         self._accent = accent
 
         layout = QVBoxLayout(self)

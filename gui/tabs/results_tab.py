@@ -2,7 +2,7 @@
 
 import numpy as np
 from PySide6.QtWidgets import (
-    QWidget, QScrollArea, QFrame, QHBoxLayout, QVBoxLayout, QComboBox, QToolButton, QMenu,
+    QWidget, QScrollArea, QFrame, QTabBar, QHBoxLayout, QVBoxLayout, QComboBox, QToolButton, QMenu,
 )
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
@@ -22,8 +22,18 @@ class ResultsTab(QScrollArea):
         self.setFrameShape(QFrame.NoFrame)
         host = QWidget()
         self.setWidget(host)
-        layout = QHBoxLayout(host)
+        outer = QVBoxLayout(host)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.chart_views = QTabBar()
+        self.chart_views.setObjectName("ViewTabs")
+        self.chart_views.setAccessibleName("Gráfico dos resultados")
+        for title in ("Distribuição", "Evolução", "Lado a lado"):
+            self.chart_views.addTab(title)
+        outer.addWidget(self.chart_views)
+        layout = QHBoxLayout()
+        outer.addLayout(layout, 1)
         self._panes = layout
+        self._figure_panes = []
         self._layout_timer = QTimer(self)
         self._layout_timer.setSingleShot(True)
         self._layout_timer.setInterval(0)
@@ -62,8 +72,16 @@ class ResultsTab(QScrollArea):
             column.addLayout(tools)
             column.addWidget(canvas, 1)
             layout.addWidget(pane, 1)
+            self._figure_panes.append(pane)
+        self.chart_views.currentChanged.connect(self._show_plot)
+        self._show_plot(0)
         self.canvas_hist.set_value_lookup(self._histogram_value)
         self.canvas_evol.set_value_lookup(self._evolution_value)
+
+    def _show_plot(self, index):
+        for i, pane in enumerate(self._figure_panes):
+            pane.setVisible(index == 2 or i == index)
+        self._layout_timer.start()
 
     def _arrange_panes(self):
         # Uma coluna preserva a leitura dos eixos quando o texto é ampliado.

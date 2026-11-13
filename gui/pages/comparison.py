@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QTabWidget, QWidget, QVBoxLayout, QSlider, QCheckBox, QPushButton, QPlainTextEdit,
+    QTabWidget, QTabBar, QWidget, QVBoxLayout, QSlider, QCheckBox, QPushButton, QPlainTextEdit,
 )
 from gui.pages.base import PageBase
 from gui.widgets.flow_layout import FlowLayout
@@ -143,7 +143,16 @@ class ComparisonPage(PageBase):
         self.tabs.tabBar().hide()
         self.view_selector.currentIndexChanged.connect(self.tabs.setCurrentIndex)
         self.tabs.currentChanged.connect(self.view_selector.setCurrentIndex)
-        self.body().addWidget(self.view_selector)
+        self.view_selector.hide()
+        self.view_tabs = QTabBar()
+        self.view_tabs.setObjectName("ViewTabs")
+        self.view_tabs.setUsesScrollButtons(True)
+        self.view_tabs.setAccessibleName("Visualização da comparação")
+        for title in ("Distribuições", "Curvas", "Bloch", "Configuração", "ZNE", "Métricas"):
+            self.view_tabs.addTab(title)
+        self.view_tabs.currentChanged.connect(self.view_selector.setCurrentIndex)
+        self.view_selector.currentIndexChanged.connect(self.view_tabs.setCurrentIndex)
+        self.body().addWidget(self.view_tabs)
         self.tabs.setMinimumHeight(340)
         self.body().addWidget(self.tabs,1)
         self.full_data=None
@@ -462,6 +471,9 @@ class ComparisonPage(PageBase):
         del blockers
         selector_block = QSignalBlocker(self.view_selector)
         self.view_selector.setCurrentIndex(self.tabs.currentIndex())
+        tabs_block = QSignalBlocker(self.view_tabs)
+        self.view_tabs.setCurrentIndex(self.tabs.currentIndex())
+        del tabs_block
         del selector_block
         self._suppress_load = True
         try:

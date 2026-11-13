@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QHBoxLayout,
     QProgressBar,
-    QWidget, QVBoxLayout, QTabWidget, QFrame, QSizePolicy, QToolButton, QMenu, QScrollArea,
+    QWidget, QVBoxLayout, QTabWidget, QListWidget, QListWidgetItem, QSplitter, QFrame, QSizePolicy, QToolButton, QMenu, QScrollArea,
 )
 from core.figure_labels import field_label, axis_label
 from gui.pages.base import PageBase
@@ -163,8 +163,36 @@ class AnalysisPage(PageBase):
         form.addRow(self.parameter_hint)
         form.addRow(self.use_example)
         form.addRow(self.use_axis_examples)
-        setup.addWidget(form_widget)
-        setup.addWidget(self.help)
+        family_row = form.takeRow(self.family)
+        if family_row.labelItem and family_row.labelItem.widget():
+            family_row.labelItem.widget().deleteLater()
+        form.setRowVisible(self.kind, False)
+        self.study_catalog = QListWidget()
+        self.study_catalog.setAccessibleName("Estudos disponíveis nesta família")
+        self.study_catalog.setWordWrap(True)
+        self.study_catalog.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.study_catalog.setTextElideMode(Qt.ElideNone)
+        self.study_catalog.setResizeMode(QListWidget.Adjust)
+        catalog = QWidget()
+        catalog_body = QVBoxLayout(catalog)
+        catalog_body.setContentsMargins(0, 0, 12, 0)
+        catalog_body.addWidget(QLabel("Pergunta científica"))
+        catalog_body.addWidget(self.family)
+        catalog_body.addWidget(self.study_catalog, 1)
+        self.study_splitter = QSplitter(Qt.Horizontal)
+        self.study_splitter.setHandleWidth(3)
+        self.study_splitter.addWidget(catalog)
+        parameters = QWidget()
+        parameters_body = QVBoxLayout(parameters)
+        parameters_body.setContentsMargins(12, 0, 0, 0)
+        parameters_body.addWidget(form_widget)
+        parameters_body.addWidget(self.help)
+        parameters_body.addStretch()
+        self.study_splitter.addWidget(parameters)
+        self.study_splitter.setSizes([300, 700])
+        self.study_splitter.setStretchFactor(1, 1)
+        setup.addWidget(self.study_splitter, 1)
+        self.study_catalog.currentItemChanged.connect(lambda item, previous: self.kind.setCurrentIndex(self.kind.findData(item.data(Qt.UserRole))) if item else None)
         setup.addStretch()
         self.protocol=ProtocolPanel()
         plan_note = QLabel("Opcional: registre pergunta, hipótese, controles e referência no TCC. Salvar uma revisão guarda o plano; calcular um estudo produz outra evidência, vinculada à execução de origem.")
@@ -244,6 +272,23 @@ class AnalysisPage(PageBase):
             index = next(i for i in range(self.kind.count()) if self._family_for(self.kind.itemData(i)) == family)
             self.kind.setCurrentIndex(index)
 
+    def _refresh_study_catalog(self):
+        if not hasattr(self, 'study_catalog'):
+            return
+        blocker = QSignalBlocker(self.study_catalog)
+        self.study_catalog.clear()
+        selected = self.kind.currentData()
+        for i in range(self.kind.count()):
+            if not self.kind.view().isRowHidden(i):
+                key = self.kind.itemData(i)
+                item = QListWidgetItem(self.kind.itemText(i))
+                item.setData(Qt.UserRole, key)
+                item.setToolTip(STUDIES[key][1])
+                self.study_catalog.addItem(item)
+                if key == selected:
+                    self.study_catalog.setCurrentItem(item)
+        del blocker
+
     def _update_controls(self, *_):
         kind = self.kind.currentData()
         family = self._family_for(kind)
@@ -252,6 +297,7 @@ class AnalysisPage(PageBase):
             self.family.setCurrentIndex(self.family.findData(family))
             del blocker
         self._filter_studies(keep_current=True)
+        self._refresh_study_catalog()
         for w in (self.parameter, self.values, self.seeds):
             self.form.setRowVisible(w, kind == "sweep")
         self.form.setRowVisible(self.steps, kind in ("convergence", "trotter_noise"))
@@ -665,3 +711,8 @@ class AnalysisPage(PageBase):
         self.progress.setVisible(running)
         if running:
             self.progress.setValue(0)
+
+    def resizeEvent(self,event):
+        super().resizeEvent(event)
+        if hasattr(self,'study_splitter'):
+            self.study_splitter.setOrientation(Qt.Vertical if self.width()<950*max(1,self.font().pixelSize()/15) else Qt.Horizontal)

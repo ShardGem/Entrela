@@ -41,6 +41,7 @@ def main():
     parser.add_argument('--font-size', type=int, choices=range(11, 25), default=15)
     parser.add_argument('--width', type=int, default=1440)
     parser.add_argument('--height', type=int, default=960)
+    parser.add_argument('--all-pages', action='store_true', help='Inclui todas as ferramentas nos três temas.')
     args = parser.parse_args()
     if args.width < 800 or args.height < 600:
         parser.error('A captura requer pelo menos 800 × 600 pixels.')
@@ -67,8 +68,9 @@ def main():
             window._apply_preferences()
             window.resize(args.width, args.height)
             window.show()
-            for page, suffix in SCREENS.items():
-                window._show_page(page)
+            screens = {key: SCREENS.get(key, key) for key in window.pages} if args.all_pages else SCREENS
+            for page, suffix in screens.items():
+                window.navigation.open_page(page)
                 if page == 'history':
                     window.page_history.load([experiment])
                     window.page_history.set_detail(experiment, files=[])
@@ -86,7 +88,7 @@ def main():
             gc.collect()
     if errors:
         raise RuntimeError('\n'.join(errors))
-    print('PASS: 15 capturas dos temas reais, com experimento, preferências e armazenamento temporários.')
+    print(f'PASS: {len(screens) * len(PROFILES)} capturas dos temas reais, com experimento, preferências e armazenamento temporários.')
 
 
 if __name__ == '__main__':

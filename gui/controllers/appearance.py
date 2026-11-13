@@ -159,9 +159,10 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", dens
                             getattr(artist, setter)(mapping[color])
                     except (ValueError, TypeError, AttributeError):
                         pass
-            widget.figure.set_facecolor(PALETTE.bg)
+            figure_surface = getattr(PALETTE, getattr(widget, "interface_surface", "bg"))
+            widget.figure.set_facecolor(figure_surface)
             for ax in widget.figure.axes:
-                ax.set_facecolor(PALETTE.bg)
+                ax.set_facecolor(figure_surface)
                 legend = ax.get_legend()
                 if legend:
                     legend.get_frame().set_facecolor(PALETTE.surface)

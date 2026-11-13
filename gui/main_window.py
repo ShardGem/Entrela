@@ -278,6 +278,7 @@ class MainWindow(QMainWindow):
         self.job_monitor.cancel_requested.connect(self._cancel_simulation)
         self.sidebar.compact_requested.connect(self._toggle_sidebar)
         self.sidebar.navigate.connect(self.navigation.open_page)
+        self.page_history.configure_requested.connect(lambda: self._show_page("simulation"))
         self.topbar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
         self.topbar.commands_requested.connect(self._open_commands)
         self.page_workspace.page_selected.connect(self._show_page)

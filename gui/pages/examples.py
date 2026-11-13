@@ -1,8 +1,10 @@
-from PySide6.QtCore import Signal,Qt
-from PySide6.QtWidgets import QLineEdit,QComboBox,QListWidget,QListWidgetItem,QLabel,QHBoxLayout
+from PySide6.QtCore import Signal,Qt,QTimer
+from PySide6.QtWidgets import QLineEdit,QComboBox,QListWidget,QListWidgetItem,QLabel,QHBoxLayout,QSplitter,QScrollArea,QFrame,QVBoxLayout,QWidget
 from gui.pages.base import PageBase
 from gui.widgets.card import Card
-from gui.widgets.button import PrimaryButton
+from gui.widgets.button import PrimaryButton, SecondaryButton
+from gui.widgets.preparation_preview import PreparationPreview
+from gui.design_system import Surface
 from core.examples import EXAMPLES,get_example
 import unicodedata
 
@@ -24,16 +26,27 @@ class ExamplesPage(PageBase):
         self.body().addLayout(filters)
         self.list=QListWidget()
         self.list.setMinimumHeight(230)
-        self.body().addWidget(self.list)
-        card=Card("O que você vai investigar")
+        self.splitter=QSplitter(Qt.Horizontal)
+        self.splitter.setHandleWidth(3)
+        self.splitter.addWidget(self.list)
+        card=Surface("O que você vai investigar")
+        self.preparation=PreparationPreview()
+        card.add(self.preparation)
         self.details=QLabel()
         self.details.setWordWrap(True)
         card.add(self.details)
         self.btn_try=PrimaryButton("Experimentar — criar cópia")
         self.btn_try.clicked.connect(lambda:self.example_requested.emit(self.current_example_id))
         card.add(self.btn_try)
-        self.body().addWidget(card)
-        self.btn_tutorial=PrimaryButton("Aprender fazendo: tutorial de Bell")
+        detail=QScrollArea()
+        detail.setWidgetResizable(True)
+        detail.setFrameShape(QFrame.NoFrame)
+        detail.setWidget(card)
+        self.splitter.addWidget(detail)
+        self.splitter.setStretchFactor(1,1)
+        self.splitter.setSizes([350,800])
+        self.body().addWidget(self.splitter,1)
+        self.btn_tutorial=SecondaryButton("Aprender fazendo: tutorial de Bell")
         self.btn_tutorial.clicked.connect(self.tutorial_requested.emit)
         self.add_action(self.btn_tutorial)
         self.search.textChanged.connect(self._filter)
@@ -63,6 +76,7 @@ class ExamplesPage(PageBase):
         self.current_example_id=example.id
         self.btn_try.setEnabled(True)
         cfg=example.config
+        self.preparation.set_preparation(cfg.system.num_qubits,cfg.system.initial_state)
         self.details.setText(f"{example.description}\n\nObjetivo: {example.objective}\n\n"
             f"O que esperamos: {example.expected}\n\n"
             f"{cfg.system.num_qubits} qubits · {cfg.system.hamiltonian} · "
@@ -74,3 +88,8 @@ class ExamplesPage(PageBase):
         self.level_filter.setCurrentIndex(0)
         for row in range(self.list.count()):
             if self.list.item(row).data(Qt.UserRole)==identifier:self.list.setCurrentRow(row)
+
+    def resizeEvent(self,event):
+        super().resizeEvent(event)
+        if hasattr(self,'splitter'):
+            self.splitter.setOrientation(Qt.Vertical if self.width()<850*max(1,self.font().pixelSize()/15) else Qt.Horizontal)

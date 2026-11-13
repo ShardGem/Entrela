@@ -87,6 +87,7 @@ class ConfigPanel(QWidget):
         self._section_scroll_timer.setSingleShot(True)
         self._section_scroll_timer.setInterval(0)
         self._section_scroll_timer.timeout.connect(self._scroll_to_section)
+        self._inspector_mode = False
         self.current_mode, self.current_section = "guided", "system"
         root = QVBoxLayout(self)
         root.setSpacing(12)
@@ -310,6 +311,12 @@ class ConfigPanel(QWidget):
         layout.addWidget(button)
         return widget
 
+    def set_inspector_mode(self, enabled=True):
+        self._inspector_mode = bool(enabled)
+        for form in self.forms.values():
+            form.setRowWrapPolicy(QFormLayout.WrapAllRows if enabled else QFormLayout.WrapLongRows)
+        self._present()
+
     def set_mode(self, mode):
         if mode not in ("guided", "advanced"):
             raise ValueError("Modo inválido")
@@ -346,9 +353,10 @@ class ConfigPanel(QWidget):
 
     def _present(self):
         guided = self.current_mode == "guided"
-        self.section_nav.setVisible(guided and not self._compact_sections)
-        self.section_selector.setVisible(guided and self._compact_sections)
-        self.parameter_title.setVisible(not (guided and self._compact_sections))
+        compact = self._compact_sections or self._inspector_mode
+        self.section_nav.setVisible(guided and not compact)
+        self.section_selector.setVisible(guided and compact)
+        self.parameter_title.setVisible(not (guided and compact))
         blocker = QSignalBlocker(self.section_selector)
         self.section_selector.setCurrentIndex(self.section_selector.findData(self.current_section))
         self.section_selector.setToolTip(self.section_selector.currentData(Qt.ToolTipRole) or "Etapa da configuração guiada")
@@ -371,7 +379,7 @@ class ConfigPanel(QWidget):
             widget.summary.setVisible(not guided and bool(widget.summary.text()))
             self.section_buttons[key].setChecked(key == self.current_section)
         for label in self.descriptions:
-            label.setVisible(self.current_mode == "guided" and not self._compact_sections)
+            label.setVisible(self.current_mode == "guided" and not compact)
         self.btn_back.setVisible(self.current_mode == "guided")
         self.btn_next.setVisible(self.current_mode == "guided")
         self.btn_back.setEnabled(self.current_section != "system")

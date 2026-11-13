@@ -61,6 +61,7 @@ def test_results_keep_full_plots_visible_after_other_tabs(window, qt_app):
     window.resize(1440, 960)
     window._show_page('results')
     page = window.page_results
+    page.results_tab.chart_views.setCurrentIndex(2)
     for tab in (page.metadata, page.state_inspector, page.interpretation, page.results_tab):
         page.tabs.setCurrentWidget(tab)
         settle(qt_app)
@@ -79,6 +80,8 @@ def test_small_results_stack_plots_with_the_same_data(window, qt_app):
     window.resize(1024, 768)
     settle(qt_app)
     graph = window.page_results.results_tab
+    graph.chart_views.setCurrentIndex(2)
+    settle(qt_app)
     first = graph.canvas_hist.mapTo(graph, QPoint(0, 0))
     second = graph.canvas_evol.mapTo(graph, QPoint(0, 0))
     assert second.y() >= first.y() + graph.canvas_hist.height()

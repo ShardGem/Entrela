@@ -1,9 +1,11 @@
 from core.types import system_label
 from data.workspace import experiment_title
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QLabel, QHBoxLayout, QGridLayout, QPushButton, QWidget, QVBoxLayout
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtWidgets import QLabel, QHBoxLayout, QGridLayout, QPushButton, QWidget, QVBoxLayout, QSplitter
 from gui.pages.base import PageBase
-from gui.widgets.card import Card, MetricCard
+from gui.widgets.card import Card, MetricCard, MetricGrid
+from gui.design_system import Surface
+from gui.widgets.collapsible import CollapsibleSection
 from gui.widgets.button import PrimaryButton, SecondaryButton
 
 
@@ -20,100 +22,62 @@ class DashboardPage(PageBase):
             "Investigue como o ruído afeta simulações quânticas e avalie a mitigação com dados reproduzíveis.",
             parent,
         )
-        hero = QLabel("Prepare, investigue e reproduza.")
+        hero = QLabel("Seu espaço de investigação")
         hero.setObjectName("HeroTitle")
         hero.setWordWrap(True)
         self.body().addWidget(hero)
-        actions = QHBoxLayout()
-        self._dashboard_actions = actions
-        for text, description, signal in [
-            (
-                "Criar experimento",
-                "Configure o sistema e investigue sua evolução.",
-                self.new_simulation,
-            ),
-            (
-                "Explorar exemplos",
-                "Abra cópias editáveis de experimentos científicos.",
-                self.examples_requested,
-            ),
-            (
-                "Aprender fazendo",
-                "Prepare, execute e reabra um estado de Bell.",
-                self.tutorial_requested,
-            ),
-        ]:
-            card = Card(text)
-            label = QLabel(description)
-            label.setWordWrap(True)
-            card.add(label)
-            button = PrimaryButton(text) if text == "Criar experimento" else SecondaryButton(text)
-            button.clicked.connect(signal.emit)
-            card.add(button)
-            actions.addWidget(card, 1)
-        self.body().addLayout(actions)
-        workflow = Card("Como investigar no Entrela")
-        flow = QGridLayout()
-        flow.setHorizontalSpacing(20)
-        flow.setVerticalSpacing(16)
-        for index, (title, description) in enumerate([
-            ("1 · Preparar", "Escolha um exemplo ou configure qubits, estado inicial e interações."),
-            ("2 · Comparar", "Execute o mesmo sistema com e sem ruído. Preserve os parâmetros que deseja controlar."),
-            ("3 · Analisar", "Inspecione fidelidade, pureza, energia e estados. Avalie o erro do observável ao aplicar ZNE."),
-            ("4 · Reproduzir", "Reabra o histórico e exporte configuração, semente, versões e resultados para o seu estudo."),
-        ]):
-            step = QWidget()
-            step.setStyleSheet("background: transparent;")
-            step_layout = QVBoxLayout(step)
-            step_layout.setContentsMargins(0, 0, 0, 0)
-            heading = QLabel(title)
-            heading.setObjectName("SectionTitle")
-            heading.setWordWrap(True)
-            explanation = QLabel(description)
-            explanation.setWordWrap(True)
-            step_layout.addWidget(heading)
-            step_layout.addWidget(explanation)
-            flow.addWidget(step, index // 2, index % 2)
-        flow.setColumnStretch(0, 1)
-        flow.setColumnStretch(1, 1)
-        workflow.add_layout(flow)
-        self.body().addWidget(workflow)
-
-        self.concept_toggle = SecondaryButton("Primeira vez? Entenda qubits, ruído e mitigação")
-        self.concept_toggle.setCheckable(True)
-        self.concept_toggle.setAccessibleName("Mostrar conceitos essenciais")
-        self.body().addWidget(self.concept_toggle)
-        self.concepts = Card("Conceitos essenciais")
-        for title, text in [
-            ("Qubit e circuito", "Um qubit pode ser medido como 0 ou 1. O circuito prepara e transforma o estado antes da medição; as probabilidades dependem dessas operações."),
-            ("Ruído e esfera de Bloch", "Ruído pode misturar o estado. A esfera mostra o estado local de cada qubit; um vetor curto também pode resultar de emaranhamento, sem ruído."),
-            ("Fidelidade e pureza", "Fidelidade compara dois estados com uma referência explícita. Pureza mede mistura; um estado global puro pode ter qubits locais mistos."),
-            ("Mitigação ZNE", "Executa versões com ruído amplificado e extrapola um observável. Não reconstrói um estado mitigado e pode aumentar o erro; a referência ideal permite verificar isso."),
-        ]:
-            label = QLabel(f"<b>{title}</b><br>{text}")
-            label.setWordWrap(True)
-            self.concepts.add(label)
-        self.concepts.hide()
-        self.concept_toggle.toggled.connect(self.concepts.setVisible)
-        self.body().addWidget(self.concepts)
-        grid = QGridLayout()
-        self.card_sims = MetricCard("Registros", "0")
+        overview = QLabel("Prepare sistemas, observe sua evolução e reúna evidências reproduzíveis.")
+        overview.setWordWrap(True)
+        overview.setObjectName("SectionSubtitle")
+        self.body().addWidget(overview)
+        self.card_sims = MetricCard("Execuções salvas", "0")
         self.card_last = MetricCard("Último modelo")
         self.card_fid = MetricCard("Última fidelidade")
         self.card_purity = MetricCard("Última pureza")
-        for index, card in enumerate(
-            [self.card_sims, self.card_last, self.card_fid, self.card_purity]
+        self.body().addWidget(MetricGrid([self.card_sims, self.card_last, self.card_fid, self.card_purity]))
+        self.dashboard_splitter = QSplitter(Qt.Horizontal)
+        self.dashboard_splitter.setHandleWidth(3)
+        self.recent = Surface("Continue de onde parou")
+        self.dashboard_splitter.addWidget(self.recent)
+        quick = Surface("Começar uma investigação")
+        for text, description, signal in [
+            ("Criar experimento", "Configure uma evolução ou monte um circuito de portas.", self.new_simulation),
+            ("Explorar exemplos", "Abra modelos editáveis com objetivos e previsões explicados.", self.examples_requested),
+            ("Aprender fazendo", "Percorra o tutorial verificável de um estado de Bell.", self.tutorial_requested),
+        ]:
+            button = PrimaryButton(text) if text == "Criar experimento" else SecondaryButton(text)
+            button.clicked.connect(signal.emit)
+            quick.add(button)
+            hint = QLabel(description); hint.setWordWrap(True); hint.setObjectName("FieldHint")
+            quick.add(hint)
+        workflow = CollapsibleSection("Como conduzir um estudo")
+        steps = QLabel("1 · Prepare o estado e o protocolo.\n2 · Execute e preserve os resultados.\n3 · Compare referências, ruído e observáveis.\n4 · Documente e reproduza as evidências.")
+        steps.setWordWrap(True)
+        workflow.content_layout.addWidget(steps)
+        quick.add(workflow)
+        self.concept_toggle = SecondaryButton("Conceitos essenciais")
+        self.concept_toggle.setCheckable(True)
+        self.concept_toggle.setAccessibleName("Mostrar conceitos essenciais")
+        quick.add(self.concept_toggle)
+        self.concepts = Card("Interpretar os resultados")
+        for text in (
+            "O circuito transforma o estado antes da medição; as contagens são amostras de suas probabilidades.",
+            "A esfera de Bloch representa cada estado local. Vetores curtos também podem resultar de emaranhamento.",
+            "Fidelidade usa uma referência explícita. Pureza global e pureza local têm interpretações diferentes.",
+            "ZNE extrapola observáveis e pode aumentar o erro; não reconstrói um estado mitigado.",
         ):
-            grid.addWidget(card, index // 2, index % 2)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-        self.body().addLayout(grid)
-        self.recent = Card("Continue de onde parou")
-        self.body().insertWidget(1, self.recent)
-        history = SecondaryButton("Abrir histórico completo")
+            paragraph=QLabel(text); paragraph.setWordWrap(True); self.concepts.add(paragraph)
+        self.concepts.hide()
+        self.concept_toggle.toggled.connect(self.concepts.setVisible)
+        quick.add(self.concepts)
+        quick.body().addStretch()
+        self.dashboard_splitter.addWidget(quick)
+        self.dashboard_splitter.setStretchFactor(0, 1)
+        self.dashboard_splitter.setSizes([800, 380])
+        self.body().addWidget(self.dashboard_splitter, 1)
+        history = SecondaryButton("Abrir histórico completo", icon="history")
         history.clicked.connect(self.open_history.emit)
-        self.body().addWidget(history)
-        self.body().addStretch()
+        self.body().addWidget(history, 0, Qt.AlignLeft)
         self.annotations = {}
         self._recent_experiments = []
 
@@ -150,6 +114,8 @@ class DashboardPage(PageBase):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if hasattr(self, "dashboard_splitter"):
+            self.dashboard_splitter.setOrientation(Qt.Vertical if self.width() < 900 * max(1, self.font().pixelSize()/15) else Qt.Horizontal)
         if hasattr(self, "_dashboard_actions"):
             self._dashboard_actions.setDirection(
                 QHBoxLayout.TopToBottom

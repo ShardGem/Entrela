@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QPlainTextEdit,
     QSizePolicy,
+    QFrame,
 )
 from qiskit.quantum_info import DensityMatrix, partial_trace
 from gui.pages.base import PageBase
@@ -119,7 +120,10 @@ class BlochPage(PageBase):
         self.body().addWidget(self._empty)
         self._content = QWidget()
         layout = QVBoxLayout(self._content)
-        controls = FlowLayout()
+        self.transport = QFrame()
+        self.transport.setObjectName("TransportBar")
+        controls = FlowLayout(self.transport)
+        controls.setContentsMargins(10, 8, 10, 8)
         self.btn_play = PrimaryButton("Reproduzir")
         self.btn_play.clicked.connect(self._toggle_play)
         self.btn_stop = GhostButton("Reiniciar")
@@ -163,7 +167,6 @@ class BlochPage(PageBase):
         controls.addWidget(self.camera_toggle)
         controls.add_group(QLabel("Velocidade"), self.speed_combo)
         controls.addWidget(self.loop)
-        layout.addLayout(controls)
         layout.addWidget(self.selection_label)
         self.canvas = BlochCanvas()
         self.canvas.qubit_selected.connect(self._select_qubit)
@@ -239,6 +242,7 @@ class BlochPage(PageBase):
         )
         frame_row.addWidget(self.snapshot_spin)
         layout.addLayout(frame_row)
+        layout.addWidget(self.transport)
         self.timeline_detail = QPlainTextEdit()
         self.timeline_detail.setReadOnly(True)
         self.timeline_detail.setMinimumHeight(150)

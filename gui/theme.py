@@ -3,6 +3,7 @@ Design system do Entrela.
 Fonte única de verdade para cores, tipografia e espaçamento.
 """
 from __future__ import annotations
+from gui.design_system import studio_qss
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,10 +11,10 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Palette:
     # Superfícies
-    bg: str = "#12171e"
-    bg_elevated: str = "#181f28"
-    surface: str = "#202a36"
-    surface_hover: str = "#293644"
+    bg: str = "#0d1621"
+    bg_elevated: str = "#142130"
+    surface: str = "#1c2a3b"
+    surface_hover: str = "#26364a"
     surface_active: str = "#304451"
 
     # Bordas
@@ -542,4 +543,4 @@ QProgressBar::chunk {{
 QPushButton:focus, QPushButton#PrimaryButton:focus, QPushButton#GhostButton:focus,
 QPushButton#SecondaryButton:focus, QPushButton#NavButton:focus,
 QPushButton#NavGroup:focus, QPushButton#ConfigStep:focus {{ border: 2px solid {p.text}; }}
-"""
+""" + studio_qss(p)

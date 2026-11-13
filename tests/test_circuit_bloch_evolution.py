@@ -83,12 +83,14 @@ def test_ctrl_click_multiselection_and_clipboard_shortcut_respects_text_fields(e
     assert QApplication.clipboard().text() == "Texto para copiar"
 
 
-@pytest.mark.parametrize("width,columns", [(680, 1), (880, 1), (1280, 2)])
+@pytest.mark.parametrize("width,columns", [(680, 2), (880, 2), (1280, 2)])
 def test_gate_palette_columns_fit_viewport_at_different_widths(editor, qt_app, width, columns):
     from gui.theme import build_qss
     editor.setStyleSheet(build_qss())
     editor.resize(width, 850)
     editor.show()
+    if editor._compact_scene:
+        editor.scene_compact_tabs.setCurrentWidget(editor.palette_panel)
     for _ in range(3):
         qt_app.processEvents()
     viewport = editor.palette_scroll.viewport()
@@ -97,8 +99,8 @@ def test_gate_palette_columns_fit_viewport_at_different_widths(editor, qt_app, w
         position = button.mapTo(viewport, button.rect().topLeft())
         assert position.x() >= 0
         assert position.x() + button.width() <= viewport.width()
-    # Readable gate names need more room than symbols alone. Narrow editors
-    # keep one column so the drawing and inspector retain usable space.
+    # Nas abas compactas, a paleta ocupa a largura da tela; em telas largas,
+    # duas colunas continuam cabendo ao lado do desenho e do inspetor.
     assert editor._palette_columns == columns
 
 

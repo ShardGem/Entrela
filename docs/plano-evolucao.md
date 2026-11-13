@@ -14,6 +14,8 @@ Na versão 0.24, a navegação passa a seis destinos, com duas etapas no laborat
 
 Na versão 0.24.1, os acessos diretos às funcionalidades são restaurados no menu lateral, com grupos por finalidade e nomes explícitos. Início e Preferências ficam fixos; editor, estados 3D, estudos, ZNE, comparações, histórico e relatórios voltam a ter entradas próprias. Cabeçalhos de grupo são discretos e a seleção identifica a função exata. As áreas de trabalho integradas e os rascunhos independentes permanecem. O [guia de navegação](interface-0.24.1.md) e a [galeria atual](screenshots/0.24.1/README.md) registram a organização vigente.
 
+Na versão 0.25, o estúdio científico substitui a composição vertical da configuração e do editor por área de trabalho central e inspetores. Resultados ganha modos de gráfico, estudos e preferências recebem catálogos visíveis, exemplos usam lista/detalhe e a reprodução 3D fica junto à linha do tempo. Os acessos por nome, rascunhos e resultados são preservados. As imagens e ícones enviados pelo autor foram incorporados sem alterar a splash. Consulte as [três propostas e a decisão](design/0.25.0/README.md), o [antes/depois e os limites](interface-0.25.md) e a [galeria atual](screenshots/0.25.0/README.md). Os estudos científicos P2 continuam pendentes; esta entrega trata da interface e de seus fluxos.
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |

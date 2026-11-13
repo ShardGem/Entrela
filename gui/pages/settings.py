@@ -1,7 +1,7 @@
 """Workspace preferences, independent of scientific experiment parameters."""
 
-from PySide6.QtCore import Signal, QSignalBlocker, Qt
-from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBox, QScrollArea, QWidget, QVBoxLayout, QFrame
+from PySide6.QtCore import Signal, QSignalBlocker, Qt, QEvent
+from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBox, QScrollArea, QWidget, QVBoxLayout, QFrame, QListWidget, QSplitter, QMenu
 from gui.pages.base import PageBase
 from gui.widgets.card import Card
 from gui.widgets.button import SecondaryButton
@@ -24,12 +24,32 @@ class SettingsPage(PageBase):
 
     def __init__(self, parent=None):
         super().__init__("Preferências", "Adapte a área de trabalho sem alterar os resultados dos experimentos.", parent)
+        self._forms = []
         self.category = QComboBox()
         self.category.setAccessibleName('Categoria das preferências')
+        self.category.setMinimumContentsLength(10)
+        self.category.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.sections = ContentTabs()
         self.sections.tabBar().hide()
+        self.category.hide()
+        self.category_list = QListWidget()
+        self.category_list.setObjectName("PreferenceCategories")
+        self.category_list.setAccessibleName("Categorias das preferências")
+        self.category_list.setWordWrap(True)
+        self.category_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.category_list.setTextElideMode(Qt.ElideNone)
+        self.category_list.setResizeMode(QListWidget.Adjust)
+        self.category_list.setMinimumWidth(170)
+        self.category_list.setMaximumWidth(250)
+        self.preferences_splitter = QSplitter(Qt.Horizontal)
+        self.preferences_splitter.setHandleWidth(3)
+        self.preferences_splitter.addWidget(self.category_list)
+        self.preferences_splitter.addWidget(self.sections)
+        self.preferences_splitter.setStretchFactor(1, 1)
         self.body().addWidget(self.category)
-        self.body().addWidget(self.sections, 1)
+        self.body().addWidget(self.preferences_splitter, 1)
+        self.category_list.currentRowChanged.connect(self.category.setCurrentIndex)
+        self.category.currentIndexChanged.connect(self.category_list.setCurrentRow)
         self.category.currentIndexChanged.connect(self.sections.setCurrentIndex)
         self.theme = self._combo(THEME_CHOICES)
         self.accent = self._combo((('Padrão do tema', 'theme'), ('Ciano · Entrela', 'cyan'), ('Azul', 'blue'), ('Violeta', 'violet'), ('Verde', 'green')))
@@ -45,22 +65,25 @@ class SettingsPage(PageBase):
         self.theme.setToolTip('O modo automático acompanha a preferência de cores informada pelo sistema operacional.')
         self.accent.setToolTip('Padrão do tema usa o ciano do Grafite ou o azul dos temas Claro científico e Azul escuro. As demais opções personalizam o destaque.')
         self.density.setToolTip('Ajusta os espaços de botões, formulários e tabelas. Não altera a escala dos dados.')
-        self.presentation = QCheckBox('Fonte maior e navegação compacta · F11 para tela cheia')
-        self.compact = QCheckBox('Usar menu mais estreito, mantendo os nomes dos itens')
+        self.presentation = QCheckBox('Modo de apresentação')
+        self.presentation.setToolTip('Usa fonte maior e navegação compacta. F11 alterna a tela cheia.')
+        self.compact = QCheckBox('Menu estreito com nomes')
+        self.compact.setToolTip('Reduz a largura da navegação e preserva os nomes completos dos itens.')
         self._card('Aparência', [
             ('Tema', self.theme), ('Sobre o tema', self.theme_description), ('Cor de destaque', self.accent),
             ('Tamanho do texto', self.font_size), ('Densidade', self.density),
             ('Navegação', self.compact), ('Apresentação', self.presentation),
         ])
-        self.reduce_motion = QCheckBox('Reduzir animações da interface')
+        self.reduce_motion = QCheckBox('Reduzir animações')
         self.reduce_motion.setToolTip('Desativa transições de navegação e animações decorativas. A reprodução científica continua disponível nos controles 3D.')
-        self.high_contrast = QCheckBox('Aumentar contraste de textos e contornos')
+        self.high_contrast = QCheckBox('Aumentar contraste')
+        self.high_contrast.setToolTip('Aumenta o contraste de textos e contornos nos temas disponíveis.')
         self._card('Acessibilidade', [('Movimento', self.reduce_motion), ('Contraste', self.high_contrast)])
         self.spin_shots = QSpinBox()
         self.spin_shots.setRange(1, 1_000_000)
         self.spin_shots.setValue(8192)
         self.spin_shots.setToolTip('Número inicial de amostras ao criar um experimento. A configuração de cada execução continua registrada separadamente.')
-        self.completion_notifications = QCheckBox('Mostrar aviso ao concluir uma execução')
+        self.completion_notifications = QCheckBox('Avisar ao concluir')
         self._card('Execução e avisos', [('Shots para novos experimentos', self.spin_shots), ('Notificações', self.completion_notifications)])
         self.export_dpi = QSpinBox()
         self.export_dpi.setRange(150, 600)
@@ -89,16 +112,43 @@ class SettingsPage(PageBase):
         reset = SecondaryButton('Restaurar preferências padrão')
         reset.setToolTip('Restaura a aparência e a visualização. Os experimentos salvos são preservados.')
         reset.clicked.connect(self.restore_requested.emit)
-        self.add_action(reset)
+        reset.setParent(self)
+        reset.hide()
+        self.restore_menu_button = SecondaryButton('Restaurar')
+        restore_menu = QMenu(self.restore_menu_button)
+        restore_menu.addAction('Preferências padrão', reset.click)
+        self.restore_menu_button.setMenu(restore_menu)
+        self.add_action(self.restore_menu_button)
         self.reset_layout_button = SecondaryButton('Restaurar disposição dos painéis')
         self.reset_layout_button.setToolTip('Restaura os tamanhos dos painéis e as categorias de navegação. Mantém parâmetros, circuitos e execuções.')
         self.reset_layout_button.clicked.connect(self.layout_reset_requested.emit)
-        self.add_action(self.reset_layout_button)
+        self.reset_layout_button.setParent(self)
+        self.reset_layout_button.hide()
+        restore_menu.addAction("Disposição dos painéis", self.reset_layout_button.click)
         self.apply_values(self.DEFAULTS)
         for name in self.DEFAULTS:
             widget = getattr(self, name)
             signal = widget.currentIndexChanged if isinstance(widget, QComboBox) else widget.valueChanged if isinstance(widget, QSpinBox) else widget.toggled
             signal.connect(lambda *_: self.appearance_changed.emit())
+        self._arrange_preferences()
+
+    def _arrange_preferences(self):
+        if not hasattr(self, 'preferences_splitter'):
+            return
+        narrow = self.width() < 1050 * max(1, self.font().pixelSize() / 15)
+        self.category.setVisible(narrow)
+        self.category_list.setVisible(not narrow)
+        for form in self._forms:
+            form.setRowWrapPolicy(QFormLayout.WrapAllRows if narrow else QFormLayout.WrapLongRows)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._arrange_preferences()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._arrange_preferences()
 
     def _describe_theme(self, *_):
         self.theme_description.setText(THEME_DESCRIPTIONS.get(self.theme.currentData(), THEME_DESCRIPTIONS['dark']))
@@ -113,6 +163,7 @@ class SettingsPage(PageBase):
     def _card(self, title, rows):
         card = Card(title)
         form = QFormLayout()
+        self._forms.append(form)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         form.setVerticalSpacing(12)
         for label, widget in rows:
@@ -135,6 +186,9 @@ class SettingsPage(PageBase):
         area.setWidget(holder)
         self.sections.addTab(area, title)
         self.category.addItem(title)
+        self.category_list.addItem(title)
+        if self.category_list.currentRow() < 0:
+            self.category_list.setCurrentRow(0)
 
     def collect_values(self):
         values = {}

@@ -65,7 +65,7 @@ class Gallery:
         self.window.pages[page]._scroll.verticalScrollBar().setValue(0)
         self.settle()
 
-    def capture(self, name, title, page, widget=None):
+    def capture(self, name, title, page, widget=None, *, expected_size=None):
         from PySide6.QtWidgets import QToolTip
         from PySide6.QtGui import QImageWriter, QCursor
         from gui.widgets.figure_canvas import StableFigureCanvas
@@ -89,7 +89,8 @@ class Gallery:
         path.parent.mkdir(parents=True, exist_ok=True)
         pixmap = target.grab()
         ratio = target.devicePixelRatioF()
-        if widget is None and (target.width(), target.height()) != (self.args.width, self.args.height):
+        requested_size = expected_size or (self.args.width, self.args.height)
+        if widget is None and (target.width(), target.height()) != requested_size:
             raise RuntimeError('A janela não manteve as dimensões solicitadas.')
         if abs(ratio - self.args.scale) > .01:
             raise RuntimeError(f'Escala Qt inesperada: {ratio}, esperada {self.args.scale}.')
@@ -104,6 +105,8 @@ class Gallery:
                                 pixels=[pixmap.width(), pixmap.height()],
                                 logical_size=[target.width(), target.height()],
                                 device_pixel_ratio=ratio, plot_count=len(canvases),
+                                interface_font_size=int(self.app.property('entrelaFontSize') or self.args.font_size),
+                                theme=self.window.property('entrelaTheme'),
                                 selected_result_id=experiment.id if experiment else None,
                                 analysis_id=(self.window.page_analysis.data or {}).get('analysis_id')
                                 if page == 'analysis' and self.window.page_analysis.tabs.currentWidget() is self.window.page_analysis.results_tab else None,
@@ -134,6 +137,8 @@ class Gallery:
                         studies_file='estudos.json', studies_sha256=sha256((self.args.output / 'estudos.json').read_bytes()).hexdigest(),
                         source_relation='selected_result_id identifica a execução selecionada; formulários de configuração são rascunhos independentes.',
                         expected_pages=sorted(self.window.pages), captures=self.images)
+        manifest['identity_assets'] = {str(path.relative_to(ROOT)): sha256(path.read_bytes()).hexdigest()
+                                       for path in [ROOT/'gui/assets/entrela_logo.png', ROOT/'gui/assets/entrela_texto.png', ROOT/'gui/assets/icons/entrela.svg', ROOT/'gui/assets/icons/entrela.ico', ROOT/'gui/assets/icons/entrela.png']}
         (self.args.output / 'manifesto.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
         lines = [f'# Galeria do Entrela {__version__}', '',
                  f'{len(self.images)} capturas PNG sem perdas, renderizadas diretamente no Qt. '
@@ -141,6 +146,8 @@ class Gallery:
                  'Os cenários foram executados em armazenamento temporário, com sementes registradas. '
                  'São demonstrações do aplicativo; não substituem os experimentos do TCC. '
                  'A splash e as janelas de configurações/exportação conservam seus tamanhos próprios, também na escala declarada.', '',
+                 'As capturas de texto ampliado usam janela de 1024 × 768 pixels lógicos e fonte de 24 px. '
+                 'Tema, tamanho do texto, resolução e escala de cada imagem ficam registrados no manifesto.', '',
                  'Clique nos nomes para abrir os arquivos originais. '
                  '[Manifesto e hashes](manifesto.json) · [Configurações e resultados dos cenários](cenarios.json) · [Estudos calculados](estudos.json).', '']
         for folder, label in CATEGORIES.items():
@@ -241,7 +248,7 @@ def main():
         gallery.capture('01-inicio/01-visao-geral.png', 'Visão geral do laboratório', 'dashboard')
         splash = SplashScreen()
         splash.show()
-        gallery.capture('01-inicio/02-splash.png', 'Tela de abertura original', 'splash', splash)
+        gallery.capture('01-inicio/02-splash.png', 'Tela de abertura · imagens atuais do autor', 'splash', splash)
         splash.close()
         splash.deleteLater()
         gallery.show('examples')
@@ -265,6 +272,11 @@ def main():
         panel.set_mode('advanced')
         panel.set_section('noise')
         gallery.capture('03-laboratorio/06-configuracao-avancada.png', 'Parâmetros no modo avançado', 'simulation')
+        window.page_simulation.preview_tabs.setCurrentIndex(1)
+        gallery.capture('03-laboratorio/14-bancada-protocolo.png', 'Revisão do protocolo do rascunho', 'simulation')
+        window.page_simulation.preview_tabs.setCurrentIndex(2)
+        gallery.capture('03-laboratorio/13-bancada-execucao.png', 'Evidência da execução selecionada na bancada', 'simulation')
+        window.page_simulation.preview_tabs.setCurrentIndex(0)
         panel.set_mode('guided')
         select(custom)
         gallery.show('circuit')
@@ -285,9 +297,16 @@ def main():
         window.page_circuit.editor.advanced_section.set_expanded(True, animate=False)
         gallery.capture('03-laboratorio/11-editor-avancado.png', 'Fase global e parâmetros avançados do circuito', 'circuit')
         window.page_circuit.editor.advanced_section.set_expanded(False, animate=False)
+        window.page_circuit.editor.inspector_tabs.setCurrentIndex(1)
+        gallery.capture('03-laboratorio/12-editor-execucao.png', 'Medições, semente e ruído do circuito', 'circuit')
+        window.page_circuit.editor.inspector_tabs.setCurrentIndex(0)
         select(noisy)
         gallery.show('results')
         results = window.page_results
+        for index, slug in [(0, 'distribuicao'), (1, 'evolucao')]:
+            results.results_tab.chart_views.setCurrentIndex(index)
+            gallery.capture(f'04-resultados/resultados-{slug}.png', results.results_tab.chart_views.tabText(index), 'results')
+        results.results_tab.chart_views.setCurrentIndex(2)
         for widget, key, title in [(results.results_tab, 'graficos', 'Distribuição observada e evolução'),
                                     (results.interpretation, 'interpretacao', 'Interpretação dos resultados'),
                                     (results.table, 'dados', 'Contagens, frequências e probabilidades'),
@@ -379,6 +398,9 @@ def main():
         gallery.show('history')
         window.page_history.set_detail(noisy, files=[])
         gallery.capture('06-acervo/historico-resumo.png', 'Histórico e resumo da execução', 'history')
+        window.page_history.search.setText('Nenhuma execução corresponde a esta busca')
+        gallery.capture('06-acervo/historico-sem-resultados.png', 'Histórico · busca sem resultados', 'history')
+        window.page_history.search.clear()
         select(custom)
         window.page_history.set_detail(custom, files=[])
         window.page_history.detail_tabs.setCurrentWidget(window.page_history.circuit)
@@ -401,7 +423,9 @@ def main():
             gallery.capture(f'06-acervo/exportacao-{kind}.png', title, 'documentation', window.page_documentation.export_dialog)
             window.page_documentation.export_dialog.close()
         gallery.show('settings')
-        for index, (slug, title) in enumerate([('aparencia', 'Aparência e tipografia'), ('acessibilidade', 'Acessibilidade e notificações'), ('exportacao', 'Preferências de exportação'), ('backup-exportacao', 'Dados e backup')]):
+        for slug, title, category in [('aparencia', 'Aparência e tipografia', 'Aparência'), ('acessibilidade', 'Acessibilidade', 'Acessibilidade'), ('execucao-avisos', 'Execução e notificações', 'Execução e avisos'), ('exportacao', 'Preferências de exportação', 'Exportação'), ('backup-exportacao', 'Dados e backup', 'Dados e backup')]:
+            index = window.page_settings.category.findText(category)
+            assert index >= 0, category
             window.page_settings.category.setCurrentIndex(index)
             gallery.capture(f'07-preferencias/{slug}.png', title, 'settings')
         for theme, label in [('light', 'claro'), ('navy', 'azul-escuro')]:
@@ -417,6 +441,25 @@ def main():
         window.help_dock.show()
         gallery.capture('02-aprendizado/ajuda-contextual.png', 'Ajuda contextual durante a configuração', 'simulation')
         window.help_dock.hide()
+        window.page_settings.font_size.setValue(24)
+        window.resize(1024, 768)
+        window._apply_draft(config, names[noisy.id])
+        gallery.show('simulation')
+        window.page_simulation.compact_tabs.setCurrentIndex(1)
+        window.page_simulation.preview_tabs.setCurrentIndex(1)
+        gallery.capture('07-preferencias/texto-ampliado-simulacao.png', '1024 × 768 · revisão com texto ampliado', 'simulation', expected_size=(1024, 768))
+        window.navigation.open_page('circuit')
+        gallery.idle()
+        window.page_circuit.editor.scene_compact_tabs.setCurrentIndex(1)
+        gallery.capture('07-preferencias/texto-ampliado-editor.png', '1024 × 768 · editor adaptável', 'circuit', expected_size=(1024, 768))
+        gallery.show('settings')
+        window.page_settings.category.setCurrentIndex(0)
+        gallery.capture('07-preferencias/texto-ampliado-preferencias.png', '1024 × 768 · preferências com texto ampliado', 'settings', expected_size=(1024, 768))
+        select(noisy)
+        gallery.show('history')
+        window.page_history.set_detail(noisy, files=[])
+        window.page_history.detail_tabs.setCurrentIndex(0)
+        gallery.capture('07-preferencias/texto-ampliado-historico.png', '1024 × 768 · detalhes do histórico', 'history', expected_size=(1024, 768))
         gallery.finish(experiments)
         guard.stop()
         window._unsaved_result = False

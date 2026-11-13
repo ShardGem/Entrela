@@ -12,38 +12,39 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
-## Interface e galeria em alta resolução — 0.24.1
+## Estúdio científico e galeria em alta resolução — 0.25.0
 
 - Acessos diretos às funcionalidades, organizados em Laboratório, Investigação, Registros e Aprendizado; Início e Preferências permanecem fixos.
-- Gráficos com área própria e organização vertical em janelas menores.
-- Configuração guiada com menos cabeçalhos repetidos e mais espaço para preencher os parâmetros.
-- Cena 3D com inspetor lateral de câmera, etapa, qubits e métricas; estado final acessível mesmo sem snapshots.
-- Preferências por categoria e disposição dos painéis persistente, com restauração independente dos dados.
+- Configuração com área científica central, revisão do protocolo, dados da execução selecionada e parâmetros em um inspetor lateral.
+- Editor com modelos e portas à esquerda, desenho no centro e inspetor de operação/execução à direita.
+- Gráficos amplos com modos Distribuição, Evolução e Lado a lado; reprodução 3D junto à linha do tempo.
+- Estudos por pergunta científica, exemplos em lista/detalhe e preferências com categorias visíveis.
+- Novas imagens e ícones do autor incorporados, preservando o comportamento da splash.
 - Capturas PNG nativas em **3840 × 2160**, organizadas por módulo, com índice, hashes e cenários realmente executados.
 
-**[Abrir a galeria completa da interface](docs/screenshots/0.24.1/README.md)** · [Ajustes, validação e limites](docs/interface-0.24.1.md)
+**[Abrir a galeria completa da interface](docs/screenshots/0.25.0/README.md)** · [Antes/depois, validação e limites](docs/interface-0.25.md) · [Três propostas de composição](docs/design/0.25.0/README.md)
 
-[![Simulação de quatro qubits e referência ideal na esfera de Bloch](docs/screenshots/0.24.1/04-resultados/bloch-cena.png)](docs/screenshots/0.24.1/04-resultados/bloch-cena.png)
+[![Simulação de quatro qubits e referência ideal na esfera de Bloch](docs/screenshots/0.25.0/04-resultados/bloch-cena.png)](docs/screenshots/0.25.0/04-resultados/bloch-cena.png)
 
 <details>
 <summary>Configuração, circuitos e resultados</summary>
 
-![Configuração da simulação com prévia e parâmetros](docs/screenshots/0.24.1/03-laboratorio/04-configurar-ruido.png)
+![Configuração da simulação com prévia e parâmetros](docs/screenshots/0.25.0/03-laboratorio/04-configurar-ruido.png)
 
-![Editor de circuitos e biblioteca de portas](docs/screenshots/0.24.1/03-laboratorio/08-editor.png)
+![Editor de circuitos e biblioteca de portas](docs/screenshots/0.25.0/03-laboratorio/08-editor.png)
 
-![Distribuições e evolução da simulação](docs/screenshots/0.24.1/04-resultados/resultados-graficos.png)
+![Distribuições e evolução da simulação](docs/screenshots/0.25.0/04-resultados/resultados-graficos.png)
 
 </details>
 
 <details>
 <summary>Pesquisa, comparações e histórico</summary>
 
-![Mapa de calor calculado a partir da varredura de parâmetros](docs/screenshots/0.24.1/05-pesquisa/resultado-mapa-calor.png)
+![Mapa de calor calculado a partir da varredura de parâmetros](docs/screenshots/0.25.0/05-pesquisa/resultado-mapa-calor.png)
 
-![Comparação de estados de Bloch de duas execuções](docs/screenshots/0.24.1/05-pesquisa/comparacao-bloch.png)
+![Comparação de estados de Bloch de duas execuções](docs/screenshots/0.25.0/05-pesquisa/comparacao-bloch.png)
 
-![Consulta gráfica do circuito no histórico](docs/screenshots/0.24.1/06-acervo/historico-circuito.png)
+![Consulta gráfica do circuito no histórico](docs/screenshots/0.25.0/06-acervo/historico-circuito.png)
 
 </details>
 

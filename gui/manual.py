@@ -1,7 +1,7 @@
 """Scientific help, shared by the learning page and contextual dock."""
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
-<p>O Laboratório reúne Preparar e Resultados. Em Preparar, escolha evolução por Hamiltoniano ou circuito de portas; em Resultados, selecione gráficos, estados quânticos, circuito executado e dados.
+<p>O Laboratório reúne configuração por Hamiltoniano, editor de circuitos, resultados e estados quânticos 3D. Cada ferramenta tem acesso direto pelo nome; em Resultados, selecione gráficos, circuito executado, interpretação e dados.
 O menu lateral mantém os acessos diretos: Laboratório agrupa configuração, editor, resultados e estados 3D; Investigação reúne estudos, ZNE e comparações; Registros reúne histórico, anotações, configurações salvas e relatórios; Aprendizado contém exemplos, conceitos e manual. Início e Preferências permanecem fixos.
 Escolha uma configuração salva ou edite um circuito, execute e consulte os resultados no mesmo ambiente.
 Configurar prepara evoluções por Hamiltoniano; o editor de portas tem seu próprio rascunho e parâmetros.
@@ -11,14 +11,16 @@ Os mesmos controles preservam a configuração ao alternar. O botão Buscar enco
 <p>No modo Avançado, cada categoria pode ser expandida ou recolhida; seu cabeçalho resume os valores.
 Use os botões ? ou a ajuda de cada campo para consultar significado, unidades e limites. A prévia do estado inicial
 é descritiva e ideal; não calcula o efeito do ruído nem substitui uma execução.</p>
-<p>Em janelas menores, alterne entre Parâmetros e Prévia e revisão. A barra de execução permanece acessível.
+<p>Na configuração, a área central reúne Preparação, Revisão do protocolo e Execução selecionada; os parâmetros ficam no inspetor à direita. A preparação acompanha o rascunho, enquanto a execução selecionada continua mostrando os dados já calculados. Em janelas menores, alterne entre Parâmetros e Área de experimentação. A barra de execução permanece acessível.
 Configurações inválidas indicam o campo a revisar. O menu Exemplos carrega configurações da galeria sem executá-las.</p>
+<p>Nos gráficos de Resultados, escolha Distribuição, Evolução ou Lado a lado. Contagens são amostras de medição; as curvas temporais representam probabilidades calculadas nos snapshots. Mudar a visualização não executa novamente o experimento.</p>
 <h2 id="Circuitos">Criar e consultar circuitos</h2>
 <p>No menu Editor de circuitos, escolha um modelo ou adicione portas pela paleta. q0 identifica o primeiro qubit; controle e alvo são linhas distintas nas operações controladas. Ângulos de rotação são expressos em radianos. A ajuda de cada porta explica a operação. Desfazer e Refazer recuperam alterações; Salvar revisão guarda o circuito na biblioteca. Arquivo e desenho permite importar e exportar formatos compatíveis. O circuito executado, em Resultados, é uma consulta somente de leitura: modificar o rascunho não recalcula a execução selecionada.</p>
+<p>O editor apresenta modelos e portas à esquerda, desenho ou lista de operações no centro e um inspetor à direita. Em janelas menores, alterne entre as abas Portas, Circuito e Inspetor. Na aba Porta do inspetor, consulte e ajuste a operação selecionada; na aba Execução, defina shots, semente e ruído. O botão Inspetor abre esse painel e permite recolhê-lo em telas largas; Executar circuito permanece na base da tela.</p>
 <h2 id="Esfera de Bloch">Estados quânticos e esfera de Bloch</h2>
 <p>A esfera representa o estado reduzido de cada qubit, não o estado global. Selecione uma esfera e use Focar selecionado; clique novamente ou escolha Todos os qubits para desfocar. O inspetor reúne câmera, etapa, estados locais e métricas. O cursor percorre somente snapshots realmente armazenados. Sem snapshots, mostra-se apenas o estado final calculado; não há evolução reconstruída. O Estado global permite distinguir mistura de emaranhamento.</p>
 <h2 id="Configurações">Preferências do espaço de trabalho</h2>
-<p>Escolha uma categoria para configurar aparência, acessibilidade, exportação ou dados e backup. Tema, texto, densidade e movimento são persistentes e não modificam o experimento. Restaurar disposição dos painéis recupera a organização visual; restaurar preferências recupera as opções padrão. Restaurar backup substitui dados e requer a confirmação apresentada na prévia.</p>
+<p>Escolha uma categoria na lista para configurar aparência, acessibilidade, execução e avisos, exportação ou dados e backup. Tema, texto, densidade e movimento são persistentes e não modificam o experimento. O menu Restaurar permite recuperar a disposição dos painéis ou as preferências padrão. Restaurar backup substitui dados e requer a confirmação apresentada na prévia.</p>
 <h2 id="Qubits">Qubits e estado inicial</h2>
 <p>São suportados de 1 a 6 qubits. |0…0⟩ é o estado zero; |+…+⟩ prepara superposição.
 Bell usa H(q0) e CX(q0,q1), requer dois qubits e possui vetores locais nulos, mesmo sendo globalmente puro.

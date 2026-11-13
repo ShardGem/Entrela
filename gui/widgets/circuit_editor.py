@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QFrame,
     QTabWidget,
+    QSplitter,
     QListWidget,
     QListWidgetItem,
     QAbstractItemView,
@@ -42,6 +43,7 @@ from core.circuit_document import (
 from core.types import ExperimentConfig, SystemConfig, SimulationProtocol, NoiseConfig
 from gui.widgets.circuit_canvas import CircuitCanvas
 from gui.widgets.button import PrimaryButton, SecondaryButton, GhostButton
+from gui.widgets.content_tabs import ContentTabs
 from gui.widgets.scientific_input import ScientificSpinBox
 from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.collapsible import CollapsibleSection
@@ -133,7 +135,8 @@ class CircuitEditor(QWidget):
         introduction = QLabel("Adicione portas ou carregue um modelo para começar.")
         introduction.setWordWrap(True)
         introduction.setObjectName("FieldHint")
-        root.addWidget(introduction)
+        introduction.hide()
+        introduction.setParent(self)
         self.creation_help = CollapsibleSection("Como criar um circuito")
         self.creation_help.set_summary("")
         self.creation_help.layout().removeWidget(self.creation_help.header)
@@ -258,12 +261,15 @@ class CircuitEditor(QWidget):
         self.advanced_section.expanded_changed.connect(self.advanced_section.setVisible)
         root.addLayout(files)
         root.addWidget(self.advanced_section)
-        library_row = QHBoxLayout()
+        library_row = FlowLayout()
         self.circuit_name = QLineEdit()
+        self.circuit_name.setObjectName("DocumentTitle")
+        self.circuit_name.setMinimumWidth(360)
+        self.circuit_name.setMaximumWidth(420)
         self.circuit_name.setMaxLength(120)
         self.circuit_name.setPlaceholderText("Nome do circuito")
         self.circuit_name.setAccessibleName("Nome do circuito na biblioteca")
-        library_row.addWidget(self.circuit_name, 1)
+        library_row.addWidget(self.circuit_name)
         self.save_revision_button = SecondaryButton("Salvar revisão")
         self.save_revision_button.clicked.connect(self._save_revision)
         self.save_revision_button.setEnabled(False)
@@ -308,7 +314,9 @@ class CircuitEditor(QWidget):
         self.summary.setWordWrap(True)
         self.summary.setObjectName("SectionSubtitle")
         root.addWidget(self.summary)
-        row = QHBoxLayout()
+        self.scene_splitter = QSplitter(Qt.Horizontal)
+        self.scene_splitter.setHandleWidth(3)
+        self.scene_splitter.setChildrenCollapsible(False)
         palette = QWidget()
         palette_body = QGridLayout(palette)
         palette_body.setContentsMargins(4, 4, 4, 4)
@@ -351,13 +359,28 @@ class CircuitEditor(QWidget):
         palette_scroll.setWidget(palette)
         palette_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.palette_scroll = palette_scroll
+        self.palette_scroll.viewport().installEventFilter(self)
         self.palette_panel = palette_panel
         palette_layout.addWidget(palette_scroll, 1)
         self._palette_columns = 2
         self._visible_gates = list(GATES)
         self.gate_search.textChanged.connect(self._filter_gate_palette)
         self.gate_category.currentIndexChanged.connect(self._filter_gate_palette)
-        row.addWidget(palette_panel)
+        root.removeItem(templates)
+        for item in list(templates.items):
+            if item.widget(): item.widget().hide()
+        palette_layout.insertWidget(0, self.template_selector)
+        palette_layout.insertWidget(1, self.use_template)
+        root.removeWidget(self.template_hint)
+        palette_layout.insertWidget(2, self.template_hint)
+        self.template_selector.show()
+        self.use_template.show()
+        self.creation_help.header.setParent(self)
+        self.creation_help.header.show()
+        files.addWidget(self.creation_help.header)
+        palette_panel.setMinimumWidth(180)
+        palette_panel.setMaximumWidth(270)
+        self.scene_splitter.addWidget(palette_panel)
         self.canvas = CircuitCanvas(editable=True)
         self.canvas.setMinimumWidth(220)
         self.canvas.zoom_changed.connect(self._sync_zoom)
@@ -378,7 +401,7 @@ class CircuitEditor(QWidget):
         self.operations_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         operations_layout.addWidget(self.operations_list, 1)
         self.operation_views.addTab(operations_panel, "Operações")
-        row.addWidget(self.operation_views, 1)
+        self.scene_splitter.addWidget(self.operation_views)
         self.operations_list.itemSelectionChanged.connect(self._select_from_list)
         self.canvas.operations_selected.connect(self._select_many)
         # A scene must not be cleared while Qt is dispatching a gate's release event.
@@ -491,9 +514,38 @@ class CircuitEditor(QWidget):
         inspector_scroll.setWidget(inspector)
         inspector_scroll.setMinimumWidth(235)
         inspector_scroll.setMaximumWidth(280)
-        row.addWidget(inspector_scroll)
-        root.addLayout(row, 1)
-        settings = FlowLayout()
+        inspector_scroll.setMaximumWidth(16777215)
+        inspector_scroll.setFrameShape(QFrame.NoFrame)
+        self.inspector_tabs = QTabWidget()
+        self.inspector_tabs.setDocumentMode(True)
+        self.inspector_tabs.setMinimumWidth(260)
+        self.inspector_tabs.setMaximumWidth(370)
+        self.inspector_tabs.addTab(inspector_scroll, "Porta")
+        self.scene_splitter.addWidget(self.inspector_tabs)
+        self.scene_splitter.setStretchFactor(1, 1)
+        self.scene_splitter.setSizes([220, 800, 300])
+        self.inspector_toggle = QToolButton()
+        self.inspector_toggle.setText("Inspetor")
+        self.inspector_toggle.setCheckable(True)
+        self.inspector_toggle.setChecked(True)
+        self.inspector_toggle.setAccessibleName("Mostrar inspetor do circuito")
+        self.inspector_toggle.clicked.connect(self._toggle_inspector)
+        files.addWidget(self.inspector_toggle)
+        root.addWidget(self.scene_splitter, 1)
+        self._compact_scene = False
+        self._inspector_wide_visible = True
+        self.scene_compact_tabs = ContentTabs()
+        self.scene_compact_tabs.setDocumentMode(True)
+        self.scene_compact_tabs.setAccessibleName("Portas, circuito ou inspetor")
+        self.scene_compact_tabs.currentChanged.connect(lambda *_: self._palette_layout_timer.start())
+        self.scene_compact_tabs.hide()
+        root.addWidget(self.scene_compact_tabs, 1)
+        execution_options = QWidget()
+        options_layout = QVBoxLayout(execution_options)
+        options_layout.setContentsMargins(12, 12, 12, 12)
+        settings = QFormLayout()
+        settings.setRowWrapPolicy(QFormLayout.WrapAllRows)
+        options_layout.addLayout(settings)
         self.shots = QSpinBox()
         self.shots.setRange(1, 1_000_000)
         self.shots.setValue(1024)
@@ -521,9 +573,18 @@ class CircuitEditor(QWidget):
             label = QLabel(text)
             label.setToolTip(widget.toolTip())
             label.setBuddy(widget)
-            settings.add_group(label, widget)
-        settings.addWidget(self.noise)
-        root.addLayout(settings)
+            settings.addRow(label, widget)
+        options_layout.addWidget(self.noise)
+        form_body.removeWidget(noise_toggle)
+        form_body.removeWidget(advanced)
+        options_layout.addWidget(noise_toggle)
+        options_layout.addWidget(advanced)
+        options_layout.addStretch()
+        execution_scroll = QScrollArea()
+        execution_scroll.setFrameShape(QFrame.NoFrame)
+        execution_scroll.setWidgetResizable(True)
+        execution_scroll.setWidget(execution_options)
+        self.inspector_tabs.addTab(execution_scroll, "Execução")
         self.message = QLabel(
             "Até 200 portas · Ctrl+clique seleciona várias · Ctrl+C/V copia e cola · arraste para reordenar."
         )
@@ -648,7 +709,17 @@ class CircuitEditor(QWidget):
         """Reserve actual styled button widths instead of clipping two columns."""
         if not hasattr(self, "palette_scroll"):
             return
-        columns = 1 if self.width() < 1000 * max(1, self.font().pixelSize()/15) else 2
+        compact = getattr(self, '_compact_scene', False)
+        scale = max(1, self.font().pixelSize() / 15)
+        if compact:
+            # Na aba Portas, a paleta utiliza toda a largura disponível.
+            for widget in (self.palette_panel, self.palette_scroll):
+                widget.setMinimumWidth(180)
+                widget.setMaximumWidth(16777215)
+            minimum = max(button.minimumSizeHint().width() for button in self.palette_buttons.values())
+            columns = 2 if self.palette_scroll.viewport().width() >= 2 * minimum + 16 else 1
+        else:
+            columns = 1 if self.width() < 1000 * scale else 2
         if columns != self._palette_columns:
             self._palette_columns = columns
             self._layout_gate_palette()
@@ -657,6 +728,8 @@ class CircuitEditor(QWidget):
             button.ensurePolished()
             button.setMinimumHeight(button.sizeHint().height())
             widths[index % columns] = max(widths[index % columns], button.minimumSizeHint().width())
+        if compact:
+            return
         margins = self.palette_grid.contentsMargins()
         width = (sum(widths) + max(0, columns - 1) * self.palette_grid.horizontalSpacing()
                  + margins.left() + margins.right()
@@ -687,11 +760,59 @@ class CircuitEditor(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._resize_gate_palette()
+        self._arrange_scene()
+
+    def eventFilter(self, watched, event):
+        if hasattr(self, 'palette_scroll') and watched is self.palette_scroll.viewport() and event.type() == QEvent.Resize:
+            self._palette_layout_timer.start()
+        return super().eventFilter(watched, event)
 
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, "_palette_layout_timer"):
             self._palette_layout_timer.start()
+            self._arrange_scene()
+
+    def _toggle_inspector(self, visible):
+        if self._compact_scene:
+            self.scene_compact_tabs.setCurrentWidget(self.inspector_tabs)
+        else:
+            self.inspector_tabs.setVisible(visible)
+
+    def _arrange_scene(self):
+        if not hasattr(self, 'scene_compact_tabs'):
+            return
+        compact = self.width() < 1100 * max(1, self.font().pixelSize() / 15)
+        if compact == self._compact_scene:
+            return
+        self._compact_scene = compact
+        if compact:
+            self._inspector_wide_visible = self.inspector_toggle.isChecked()
+            self.inspector_toggle.setCheckable(False)
+            self.scene_splitter.hide()
+            self.palette_panel.setMaximumWidth(16777215)
+            self.inspector_tabs.setMaximumWidth(16777215)
+            for widget, title in ((self.palette_panel, 'Portas'), (self.operation_views, 'Circuito'),
+                                  (self.inspector_tabs, 'Inspetor')):
+                self.scene_compact_tabs.addTab(widget, title)
+            self.scene_compact_tabs.setCurrentIndex(1)
+            self.scene_compact_tabs.show()
+        else:
+            while self.scene_compact_tabs.count():
+                self.scene_compact_tabs.removeTab(0)
+            self.scene_compact_tabs.hide()
+            for widget in (self.palette_panel, self.operation_views, self.inspector_tabs):
+                self.scene_splitter.addWidget(widget)
+            self.palette_panel.setMaximumWidth(270)
+            self.inspector_tabs.setMaximumWidth(370)
+            self.palette_panel.show()
+            self.operation_views.show()
+            self.inspector_toggle.setCheckable(True)
+            self.inspector_toggle.setChecked(self._inspector_wide_visible)
+            self.inspector_tabs.setVisible(self._inspector_wide_visible)
+            self.scene_splitter.setSizes([220, 800, 300])
+            self.scene_splitter.show()
+        self._palette_layout_timer.start()
 
     def set_storage_directory(self, path):
         """Keep reusable circuit revisions separate from immutable run records."""

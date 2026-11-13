@@ -19,9 +19,12 @@ from gui.widgets.plot_canvas import MplCanvas
 from gui.widgets.circuit_inspector import CircuitInspector
 from gui.widgets.flow_layout import FlowLayout
 from gui.theme import PALETTE
+from gui.widgets.card import EmptyState
+from gui.formatting import quantity
 
 
 class HistoryPage(PageBase):
+    configure_requested = Signal()
     compare_requested = Signal(str, str)
     experiment_selected = Signal(str)
     experiment_deleted = Signal(str)
@@ -85,6 +88,7 @@ class HistoryPage(PageBase):
         self.table.itemSelectionChanged.connect(self._selection_changed)
         self.add_action(self.compare_selected)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.horizontalHeader().setStretchLastSection(False)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(9, QHeaderView.ResizeToContents)
@@ -108,10 +112,13 @@ class HistoryPage(PageBase):
 
         details = QWidget()
         self.detail_panel = details
+        details.setObjectName("InspectorPanel")
+        details.setAttribute(Qt.WA_StyledBackground, True)
         detail_layout = QVBoxLayout(details)
-        detail_layout.setContentsMargins(0, 8, 0, 0)
+        detail_layout.setContentsMargins(18, 16, 18, 16)
         bar = FlowLayout()
         self.detail_title = QLabel("Selecione Visualizar em uma execução")
+        self.detail_title.setObjectName("PanelTitle")
         self.detail_title.setWordWrap(True)
         self.detail_title.setTextFormat(Qt.PlainText)
         detail_layout.addWidget(self.detail_title)
@@ -144,6 +151,10 @@ class HistoryPage(PageBase):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
         self.body().addWidget(splitter, 1)
+        self.empty = EmptyState("history", "Nenhuma execução para exibir", "Revise os filtros ou configure uma simulação para registrar seus resultados.", "Configurar simulação")
+        self.empty.action_button.clicked.connect(self.configure_requested.emit)
+        self.empty.hide()
+        self.body().addWidget(self.empty, 1)
         self.selected_identifier = None
         self._detail_experiment = None
         self.detail_panel.hide()
@@ -210,7 +221,7 @@ class HistoryPage(PageBase):
                 experiment_title(exp, self.annotations), system_label(exp.config),
                 str(exp.config.system.num_qubits),
                 exp.config.noise.kind if exp.config.noise.enabled else "Ideal",
-                "—" if exp.result.fidelity is None else f"{exp.result.fidelity:.4f}", status,
+                quantity(exp.result.fidelity), status,
                 annotation.get("project", ""), ", ".join(annotation.get("tags", [])),
             ]
             search_text = " ".join(values) + " " + exp.id + " " + json.dumps(annotation, ensure_ascii=False)
@@ -240,7 +251,7 @@ class HistoryPage(PageBase):
             for col, value in enumerate(values):
                 item = DataTableItem(value, sort_values.get(col))
                 item.setData(Qt.UserRole, exp.id)
-                item.setToolTip(str(value))
+                item.setToolTip(str(exp.result.fidelity) if col == 5 and exp.result.fidelity is not None else str(value))
                 if col in (3, 5):
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.table.setItem(row, col, item)
@@ -257,6 +268,8 @@ class HistoryPage(PageBase):
             f"{len(matches)} registro(s) · página {self.offset // self.page_size + 1}"
             if matches else "Nenhum experimento encontrado. Execute uma simulação ou ajuste os filtros."
         )
+        self.empty.setVisible(not bool(matches))
+        self.splitter.setVisible(bool(matches))
         self.previous.setEnabled(self.offset > 0)
         self.next.setEnabled(self.offset + self.page_size < len(matches))
 
@@ -288,7 +301,12 @@ class HistoryPage(PageBase):
             self.compare_requested.emit(*ids)
 
     def _arrange_details(self):
-        wide = self.width() >= 1050 * max(1, self.font().pixelSize() / 15)
+        scale = max(1, self.font().pixelSize() / 15)
+        wide = self.width() >= 1050 * scale
+        # O mestre precisa acomodar nome, data, métricas e a ação de consulta.
+        # Abaixo dessa largura o cabeçalho Stretch pode reter a largura anterior
+        # e deixar o olho e até o título da coluna fora da área visível.
+        self.table.setMinimumWidth(round(700 * scale) if wide else 0)
         self.splitter.setOrientation(Qt.Horizontal if wide else Qt.Vertical)
         if wide and self._auto_detail_focus:
             self.expand_details.setChecked(False)

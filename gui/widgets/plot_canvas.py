@@ -9,10 +9,12 @@ from gui.theme import PALETTE
 
 
 def style_axes(ax):
-    ax.set_facecolor(PALETTE.bg)
+    ax.set_facecolor(PALETTE.bg_elevated)
     ax.tick_params(colors=PALETTE.text_muted)
     for spine in ax.spines.values():
-        spine.set_color(PALETTE.border_strong)
+        spine.set_color(PALETTE.border)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
     ax.xaxis.label.set_color(PALETTE.text_muted)
     ax.yaxis.label.set_color(PALETTE.text_muted)
     ax.title.set_color(PALETTE.text)
@@ -21,7 +23,7 @@ def style_axes(ax):
 
 def style_figure(fig):
     """Apply the live palette after a shared scientific renderer draws data."""
-    fig.set_facecolor(PALETTE.bg)
+    fig.set_facecolor(PALETTE.bg_elevated)
     for axes in fig.axes:
         style_axes(axes)
         for label in axes.texts:
@@ -37,9 +39,11 @@ def style_figure(fig):
 
 
 class MplCanvas(StableFigureCanvas):
+    interface_surface = "bg_elevated"
+
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(
-            figsize=(width, height), dpi=dpi, facecolor=PALETTE.bg, layout="constrained"
+            figsize=(width, height), dpi=dpi, facecolor=PALETTE.bg_elevated, layout="constrained"
         )
         super().__init__(self.fig, parent, preferred=(500, 320))
         self._navigation = None

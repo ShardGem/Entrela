@@ -54,7 +54,9 @@ class PreparationPreview(QWidget):
             painter.drawText(rect.adjusted(12,8,-12,-8),Qt.AlignCenter|Qt.TextWordWrap,"Bell requer dois qubits.\nAjuste o sistema para visualizar a preparação.")
             return
         rows = min(4,self.qubits)
-        row_height = self._row_height
+        scale = min(1.8, max(1., self.width()/480), max(1., self.height()/(rows*70+40)))
+        row_height = self._row_height * scale
+        gate_size = self._gate_size * scale
         extra = self.fontMetrics().height()+12 if self.qubits > rows else 0
         top = (self.height()-extra-(rows-1)*row_height)/2
         start,end = self._label_width+30,self.width()-24
@@ -69,7 +71,7 @@ class PreparationPreview(QWidget):
             if self.initial == "plus" or (self.initial == "bell" and q == 0):
                 painter.setPen(QPen(QColor(p.primary),1.2))
                 painter.setBrush(QColor(p.primary_faint))
-                gate = QRectF(gate_x-self._gate_size/2,y-self._gate_size/2,self._gate_size,self._gate_size)
+                gate = QRectF(gate_x-gate_size/2,y-gate_size/2,gate_size,gate_size)
                 painter.drawRoundedRect(gate,4,4)
                 painter.setPen(QColor(p.primary))
                 painter.drawText(gate,Qt.AlignCenter,"H")
