@@ -1,8 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <g fill="none" stroke="#0086db" stroke-width="2.8">
-    <ellipse cx="32" cy="32" rx="28" ry="10.5"/>
-    <ellipse cx="32" cy="32" rx="28" ry="10.5" transform="rotate(60 32 32)"/>
-    <ellipse cx="32" cy="32" rx="28" ry="10.5" transform="rotate(120 32 32)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048" role="img" aria-label="Símbolo atômico azul e ciano">
+  <defs>
+    <radialGradient id="atom-gradient" cx="1024" cy="1024" r="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#004E89"/>
+      <stop offset=".26" stop-color="#0074BD"/>
+      <stop offset=".42" stop-color="#0BA8ED"/>
+      <stop offset=".60" stop-color="#3DDCFF"/>
+      <stop offset=".79" stop-color="#66EFFF"/>
+      <stop offset="1" stop-color="#8CF8FF"/>
+    </radialGradient>
+  </defs>
+  <g fill="none" stroke="url(#atom-gradient)" stroke-width="52" stroke-linecap="round">
+    <ellipse cx="1024" cy="1024" rx="859" ry="272"/>
+    <ellipse cx="1024" cy="1024" rx="859" ry="272" transform="rotate(60 1024 1024)"/>
+    <ellipse cx="1024" cy="1024" rx="859" ry="272" transform="rotate(120 1024 1024)"/>
   </g>
-  <circle cx="32" cy="32" r="5" fill="#00c5eb"/>
 </svg>
