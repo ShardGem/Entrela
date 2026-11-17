@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.theme import SPACING
+from gui.design_system import LAYOUT
 from gui.widgets.flow_layout import FlowLayout
 
 
@@ -109,4 +110,4 @@ class PageBase(QWidget):
             QHBoxLayout.TopToBottom if narrow else QHBoxLayout.LeftToRight
         )
         self._header.layout().setContentsMargins(20, 0 if getattr(self, '_embedded_heading', False) else 16, 20, 6 if getattr(self, '_embedded_heading', False) else 12)
-        self._body.setContentsMargins(20, 8, 20, 24)
+        self._body.setContentsMargins(LAYOUT.page_margin, 8, LAYOUT.page_margin, 24)

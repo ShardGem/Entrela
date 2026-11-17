@@ -29,7 +29,7 @@ class PrimaryButton(_BaseButton):
         self.setObjectName("PrimaryButton")
 
     def _icon_color(self) -> str:
-        return PALETTE.text_on_primary
+        return PALETTE.action_on
 
 
 class SecondaryButton(_BaseButton):

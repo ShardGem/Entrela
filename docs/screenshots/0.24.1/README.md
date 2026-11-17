@@ -1,6 +1,6 @@
 # Galeria do Entrela 0.24.1
 
-Arquivo histórico. A [galeria atual da interface está na versão 0.25.0](../0.25.0/README.md), com a nova composição e as imagens atualizadas do autor.
+Arquivo histórico. A [galeria atual da interface está na versão 0.26.0](../0.26.0/README.md), com a nova composição e as imagens atualizadas do autor.
 
 66 capturas PNG sem perdas, renderizadas diretamente no Qt. Janela principal: 1920 × 1080 pixels lógicos, escala 2×, fonte 15 px.
 

@@ -1,5 +1,7 @@
 # Galeria do Entrela 0.25.0
 
+Arquivo histórico. Consulte a [galeria atual da versão 0.26.0](../0.26.0/README.md).
+
 77 capturas PNG sem perdas, renderizadas diretamente no Qt. Janela principal: 1920 × 1080 pixels lógicos, escala 2×, fonte 15 px.
 
 Os cenários foram executados em armazenamento temporário, com sementes registradas. São demonstrações do aplicativo; não substituem os experimentos do TCC. A splash e as janelas de configurações/exportação conservam seus tamanhos próprios, também na escala declarada.

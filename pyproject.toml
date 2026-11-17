@@ -1,6 +1,6 @@
 [project]
 name = "entrela"
-version = "0.25.0"
+version = "0.26.0"
 description = "Simulador de qubits em ambientes ruidosos com mitigação"
 requires-python = ">=3.11"
 dependencies = [
@@ -27,4 +27,4 @@ include = ["core*", "data*", "gui*"]
 entrela = "gui.application:main"
 
 [tool.setuptools.package-data]
-gui = ["assets/*.png", "assets/icons/*"]
+gui = ["assets/*.png", "assets/icons/*", "assets/fonts/*.ttf", "assets/fonts/OFL.txt"]

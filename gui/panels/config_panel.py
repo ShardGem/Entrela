@@ -98,7 +98,7 @@ class ConfigPanel(QWidget):
         heading.addWidget(title)
         self.parameter_title = title
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("Configuração guiada", "guided")
+        self.mode_combo.addItem("Passo a passo", "guided")
         self.mode_combo.addItem("Todos os parâmetros", "advanced")
         self.mode_combo.setMinimumContentsLength(14)
         self.mode_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
@@ -356,7 +356,7 @@ class ConfigPanel(QWidget):
         compact = self._compact_sections or self._inspector_mode
         self.section_nav.setVisible(guided and not compact)
         self.section_selector.setVisible(guided and compact)
-        self.parameter_title.setVisible(not (guided and compact))
+        self.parameter_title.setVisible(not self._inspector_mode and not (guided and compact))
         blocker = QSignalBlocker(self.section_selector)
         self.section_selector.setCurrentIndex(self.section_selector.findData(self.current_section))
         self.section_selector.setToolTip(self.section_selector.currentData(Qt.ToolTipRole) or "Etapa da configuração guiada")
@@ -379,7 +379,7 @@ class ConfigPanel(QWidget):
             widget.summary.setVisible(not guided and bool(widget.summary.text()))
             self.section_buttons[key].setChecked(key == self.current_section)
         for label in self.descriptions:
-            label.setVisible(self.current_mode == "guided" and not compact)
+            label.setVisible(self.current_mode == "guided" and self.font().pixelSize() < 20)
         self.btn_back.setVisible(self.current_mode == "guided")
         self.btn_next.setVisible(self.current_mode == "guided")
         self.btn_back.setEnabled(self.current_section != "system")

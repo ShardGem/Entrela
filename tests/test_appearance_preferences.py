@@ -37,7 +37,8 @@ def test_live_appearance_roundtrip_has_no_accumulated_typographic_scaling(qt_app
         assert 'font-size: 18px' in label.styleSheet()
         apply_appearance(window, 'dark', 15)
         assert 'font-size: 15px' in label.styleSheet()
-        assert PALETTE.primary == '#7ad7dd'
+        from gui.palettes import DARK
+        assert PALETTE.primary == DARK['primary']
         assert resolve_theme('auto') in ('dark', 'light')
     finally:
         apply_appearance(window)

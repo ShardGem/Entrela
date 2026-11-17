@@ -139,6 +139,8 @@ class Gallery:
                         expected_pages=sorted(self.window.pages), captures=self.images)
         manifest['identity_assets'] = {str(path.relative_to(ROOT)): sha256(path.read_bytes()).hexdigest()
                                        for path in [ROOT/'gui/assets/entrela_logo.png', ROOT/'gui/assets/entrela_texto.png', ROOT/'gui/assets/icons/entrela.svg', ROOT/'gui/assets/icons/entrela.ico', ROOT/'gui/assets/icons/entrela.png']}
+        manifest['font_assets'] = {str(path.relative_to(ROOT)): sha256(path.read_bytes()).hexdigest()
+                                  for path in sorted((ROOT/'gui/assets/fonts').glob('*')) if path.suffix in ('.ttf', '.txt')}
         (self.args.output / 'manifesto.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
         lines = [f'# Galeria do Entrela {__version__}', '',
                  f'{len(self.images)} capturas PNG sem perdas, renderizadas diretamente no Qt. '

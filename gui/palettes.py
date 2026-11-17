@@ -7,13 +7,13 @@ from gui.theme import Palette
 DARK = asdict(Palette())
 LIGHT = {
     **DARK,
-    "bg": "#f2f5f8", "bg_elevated": "#ffffff", "surface": "#ffffff",
-    "surface_hover": "#e9f0f6", "surface_active": "#ddeaf3",
-    "border": "#d9e2eb", "border_strong": "#93a8bb",
-    "primary": "#1b6f94", "primary_hover": "#155c7c", "primary_pressed": "#104962",
-    "primary_muted": "#e0f0f6", "primary_faint": "#e0f0f6",
+    "bg": "#f4f4f4", "bg_elevated": "#ffffff", "surface": "#e8e8e8",
+    "surface_hover": "#e0e0e0", "surface_active": "#d0e2ff",
+    "border": "#c6c6c6", "border_strong": "#6f6f6f",
+    "primary": "#0f62fe", "primary_hover": "#0353e9", "primary_pressed": "#002d9c",
+    "primary_muted": "#d0e2ff", "primary_faint": "#edf5ff",
     "primary_on": "#ffffff", "text_on_primary": "#ffffff",
-    "text": "#1c2e42", "text_muted": "#4b6178", "text_dim": "#526b82",
+    "text": "#161616", "text_muted": "#393939", "text_dim": "#525252",
     "success": "#11763f", "success_bg": "#e0f4e8",
     "warning": "#925400", "warning_bg": "#fff0ce",
     "danger": "#bb293e", "danger_bg": "#ffe7eb",
@@ -40,7 +40,7 @@ THEME_CHOICES = (
     ("Automático · acompanhar o sistema", "auto"),
 )
 THEME_DESCRIPTIONS = {
-    "dark": "Grafite: superfícies neutras e ciano discreto para destacar ações e seleção.",
+    "dark": "Grafite: superfícies neutras, painéis contínuos e azul para destacar ações, foco e seleção.",
     "light": "Claro científico: fundo claro e destaque azul para leitura de parâmetros, tabelas e resultados.",
     "navy": "Azul escuro: superfícies azuladas e destaque azul suave para explorar circuitos e visualizações.",
     "auto": "Automático: alterna entre Grafite e Claro científico conforme a aparência do sistema operacional.",

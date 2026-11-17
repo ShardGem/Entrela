@@ -16,7 +16,7 @@ assert Path(gui.__file__).is_relative_to(sys.argv[1])
 assert Path(core.__file__).is_relative_to(sys.argv[1])
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QFontInfo
 from gui.splash import SplashScreen
 from gui.branding import application_icon, configure_application_identity
 from gui.main_window import MainWindow
@@ -33,6 +33,10 @@ splash=SplashScreen()
 assert not splash.logo.pixmap.isNull()
 assert not splash.text.pixmap().isNull()
 window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
+assert 'IBM Plex Sans' in QFontInfo(window.topbar.title.font()).family()
+font_folder=Path(gui.__file__).parent/'assets/fonts'
+assert len(list(font_folder.glob('*.ttf')))==3
+assert 'SIL OPEN FONT LICENSE' in (font_folder/'OFL.txt').read_text()
 window.show();app.processEvents()
 for theme in ('dark','light','navy'):
     choice=window.page_settings.theme.findData(theme)

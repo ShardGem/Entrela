@@ -107,6 +107,7 @@ class SimulationPage(PageBase):
         identity_body.setContentsMargins(0, 0, 0, 0)
         identity_body.setSpacing(2)
         role = QLabel("RASCUNHO DO HAMILTONIANO")
+        self.draft_role = role
         role.setObjectName("Eyebrow")
         identity_body.addWidget(role)
         row = QHBoxLayout()
@@ -146,11 +147,14 @@ class SimulationPage(PageBase):
         self.config_panel.setAttribute(Qt.WA_StyledBackground, True)
         self.config_panel.layout().setContentsMargins(18, 16, 18, 16)
         self.config_panel.set_inspector_mode(True)
+        self.inspector_title = QLabel("Parâmetros da simulação")
+        self.inspector_title.setObjectName("PanelTitle")
+        self.config_panel.layout().insertWidget(0, self.inspector_title)
         self.config_panel.btn_executar.hide()
         self.config_panel.simulacao_acionada.connect(self._emit_run)
         self.config_panel.parametros_alterados.connect(self._refresh_summary)
 
-        self.stage = Surface("Área de experimentação")
+        self.stage = Surface("Preparação e resultados")
         self.preview_tabs = ContentTabs()
         self.preview_tabs.setDocumentMode(True)
         self.preview_tabs.setUsesScrollButtons(True)
@@ -417,6 +421,8 @@ class SimulationPage(PageBase):
         if compact == self._compact:
             return
         self._compact = compact
+        self.draft_role.setVisible(not compact)
+        self.inspector_title.setVisible(not compact)
         self._update_actions()
         if compact:
             self.splitter.hide()

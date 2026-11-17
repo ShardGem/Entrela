@@ -11,6 +11,7 @@ from core.simulation import run_experiment
 from gui.controllers.appearance import apply_appearance
 from gui.pages.history import HistoryPage
 from gui.theme import PALETTE
+from tests.test_visual_profiles import _contrast
 
 
 @pytest.fixture(scope="module")
@@ -87,7 +88,8 @@ def test_view_action_fits_cell_and_has_rendered_keyboard_focus(window, qt_app, r
         assert button.height() >= button.iconSize().height() + 8
         focused = button.grab().toImage()
         focused_edge = focused.pixelColor(focused.width()//2, 1)
-        assert focused_edge == QColor(PALETTE.text)
+        assert focused_edge == QColor(PALETTE.primary)
+        assert _contrast(focused_edge.name(), focused.pixelColor(focused.width()//2, 5).name()) >= 3
         page.search.setFocus(Qt.TabFocusReason)
         qt_app.processEvents()
         unfocused = button.grab().toImage()

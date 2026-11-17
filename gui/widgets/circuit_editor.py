@@ -44,6 +44,7 @@ from core.types import ExperimentConfig, SystemConfig, SimulationProtocol, Noise
 from gui.widgets.circuit_canvas import CircuitCanvas
 from gui.widgets.button import PrimaryButton, SecondaryButton, GhostButton
 from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.circuit_evidence import CircuitEvidence
 from gui.widgets.scientific_input import ScientificSpinBox
 from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.collapsible import CollapsibleSection
@@ -109,6 +110,7 @@ def operation_records(document):
 
 
 class CircuitEditor(QWidget):
+    results_requested = Signal()
     run_requested = Signal(object)
     cancel_requested = Signal()
     draft_changed = Signal()
@@ -219,7 +221,7 @@ class CircuitEditor(QWidget):
             toolbar.addWidget(button)
         files = toolbar
         self.file_menu = QToolButton()
-        self.file_menu.setText("Arquivo e desenho")
+        self.file_menu.setText("Arquivo")
         self.file_menu.setPopupMode(QToolButton.InstantPopup)
         self.file_menu.setAccessibleName("Operações de arquivo e visualização do circuito")
         file_menu = QMenu(self.file_menu)
@@ -251,6 +253,20 @@ class CircuitEditor(QWidget):
             action = file_menu.addAction(text, button.click)
             action.setToolTip(button.toolTip())
         files.addWidget(self.file_menu)
+        self.edit_menu_button = QToolButton()
+        self.edit_menu_button.setText("Editar")
+        self.edit_menu_button.setPopupMode(QToolButton.InstantPopup)
+        self.edit_menu = QMenu(self.edit_menu_button)
+        self.edit_menu_button.setMenu(self.edit_menu)
+        for text, callback in [
+            ("Copiar seleção", self._copy_selected), ("Recortar seleção", self._cut_selected),
+            ("Colar portas", self._paste_gates), ("Selecionar todas", self._select_all),
+            ("Remover seleção", self._remove),
+            ("Mover antes", lambda: self._reorder(self.selected, self.selected - 1)),
+            ("Mover depois", lambda: self._reorder(self.selected, self.selected + 1)),
+        ]:
+            self.edit_menu.addAction(text, callback)
+        files.addWidget(self.edit_menu_button)
         files.addWidget(self.zoom)
         self.advanced_section.layout().removeWidget(self.advanced_section.header)
         self.advanced_section.header.setParent(self)
@@ -327,6 +343,10 @@ class CircuitEditor(QWidget):
         for i, name in enumerate(GATES):
             symbol, title = GATE_NAMES[name]
             button = GatePaletteButton(symbol + "\n" + fill(title, width=12))
+            family = ('controlled' if name in GATE_CATEGORIES['Controladas'] else
+                      'rotation' if name in ('rx', 'ry', 'rz', 'rxx', 'ryy', 'rzz', 'u') else
+                      'phase' if name in ('s', 'sdg', 't', 'tdg', 'z', 'p') else 'basic')
+            button.setProperty('gateFamily', family)
             button.setAccessibleName(f"Adicionar {symbol}: {title}")
             button.setToolTip(GATE_HELP[name] + "\nAdicionar após a seleção.")
             button.clicked.connect(lambda _, n=name: self._add(n))
@@ -375,6 +395,9 @@ class CircuitEditor(QWidget):
         palette_layout.insertWidget(2, self.template_hint)
         self.template_selector.show()
         self.use_template.show()
+        palette_heading = QLabel('Portas e modelos')
+        palette_heading.setObjectName('PanelTitle')
+        palette_layout.insertWidget(0, palette_heading)
         self.creation_help.header.setParent(self)
         self.creation_help.header.show()
         files.addWidget(self.creation_help.header)
@@ -386,7 +409,17 @@ class CircuitEditor(QWidget):
         self.canvas.zoom_changed.connect(self._sync_zoom)
         self.operation_views = QTabWidget()
         self.operation_views.setDocumentMode(True)
-        self.operation_views.addTab(self.canvas, "Desenho")
+        self.drawing_stage = QSplitter(Qt.Vertical)
+        self.drawing_stage.setChildrenCollapsible(False)
+        self.drawing_stage.setHandleWidth(3)
+        self.evidence = CircuitEvidence()
+        self.evidence.results_requested.connect(self.results_requested.emit)
+        self.drawing_stage.addWidget(self.canvas)
+        self.drawing_stage.addWidget(self.evidence)
+        self.drawing_stage.setStretchFactor(0, 3)
+        self.drawing_stage.setStretchFactor(1, 1)
+        self.drawing_stage.setSizes([500, 240])
+        self.operation_views.addTab(self.drawing_stage, "Desenho")
         operations_panel = QWidget()
         operations_layout = QVBoxLayout(operations_panel)
         operations_layout.setContentsMargins(6, 6, 6, 6)
@@ -437,7 +470,7 @@ class CircuitEditor(QWidget):
         self.gate_type = QComboBox()
         self.gate_type.addItems(list(GATES))
         self.gate_type.setToolTip("Código da porta usada no desenho. A explicação acima mostra seu nome e efeito.")
-        form.addRow("Porta no desenho", self.gate_type)
+        form.addRow("Tipo de porta", self.gate_type)
         self.qubit_fields = []
         self.param_fields = []
         for i in range(3):
@@ -457,19 +490,16 @@ class CircuitEditor(QWidget):
         self.gate_form = form
         form_body.addLayout(form)
         apply = SecondaryButton("Aplicar alterações")
+        self.apply_gate_button = apply
         apply.setToolTip("Atualiza a porta selecionada com os qubits e ângulos dos campos.")
         apply.clicked.connect(self._apply_gate)
         form_body.addWidget(apply)
-        for text, callback in [
-            ("Remover seleção", self._remove),
-            ("Copiar seleção", self._copy_selected),
-            ("Colar portas", self._paste_gates),
-            ("Mover antes", lambda: self._reorder(self.selected, self.selected - 1)),
-            ("Mover depois", lambda: self._reorder(self.selected, self.selected + 1)),
-        ]:
-            button = SecondaryButton(text)
-            button.clicked.connect(callback)
-            form_body.addWidget(button)
+        selection_actions = QToolButton()
+        selection_actions.setText('Ações da seleção')
+        selection_actions.setAccessibleName('Copiar, mover ou remover as portas selecionadas')
+        selection_actions.setPopupMode(QToolButton.InstantPopup)
+        selection_actions.setMenu(self.edit_menu)
+        form_body.addWidget(selection_actions)
         note = QLabel("q0 é o primeiro qubit. Use qubits diferentes em portas controladas.\n" + ANGLE_HELP)
         note.setWordWrap(True)
         form_body.addWidget(note)
@@ -531,9 +561,18 @@ class CircuitEditor(QWidget):
         self.inspector_toggle.setAccessibleName("Mostrar inspetor do circuito")
         self.inspector_toggle.clicked.connect(self._toggle_inspector)
         files.addWidget(self.inspector_toggle)
+        self.evidence_toggle = QToolButton()
+        self.evidence_toggle.setText('Resultados')
+        self.evidence_toggle.setCheckable(True)
+        self.evidence_toggle.setChecked(True)
+        self.evidence_toggle.setToolTip('Mostrar ou ocultar o resultado gravado abaixo do desenho. Não executa a simulação.')
+        self.evidence_toggle.toggled.connect(self.evidence.setVisible)
+        self.evidence_toggle.clicked.connect(self._open_evidence)
+        files.addWidget(self.evidence_toggle)
         root.addWidget(self.scene_splitter, 1)
         self._compact_scene = False
         self._inspector_wide_visible = True
+        self._evidence_wide_visible = True
         self.scene_compact_tabs = ContentTabs()
         self.scene_compact_tabs.setDocumentMode(True)
         self.scene_compact_tabs.setAccessibleName("Portas, circuito ou inspetor")
@@ -638,6 +677,8 @@ class CircuitEditor(QWidget):
         self.noise.toggled.connect(lambda *_: self.draft_changed.emit())
         self.noise_kind.currentIndexChanged.connect(lambda *_: self.draft_changed.emit())
         self.gate_type.currentIndexChanged.connect(lambda *_: self.draft_changed.emit())
+        self.draft_changed.connect(lambda: self.evidence.set_document(self.document))
+        self.evidence.set_document(self.document)
 
     def draft_state(self):
         return dict(document=self.document.to_dict(), name=self.circuit_name.text(),
@@ -762,6 +803,31 @@ class CircuitEditor(QWidget):
         self._resize_gate_palette()
         self._arrange_scene()
 
+    def heightForWidth(self, width):
+        """Reserva espaço para os comandos e deixa o desenho usar o restante.
+
+        O tamanho preferido de um gráfico é uma sugestão, não a altura mínima
+        do documento. Usá-lo aqui empurra os resultados para fora da tela.
+        """
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        available = max(1, width - margins.left() - margins.right())
+        heights = []
+        flexible = (getattr(self, 'scene_splitter', None), getattr(self, 'scene_compact_tabs', None))
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            if item.isEmpty():
+                continue
+            widget = item.widget()
+            if widget is not None and widget in flexible:
+                height = widget.minimumSizeHint().height()
+            elif item.hasHeightForWidth():
+                height = item.heightForWidth(available)
+            else:
+                height = item.minimumSize().height()
+            heights.append(max(0, height))
+        return margins.top() + margins.bottom() + sum(heights) + max(0, len(heights)-1) * layout.spacing()
+
     def eventFilter(self, watched, event):
         if hasattr(self, 'palette_scroll') and watched is self.palette_scroll.viewport() and event.type() == QEvent.Resize:
             self._palette_layout_timer.start()
@@ -779,6 +845,12 @@ class CircuitEditor(QWidget):
         else:
             self.inspector_tabs.setVisible(visible)
 
+    def _open_evidence(self, visible):
+        if visible:
+            self.operation_views.setCurrentIndex(0)
+            if self._compact_scene:
+                self.scene_compact_tabs.setCurrentWidget(self.operation_views)
+
     def _arrange_scene(self):
         if not hasattr(self, 'scene_compact_tabs'):
             return
@@ -788,6 +860,8 @@ class CircuitEditor(QWidget):
         self._compact_scene = compact
         if compact:
             self._inspector_wide_visible = self.inspector_toggle.isChecked()
+            self._evidence_wide_visible = self.evidence_toggle.isChecked()
+            self.evidence_toggle.setChecked(False)
             self.inspector_toggle.setCheckable(False)
             self.scene_splitter.hide()
             self.palette_panel.setMaximumWidth(16777215)
@@ -810,6 +884,7 @@ class CircuitEditor(QWidget):
             self.inspector_toggle.setCheckable(True)
             self.inspector_toggle.setChecked(self._inspector_wide_visible)
             self.inspector_tabs.setVisible(self._inspector_wide_visible)
+            self.evidence_toggle.setChecked(self._evidence_wide_visible)
             self.scene_splitter.setSizes([220, 800, 300])
             self.scene_splitter.show()
         self._palette_layout_timer.start()
@@ -991,6 +1066,7 @@ class CircuitEditor(QWidget):
 
     def _select(self, index, sync_canvas=True):
         self.selected = index if 0 <= index < len(self.document.gates) else -1
+        self.apply_gate_button.setEnabled(self.selected >= 0 and not self._running)
         if sync_canvas:
             self.selected_indices = [self.selected] if self.selected >= 0 else []
             self.canvas.select_operations(self.selected_indices)
@@ -1211,6 +1287,7 @@ class CircuitEditor(QWidget):
 
     def set_running(self, running):
         self._running = running
+        self.apply_gate_button.setEnabled(self.selected >= 0 and not running)
         self.run.setEnabled(not running)
         self.run.setText("Executando…" if running else "Executar circuito")
         self.cancel.setEnabled(running)

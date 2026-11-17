@@ -11,29 +11,33 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Palette:
     # Superfícies
-    bg: str = "#0d1621"
-    bg_elevated: str = "#142130"
-    surface: str = "#1c2a3b"
-    surface_hover: str = "#26364a"
-    surface_active: str = "#304451"
+    bg: str = "#161616"
+    bg_elevated: str = "#262626"
+    surface: str = "#393939"
+    surface_hover: str = "#454545"
+    surface_active: str = "#525252"
 
     # Bordas
-    border: str = "#2e3b4b"
-    border_strong: str = "#62758a"
+    border: str = "#454545"
+    border_strong: str = "#8d8d8d"
 
     # Acento
-    primary: str = "#7ad7dd"
-    primary_hover: str = "#a3e6e9"
-    primary_pressed: str = "#59b9c3"
-    primary_muted: str = "#1b3940"
-    primary_faint: str = "#1b3940"
+    primary: str = "#78a9ff"
+    primary_hover: str = "#a6c8ff"
+    primary_pressed: str = "#4589ff"
+    primary_muted: str = "#243a5e"
+    primary_faint: str = "#243a5e"
     primary_on: str = "#0a0a0b"
     text_on_primary: str = "#0a0a0b"
+    action_bg: str = "#0f62fe"
+    action_hover: str = "#0353e9"
+    action_pressed: str = "#002d9c"
+    action_on: str = "#ffffff"
 
     # Texto
-    text: str = "#e9eff6"
-    text_muted: str = "#b0bfd0"
-    text_dim: str = "#a2b4c7"
+    text: str = "#f4f4f4"
+    text_muted: str = "#d4d4d4"
+    text_dim: str = "#c6c6c6"
 
     # Semânticas
     success: str = "#4ade80"
@@ -42,11 +46,11 @@ class Palette:
     warning_bg: str = "#2a1e05"
     danger: str = "#fb7185"
     danger_bg: str = "#2a0e0c"
-    info: str = "#7ad7dd"
-    info_bg: str = "#1b3940"
+    info: str = "#78a9ff"
+    info_bg: str = "#243a5e"
 
     # Paleta quântica (compat)
-    q1: str = "#7ad7dd"
+    q1: str = "#78a9ff"
     q2: str = "#a78bfa"
     q3: str = "#22c55e"
     q4: str = "#f59e0b"
@@ -77,7 +81,7 @@ PALETTE = Palette()
 SPACING = Spacing()
 RADIUS = Radius()
 
-FONT_FAMILY = '"Inter", "Segoe UI", "SF Pro Text", system-ui, sans-serif'
+FONT_FAMILY = '"IBM Plex Sans", "Inter", "Segoe UI", sans-serif'
 FONT_MONO = '"JetBrains Mono", "Cascadia Code", "Consolas", monospace'
 
 
@@ -86,8 +90,13 @@ def build_qss(*, density="comfortable") -> str:
     from PySide6.QtGui import QFontDatabase
     family = FONT_FAMILY
     if QApplication.instance() is not None:
+        app = QApplication.instance()
+        if not app.property("entrelaFontsLoaded"):
+            for path in sorted((Path(__file__).parent / "assets" / "fonts").glob("*.ttf")):
+                QFontDatabase.addApplicationFont(str(path))
+            app.setProperty("entrelaFontsLoaded", True)
         available = set(QFontDatabase.families())
-        chosen = next((name for name in ("Inter", "Segoe UI", "Noto Sans", "DejaVu Sans") if name in available), None)
+        chosen = next((name for name in ("IBM Plex Sans", "Inter", "Segoe UI", "Noto Sans", "DejaVu Sans") if name in available), None)
         if chosen:
             family = '"' + chosen + '"'
     p = PALETTE

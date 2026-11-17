@@ -74,9 +74,10 @@ class Sidebar(QFrame):
 
     def _build(self):
         outer=QVBoxLayout(self)
-        outer.setContentsMargins(12,12,12,12)
-        outer.setSpacing(8)
-        brand=QHBoxLayout()
+        outer.setContentsMargins(0,8,0,8)
+        outer.setSpacing(4)
+        self.brand_box = QWidget()
+        brand=QHBoxLayout(self.brand_box)
         logo=QLabel()
         self.logo=logo
         logo.setPixmap(application_icon().pixmap(28,28))
@@ -85,8 +86,9 @@ class Sidebar(QFrame):
         self.logo_title=QLabel('Entrela')
         self.logo_title.setObjectName('SidebarLogo')
         brand.addWidget(self.logo_title,1)
-        outer.addLayout(brand)
+        outer.addWidget(self.brand_box)
         navigation = QHBoxLayout()
+        navigation.setContentsMargins(16, 0, 12, 4)
         caption = QLabel('Navegação')
         self.navigation_caption = caption
         caption.setObjectName('SectionSubtitle')

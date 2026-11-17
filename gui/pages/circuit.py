@@ -1,21 +1,22 @@
 """Executed-circuit inspection and an independent editor of working copies."""
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QTabWidget
 from core.circuit_document import CircuitDocument
 from gui.pages.base import PageBase
 from gui.widgets.circuit_inspector import CircuitInspector
 from gui.widgets.circuit_editor import CircuitEditor
 from gui.widgets.button import SecondaryButton
+from gui.widgets.content_tabs import ContentTabs
 
 
 class CircuitPage(PageBase):
+    results_requested = Signal()
     snapshot_requested = Signal(int)
     run_requested = Signal(object)
     cancel_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__("Circuitos", "Explore a execução ou crie um circuito com portas editáveis.", parent)
-        self.tabs = QTabWidget()
+        self.tabs = ContentTabs()
         self.body().addWidget(self.tabs, 1)
         self.inspector = CircuitInspector(snapshots_action=True)
         self.inspector.snapshot_requested.connect(self.snapshot_requested.emit)
@@ -31,6 +32,7 @@ class CircuitPage(PageBase):
         self.editor = CircuitEditor()
         self.editor.run_requested.connect(self.run_requested.emit)
         self.editor.cancel_requested.connect(self.cancel_requested.emit)
+        self.editor.results_requested.connect(self.results_requested.emit)
         self.tabs.addTab(self.editor, "Editor de circuitos")
         self.editor.layout().removeWidget(self.editor.execution_bar)
         self._root.addWidget(self.editor.execution_bar)
@@ -62,6 +64,7 @@ class CircuitPage(PageBase):
 
     def show_experiment(self, experiment, title=None):
         self.inspector.show_experiment(experiment, title)
+        self.editor.evidence.set_experiment(experiment, title)
         self.copy_button.setEnabled(not bool(experiment.result.error))
 
     def _quantum_circuit(self):

@@ -48,7 +48,7 @@ class PreparationPreview(QWidget):
         rect = QRectF(self.rect()).adjusted(1,1,-1,-1)
         painter.setBrush(QColor(p.bg_elevated))
         painter.setPen(QPen(QColor(p.border),1))
-        painter.drawRoundedRect(rect,8,8)
+        painter.drawRoundedRect(rect, 6, 6)
         if self.initial == "bell" and self.qubits != 2:
             painter.setPen(QColor(p.warning))
             painter.drawText(rect.adjusted(12,8,-12,-8),Qt.AlignCenter|Qt.TextWordWrap,"Bell requer dois qubits.\nAjuste o sistema para visualizar a preparação.")

@@ -228,12 +228,13 @@ def test_gui_analysis_rerun_and_library(window):
 def test_preferences_theme_and_restart(window, qt_app):
     from gui.main_window import MainWindow
     from gui.theme import PALETTE
+    from gui.palettes import LIGHT
 
     window.page_settings.theme.setCurrentIndex(1)
     window.page_settings.font_size.setValue(15)
     window.page_bloch.speed_combo.setCurrentText("2x")
     window.page_bloch.loop.setChecked(True)
-    assert PALETTE.bg == "#f2f5f8"
+    assert PALETTE.bg == LIGHT['bg']
     repo, settings = window.repository, window.settings
     window.close()
     other = MainWindow(repo, settings)

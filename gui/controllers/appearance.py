@@ -62,6 +62,8 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", dens
         primary, hover, pressed, muted = ACCENTS[accent][theme == "light"]
         after.update(primary=primary, primary_hover=hover, primary_pressed=pressed,
                      primary_muted=muted, primary_faint=muted)
+        after.update(action_bg=primary, action_hover=hover, action_pressed=pressed,
+                     action_on=after['primary_on'])
     if high_contrast:
         after.update(text="#ffffff" if theme != "light" else "#000000",
                      text_muted="#d7e0ed" if theme != "light" else "#263b53",

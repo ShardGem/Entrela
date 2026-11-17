@@ -16,6 +16,8 @@ Na versão 0.24.1, os acessos diretos às funcionalidades são restaurados no me
 
 Na versão 0.25, o estúdio científico substitui a composição vertical da configuração e do editor por área de trabalho central e inspetores. Resultados ganha modos de gráfico, estudos e preferências recebem catálogos visíveis, exemplos usam lista/detalhe e a reprodução 3D fica junto à linha do tempo. Os acessos por nome, rascunhos e resultados são preservados. As imagens e ícones enviados pelo autor foram incorporados sem alterar a splash. Consulte as [três propostas e a decisão](design/0.25.0/README.md), o [antes/depois e os limites](interface-0.25.md) e a [galeria atual](screenshots/0.25.0/README.md). Os estudos científicos P2 continuam pendentes; esta entrega trata da interface e de seus fluxos.
 
+Na versão 0.26, a organização usa cabeçalho global, contexto local, ações claras e editor com resultado gravado junto ao desenho. A inspiração é o IBM Quantum Platform, com botões arredondados conforme a preferência do autor. Tipografia, campos, tabelas e painéis são compartilhados pelos temas. Os modelos científicos, dados, funções e splash são preservados. Consulte o [guia, antes/depois e limites](interface-0.26.md) e a [galeria atual](screenshots/0.26.0/README.md).
+
 ## P0 — Confiabilidade dos resultados e preservação dos dados
 
 | Ordem | Trabalho | Critério de conclusão | Situação nesta etapa |
