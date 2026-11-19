@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from core.figure_labels import field_label, axis_label
 from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton, SecondaryButton
+from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
 from gui.widgets.research_protocol import ProtocolPanel
@@ -36,6 +37,7 @@ class AnalysisPage(PageBase):
             "Use uma execução como referência para investigar precisão, ruído e mitigação.",
             parent,
         )
+        self.body().setSpacing(12)
         self.experiment = None
         self.data = None
         self.series = []
@@ -54,13 +56,15 @@ class AnalysisPage(PageBase):
         self.source_button.setMenu(self.source_menu)
         self._recent_sources = []
         source_row.addWidget(self.source_button)
-        self.body().addLayout(source_row)
         self.set_recent_sources([])
         self.saved = QComboBox()
-        self.saved.addItem("Resultados salvos desta execução", None)
+        self.saved.addItem("Estudos salvos", None)
+        self.saved.setMinimumContentsLength(16)
+        self.saved.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.saved.setAccessibleName("Resultados de estudos salvos da execução selecionada")
         self.saved.currentIndexChanged.connect(self._open_saved)
-        self.body().addWidget(self.saved)
+        source_row.addWidget(self.saved)
+        self.body().addLayout(source_row)
         self.tabs = QTabWidget()
         def scroll_tab():
             area = QScrollArea()
@@ -80,7 +84,7 @@ class AnalysisPage(PageBase):
         self.tabs.addTab(self.planning_tab, "Planejamento")
         self.body().addWidget(self.tabs, 1)
         form_widget = QWidget()
-        form_widget.setMaximumWidth(960)
+        form_widget.setMaximumWidth(640)
         form = QFormLayout(form_widget)
         self._form_widget = form_widget
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
@@ -115,6 +119,7 @@ class AnalysisPage(PageBase):
         self.benchmark_shots.setToolTip("Shots por fator 1, 3 e 5. Os ajustes reutilizam as mesmas medições; o custo total é informado no resultado.")
         self.help = QLabel()
         self.help.setWordWrap(True)
+        self.help.setMaximumWidth(640)
         self.help.setObjectName("FieldHint")
         self.x_parameter=ParameterCombo(["trotter_steps","p1","p2","t1_us","t2_us","J","h"])
         self.y_parameter=ParameterCombo(["trotter_steps","p1","p2","t1_us","t2_us","J","h"])
@@ -216,7 +221,7 @@ class AnalysisPage(PageBase):
         self.availability = QLabel()
         self.availability.setWordWrap(True)
         self.availability.setObjectName("FieldHint")
-        footer.addWidget(self.availability)
+        actions.insertWidget(0, self.availability, 1)
         footer.addLayout(actions)
         self.progress = QProgressBar()
         self.progress.setAccessibleName("Progresso da análise científica")
@@ -233,7 +238,9 @@ class AnalysisPage(PageBase):
         self.series_combo = QComboBox()
         self.series_combo.currentIndexChanged.connect(self._plot)
         self.series_combo.setAccessibleName("Métrica exibida no gráfico do estudo")
-        results.addWidget(self.series_combo)
+        plot_tools = FlowLayout()
+        plot_tools.addWidget(self.series_combo)
+        results.addLayout(plot_tools)
         self.canvas = MplCanvas(height=3)
         self.canvas.setMinimumHeight(260)
         results.addWidget(self.canvas)
@@ -247,11 +254,12 @@ class AnalysisPage(PageBase):
         self.export_button = SecondaryButton("Exportar análise / figura")
         self.export_button.clicked.connect(self._export)
         self.export_button.setEnabled(False)
-        self.add_action(self.export_button)
+        plot_tools.addWidget(self.export_button)
         self.replay_button = SecondaryButton("Reproduzir análise")
         self.replay_button.setEnabled(False)
         self.replay_button.clicked.connect(self._replay)
-        self.add_action(self.replay_button)
+        plot_tools.addWidget(self.replay_button)
+        self.tabs.currentChanged.connect(self._update_execution_bar)
         self.kind.currentIndexChanged.connect(self._update_controls)
         for combo in (self.parameter, self.x_parameter, self.y_parameter):
             combo.currentIndexChanged.connect(self._parameter_guidance)
@@ -400,7 +408,7 @@ class AnalysisPage(PageBase):
     def set_saved(self, paths):
         self.saved.blockSignals(True)
         self.saved.clear()
-        self.saved.addItem("Resultados salvos desta execução", None)
+        self.saved.addItem("Estudos salvos", None)
         for label, path in paths:
             self.saved.addItem(label, str(path))
         self.saved.blockSignals(False)
@@ -681,8 +689,12 @@ class AnalysisPage(PageBase):
         except (OSError, ValueError, TypeError) as exc:
             self.message.setText(str(exc))
 
+    def _update_execution_bar(self):
+        self.execution_bar.setVisible(self._running or self.tabs.currentWidget() is self.configuration_tab)
+
     def set_running(self, running):
         self._running = running
+        self._update_execution_bar()
         self.source_button.setEnabled(bool(self._recent_sources) and not running)
         self.source_menu.setEnabled(not running)
         if running:

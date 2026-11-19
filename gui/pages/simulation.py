@@ -8,11 +8,9 @@ from PySide6.QtWidgets import (
     QGridLayout,
 )
 from gui.pages.base import PageBase
-from gui.widgets.card import MetricCard, MetricGrid
 from gui.widgets.content_tabs import ContentTabs
 from gui.design_system import Surface, LAYOUT
-from gui.widgets.plot_canvas import MplCanvas, style_figure
-from gui.formatting import quantity
+from gui.widgets.flow_layout import FlowLayout
 from gui.widgets.button import PrimaryButton, SecondaryButton, GhostButton
 from gui.widgets.collapsible import CollapsibleSection
 from gui.widgets.preparation_preview import PreparationPreview
@@ -90,7 +88,7 @@ class SimulationPage(PageBase):
         self._refresh_summary()
 
     def _build(self):
-        self.examples_button = SecondaryButton("Exemplos",icon="examples")
+        self.examples_button = GhostButton("Exemplos", icon="examples")
         self.examples_button.setToolTip("Carregar uma configuração demonstrativa existente. Nenhuma simulação é executada ao escolher o exemplo.")
         examples = QMenu(self.examples_button)
         from core.examples import get_example
@@ -100,14 +98,13 @@ class SimulationPage(PageBase):
             action.setToolTip(example.description)
             action.triggered.connect(lambda checked=False,key=identifier: self.example_requested.emit(key))
         self.examples_button.setMenu(examples)
-        self.add_action(self.examples_button)
 
         identity = QFrame()
         identity.setObjectName("DocumentHeader")
         identity_body = QVBoxLayout(identity)
         identity_body.setContentsMargins(0, 0, 0, 0)
         identity_body.setSpacing(2)
-        role = QLabel("RASCUNHO DO HAMILTONIANO")
+        role = QLabel("Rascunho")
         self.draft_role = role
         role.setObjectName("Eyebrow")
         identity_body.addWidget(role)
@@ -115,7 +112,7 @@ class SimulationPage(PageBase):
         self.experiment_name = QLineEdit()
         self.experiment_name.setObjectName("DocumentTitle")
         self.experiment_name.setMaxLength(160)
-        self.experiment_name.setPlaceholderText("Dê um nome à sua investigação")
+        self.experiment_name.setPlaceholderText("Simulação sem título")
         self.experiment_name.setAccessibleName("Nome do experimento")
         row.addWidget(self.experiment_name, 1)
         self.description_toggle = QToolButton()
@@ -123,8 +120,11 @@ class SimulationPage(PageBase):
         self.description_toggle.setCheckable(True)
         self.description_toggle.setArrowType(Qt.RightArrow)
         self.description_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        row.addWidget(self.description_toggle)
         identity_body.addLayout(row)
+        self.setup_actions = FlowLayout(spacing=8)
+        self.setup_actions.addWidget(self.examples_button)
+        self.setup_actions.addWidget(self.description_toggle)
+        identity_body.addLayout(self.setup_actions)
         self.description_row = QWidget()
         desc = QHBoxLayout(self.description_row)
         desc.setContentsMargins(0, 0, 0, 0)
@@ -144,67 +144,45 @@ class SimulationPage(PageBase):
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setHandleWidth(LAYOUT.handle_width)
         self.config_panel = ConfigPanel()
-        self.config_panel.setObjectName("InspectorPanel")
+        self.config_panel.setObjectName("ParameterWorkspace")
         self.config_panel.setAttribute(Qt.WA_StyledBackground, True)
-        self.config_panel.layout().setContentsMargins(18, 16, 18, 16)
+        self.config_panel.layout().setContentsMargins(4, 14, 24, 8)
         self.config_panel.set_inspector_mode(False)
-        self.inspector_title = QLabel("Parâmetros da simulação")
-        self.inspector_title.setObjectName("PanelTitle")
+        self.inspector_title = QLabel("Sistema e estado inicial")
+        self.inspector_title.setObjectName("WorkspaceSectionTitle")
         self.config_panel.layout().insertWidget(0, self.inspector_title)
         self.config_panel.btn_executar.hide()
         self.config_panel.simulacao_acionada.connect(self._emit_run)
         self.config_panel.parametros_alterados.connect(self._refresh_summary)
 
         self.steps = QWidget()
-        self.steps.setObjectName('PreparationSteps')
         steps_layout = QVBoxLayout(self.steps)
-        steps_layout.setContentsMargins(12, 16, 12, 16)
+        steps_layout.setContentsMargins(0, 0, 0, 0)
         steps_layout.addWidget(self.config_panel.section_nav)
-        steps_layout.addStretch()
         self.config_panel.external_steps = True
         self.config_panel._section_columns = 0
         self.config_panel._arrange_sections()
         self.config_panel._present()
-        self.steps.setMinimumWidth(180)
-        self.stage = Surface("Revisão do protocolo")
-        self.preview_tabs = ContentTabs()
-        self.preview_tabs.setDocumentMode(True)
-        self.preview_tabs.setUsesScrollButtons(True)
-        self.preview_tabs.setAccessibleName("Preparação, revisão ou execução selecionada")
-        preparation_view = QWidget()
-        preparation_layout = QVBoxLayout(preparation_view)
-        preparation_layout.setContentsMargins(0, 8, 0, 0)
-        badge = QLabel("PRÉVIA IDEAL · configuração em edição")
-        badge.setObjectName("Eyebrow")
-        preparation_layout.addWidget(badge)
+        self.stage = Surface("Plano da simulação", role="WorkbenchInspector")
+        self.stage.add(self.steps)
         self.preparation = PreparationPreview()
-        preparation_layout.addWidget(self.preparation, 1)
         self.state_caption = QLabel()
         self.state_caption.setObjectName("StateFormula")
         self.state_caption.setWordWrap(True)
         self.state_caption.setTextFormat(Qt.PlainText)
-        preparation_layout.addWidget(self.state_caption)
-        self.draft_facts = QLabel()
-        self.draft_facts.setWordWrap(True)
-        self.draft_facts.setObjectName("SectionSubtitle")
-        preparation_layout.addWidget(self.draft_facts)
-        hint = QLabel("A preparação acompanha o formulário. Execute para calcular a evolução com os parâmetros e o ruído escolhidos.")
-        hint.setWordWrap(True)
-        hint.setObjectName("FieldHint")
-        preparation_layout.addWidget(hint)
-        self.preview_tabs.addTab(preparation_view, "Preparação")
         self.initial_preview_section = CollapsibleSection('Prévia ideal de preparação', expanded=True)
-        preparation_layout.removeWidget(self.preparation)
-        preparation_layout.removeWidget(self.state_caption)
         self.initial_preview_section.content_layout.addWidget(self.preparation)
         self.initial_preview_section.content_layout.addWidget(self.state_caption)
-        self.config_panel.forms['system'].addRow(self.initial_preview_section)
-        preparation_link = GhostButton('Ver preparação na etapa Sistema')
-        preparation_link.clicked.connect(lambda: self.config_panel.set_section('system'))
-        preparation_layout.addWidget(preparation_link)
-
-        protocol_view = QWidget()
-        protocol_layout = QVBoxLayout(protocol_view)
+        system_content = self.config_panel.sections['system'].content_layout
+        system_fields = self.config_panel.forms['system']
+        system_content.removeItem(system_fields)
+        self.system_layout = QHBoxLayout()
+        self.system_layout.setSpacing(20)
+        self.system_layout.addLayout(system_fields, 1)
+        self.system_layout.addWidget(self.initial_preview_section, 1, Qt.AlignTop)
+        system_content.addLayout(self.system_layout)
+        self.protocol = CollapsibleSection("Revisar parâmetros")
+        protocol_layout = self.protocol.content_layout
         grid = QGridLayout()
         grid.setHorizontalSpacing(20)
         grid.setVerticalSpacing(14)
@@ -236,50 +214,19 @@ class SimulationPage(PageBase):
         self.science.content_layout.addWidget(explanation)
         self.science.set_summary("Simulação local · estado ideal ou ensemble ruidoso")
         protocol_layout.addWidget(self.science)
-        protocol_layout.addStretch()
-        self.preview_tabs.addTab(protocol_view, "Revisão do protocolo")
-
-        self.source_view = QWidget()
-        source_layout = QVBoxLayout(self.source_view)
-        self.source_title = QLabel("Execute ou abra uma execução para examinar seus dados.")
-        self.source_title.setWordWrap(True)
-        self.source_title.setObjectName("PanelTitle")
-        source_layout.addWidget(self.source_title)
-        self.source_note = QLabel("Os dados desta área pertencem à execução selecionada. Editar os parâmetros não recalcula esses resultados.")
-        self.source_note.setWordWrap(True)
-        self.source_note.setObjectName("FieldHint")
-        source_layout.addWidget(self.source_note)
-        self.source_metrics = []
-        metric_cards = []
-        for name in ("Fidelidade", "Pureza global", "Energia ⟨H⟩"):
-            card = MetricCard(name)
-            metric_cards.append(card)
-            self.source_metrics.append(card._value)
-        source_layout.addWidget(MetricGrid(metric_cards))
-        self.source_plot = MplCanvas()
-        source_layout.addWidget(self.source_plot, 1)
-        open_results = SecondaryButton("Abrir resultados completos", icon="results")
-        open_results.clicked.connect(lambda: self.navigation_requested.emit("results"))
-        source_layout.addWidget(open_results, 0, Qt.AlignRight)
-        self.preview_tabs.addTab(self.source_view, "Execução selecionada")
-        self.preview_tabs.setTabEnabled(2, False)
-        self.preview_tabs.setCurrentIndex(1)
-        self.preview_tabs.tabBar().hide()
+        self.stage.add(self.protocol)
         self.config_panel.section_changed.connect(self._step_selected)
-        self.stage.add(self.preview_tabs, 1)
         self.summary_scroll = QScrollArea()
         self.summary_scroll.setWidgetResizable(True)
         self.summary_scroll.setFrameShape(QFrame.NoFrame)
         self.summary_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.summary_scroll.setMinimumWidth(240)
         self.summary_scroll.setWidget(self.stage)
-        self.splitter.addWidget(self.steps)
         self.splitter.addWidget(self.config_panel)
         self.splitter.addWidget(self.summary_scroll)
-        self.splitter.setStretchFactor(0, 0)
-        self.splitter.setStretchFactor(1, 1)
-        self.splitter.setStretchFactor(2, 0)
-        self.splitter.setSizes([200, 780, 320])
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 0)
+        self.splitter.setSizes([840, 300])
         self.body().addWidget(self.splitter, 1)
         self.compact_tabs = ContentTabs()
         self.compact_tabs.setDocumentMode(True)
@@ -291,20 +238,18 @@ class SimulationPage(PageBase):
         footer = QVBoxLayout(self.execution_bar)
         footer.setContentsMargins(20,10,20,12)
         footer.setSpacing(8)
-        validation = QHBoxLayout()
         self.configuration_feedback = QLabel()
         self.configuration_feedback.setObjectName("ValidationMessage")
         self.configuration_feedback.setWordWrap(True)
         self.configuration_feedback.setAccessibleName("Validação da configuração")
-        validation.addWidget(self.configuration_feedback,1)
         self.revise_button = GhostButton("Revisar parâmetros")
         self.revise_button.clicked.connect(lambda: self._review_error())
-        validation.addWidget(self.revise_button)
-        footer.addLayout(validation)
         actions = QHBoxLayout()
         actions.setSpacing(12)
         self.status = SimulationStatus()
-        actions.addWidget(self.status,1)
+        actions.addWidget(self.status, 1)
+        actions.addWidget(self.configuration_feedback, 1)
+        actions.addWidget(self.revise_button)
         self.btn_cancel = SecondaryButton("Cancelar")
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.clicked.connect(self.cancel_requested.emit)
@@ -315,24 +260,26 @@ class SimulationPage(PageBase):
         actions.addWidget(self.btn_run)
         footer.addLayout(actions)
         self.last_result_row = QWidget()
-        last = QHBoxLayout(self.last_result_row)
-        last.setContentsMargins(0,0,0,0)
-        self.last_result_label = QLabel("Execução selecionada")
+        last = QVBoxLayout(self.last_result_row)
+        last.setContentsMargins(0, 4, 0, 0)
+        self.last_result_label = QLabel()
         self.last_result_label.setObjectName("FieldHint")
         self.last_result_label.setWordWrap(True)
-        last.addWidget(self.last_result_label,1)
-        self.last_results = GhostButton("Ver resultados",icon="results")
+        self.last_result_label.setTextFormat(Qt.PlainText)
+        last.addWidget(self.last_result_label)
+        self.last_results = GhostButton("Abrir resultados", icon="results")
         self.last_results.clicked.connect(lambda: self.navigation_requested.emit("results"))
-        self.last_bloch = GhostButton("Abrir estados 3D",icon="bloch")
-        self.last_bloch.clicked.connect(lambda: self.navigation_requested.emit("bloch"))
-        last.addWidget(self.last_results)
-        last.addWidget(self.last_bloch)
-        footer.addWidget(self.last_result_row)
+        last.addWidget(self.last_results, 0, Qt.AlignLeft)
+        self.stage.add(self.last_result_row)
+        self.stage.body().addStretch()
         self.last_result_row.hide()
         self._root.addWidget(self.execution_bar)
         self._scroll.takeWidget()
         self._scroll.hide()
         self._root.insertWidget(1, self._body_widget, 1)
+
+    def add_setup_action(self, button):
+        self.setup_actions.addWidget(button)
 
     def _emit_run(self):
         try:
@@ -345,7 +292,6 @@ class SimulationPage(PageBase):
     def _step_selected(self, key):
         self.inspector_title.setText({'system':'Sistema e estado inicial', 'hamiltonian':'Hamiltoniano',
             'evolution':'Evolução temporal', 'noise':'Modelo de ruído', 'execution':'Execução e amostragem'}[key])
-        self.preview_tabs.setCurrentIndex(1)
 
     def validate_configuration(self):
         """One validation path for the form, footer, button and execution shortcut."""
@@ -367,7 +313,7 @@ class SimulationPage(PageBase):
             f"Térmico · T₁={p['t1']:g} µs · T₂={p['t2']:g} µs" if "Térm" in p['modelo_ruido'] else
             f"Despolarizador · p₁={p['p1']:g} · p₂={p['p2']:g}")
         self._summary_rows['shots'].setText(f"{p['shots']:,} shots · semente {p['seed'] or 'automática'}".replace(',','.'))
-        self.draft_facts.setText(self._summary_rows['sistema'].text() + "\n" + self._summary_rows['protocolo'].text() + " · " + self._summary_rows['ruido'].text())
+        self.protocol.set_summary(f"{p['hamiltoniano']} · {p['qubits']} qubits · {p['passos']} passos")
         from core.types import resource_estimate
         try:
             config = self.config_panel.get_config()
@@ -403,13 +349,15 @@ class SimulationPage(PageBase):
         self.configuration_feedback.setProperty('state','valid' if self._valid else 'error')
         self.configuration_feedback.style().unpolish(self.configuration_feedback)
         self.configuration_feedback.style().polish(self.configuration_feedback)
-        self.revise_button.setVisible(not self._valid)
         self._update_actions()
 
     def _update_actions(self):
         self.btn_run.setEnabled(not self._running and self._valid)
         self.btn_cancel.setEnabled(self._running)
-        self.configuration_feedback.setVisible(not self._valid or self._running)
+        self.btn_cancel.setVisible(self._running)
+        self.configuration_feedback.setVisible(not self._valid and not self._running)
+        self.revise_button.setVisible(not self._valid and not self._running)
+        self.status.setVisible(self._valid or self._running)
 
     def _review_error(self):
         if self._compact:
@@ -418,20 +366,13 @@ class SimulationPage(PageBase):
 
     def set_experiment(self, experiment, title):
         self._source_experiment = experiment
-        self.source_title.setText(title)
-        self.preview_tabs.setTabEnabled(2, True)
-        for field, value in zip(self.source_metrics, (experiment.result.fidelity, experiment.result.purity, experiment.result.energy)):
-            field.setText(quantity(value))
-            field.setToolTip(str(value) if value is not None else "Não disponível")
-        from core.figures import draw_histograms
-        draw_histograms(self.source_plot.fig, [experiment.result.counts], frequency=True, colors=(PALETTE.primary,))
-        style_figure(self.source_plot.fig)
-        self.source_plot.draw()
-        self.last_result_row.setVisible(not getattr(self, "_embedded_heading", False))
-        self.last_result_label.setText("Execução selecionada disponível")
-        self.last_result_label.setToolTip(title)
-        self.last_bloch.setEnabled(bool(experiment.result.states) or experiment.result.final_state is not None)
-        self.last_bloch.setToolTip("Snapshots da execução selecionada" if experiment.result.states else "Estado final calculado; sem etapas intermediárias")
+        self.last_result_label.setText(f"Execução selecionada\n{title}")
+        self.last_result_row.show()
+
+    def clear_experiment(self):
+        self._source_experiment = None
+        self.last_result_label.clear()
+        self.last_result_row.hide()
 
     def set_running(self, running):
         self._running = running
@@ -442,8 +383,6 @@ class SimulationPage(PageBase):
         self.btn_run.setText("Executando…" if running else "Executar simulação")
         self._refresh_summary()
         if running:
-            self.configuration_feedback.setText("Tarefa em andamento · aguarde ou cancele para editar os parâmetros.")
-            self.revise_button.hide()
             self.status.set_running()
 
     def resizeEvent(self, event):
@@ -455,15 +394,6 @@ class SimulationPage(PageBase):
         if getattr(self, "_embedded_heading", False):
             self._header.hide()
         self.body().setContentsMargins(LAYOUT.page_margin, 4, LAYOUT.page_margin, LAYOUT.control_gap)
-        # O menu estreito mantém os nomes; use o espaço real antes de empilhar
-        # o único botão desta página e criar outra rolagem com fonte ampliada.
-        if self._actions_slot.count() != 1:
-            return
-        action = self._actions_slot.itemAt(0)
-        text_width = max(self._title.minimumSizeHint().width(), self._subtitle.minimumSizeHint().width())
-        if text_width + action.sizeHint().width() + 72 <= self.width():
-            self._header.layout().setDirection(QHBoxLayout.LeftToRight)
-
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange):
@@ -472,7 +402,10 @@ class SimulationPage(PageBase):
     def _arrange_workbench(self):
         if not hasattr(self,'compact_tabs'):
             return
-        compact = self.width() < 1260*max(1,self.font().pixelSize()/15)
+        scale = max(1, self.fontMetrics().height() / 19)
+        wide_preview = self.width() > 1110 * scale
+        self.system_layout.setDirection(QHBoxLayout.LeftToRight if wide_preview else QHBoxLayout.TopToBottom)
+        compact = self.width() < 900 * max(1, self.font().pixelSize() / 15)
         if compact == self._compact:
             return
         self._compact = compact
@@ -485,7 +418,7 @@ class SimulationPage(PageBase):
             self.steps.hide()
             self.splitter.hide()
             self.compact_tabs.addTab(self.config_panel,"Parâmetros")
-            self.compact_tabs.addTab(self.summary_scroll,"Área de experimentação")
+            self.compact_tabs.addTab(self.summary_scroll,"Plano da simulação")
             self.config_panel.setMaximumWidth(16777215)
             self.summary_scroll.setMaximumWidth(16777215)
             self.compact_tabs.show()
@@ -493,8 +426,7 @@ class SimulationPage(PageBase):
             while self.compact_tabs.count():
                 self.compact_tabs.removeTab(0)
             self.compact_tabs.hide()
-            self.splitter.insertWidget(0, self.steps)
-            self.splitter.insertWidget(1, self.config_panel)
+            self.splitter.insertWidget(0, self.config_panel)
             self.splitter.addWidget(self.summary_scroll)
             self.config_panel.setMaximumWidth(16777215)
             self.config_panel.setMinimumWidth(360)
@@ -505,6 +437,6 @@ class SimulationPage(PageBase):
             self.config_panel._arrange_sections()
             self.config_panel._present()
             self.steps.show(); self.config_panel.show(); self.summary_scroll.show()
-            self.splitter.setSizes([200,780,320])
+            self.splitter.setSizes([840, 300])
             self.splitter.show()
         self.workbench_changed.emit()

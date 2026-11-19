@@ -17,7 +17,6 @@ class ResultsTab(QScrollArea):
         self._final_probabilities = None
         self._frame_index = 0
         self._hist_title = "Distribuição observada"
-        self.source_title = "Execução selecionada"
         self._probabilities = None
         self._times = None
         self._time_unit = "Tempo (adimensional, ℏ=1)"
@@ -70,7 +69,8 @@ class ResultsTab(QScrollArea):
             column = QVBoxLayout(pane)
             column.setContentsMargins(0, 0, 0, 0)
             tools = QHBoxLayout()
-            tools.addWidget(control, 1)
+            tools.addWidget(control)
+            tools.addStretch(1)
             if extra is not None:
                 tools.addWidget(extra)
             tools.addWidget(canvas.exploration_button(pane))
@@ -124,16 +124,16 @@ class ResultsTab(QScrollArea):
             width = int(np.log2(len(self._final_probabilities)))
             values = {f'{i:0{width}b}': float(p) for i, p in enumerate(self._final_probabilities)}
         draw_histograms(self.canvas_hist.fig, [values], frequency=calculated or self.hist_measure.currentIndex() == 1,
-                        colors=(PALETTE.primary,), labels=[self.source_title], label_size=10,
+                        colors=(PALETTE.primary,), label_size=10,
                         title='Probabilidade calculada do estado final' if calculated else self._hist_title)
+        ax = self.canvas_hist.fig.axes[0]
+        legend = ax.get_legend()
+        if legend is not None:
+            legend.remove()
         if calculated:
-            self.canvas_hist.fig.axes[0].set_ylabel('Probabilidade calculada (%)')
+            ax.set_ylabel('Probabilidade calculada (%)')
         style_figure(self.canvas_hist.fig)
         self.canvas_hist.draw()
-
-    def set_source_title(self, title):
-        self.source_title = title
-        self._render_histogram()
 
     def set_final_state(self, state):
         self._final_probabilities = None if state is None else np.asarray(state.probabilities())

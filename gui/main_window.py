@@ -27,8 +27,6 @@ from gui.theme import build_qss
 from gui.branding import application_icon
 from gui.manual import WELCOME_HTML
 from gui.widgets.sidebar import Sidebar
-from gui.navigation import SECTION_PAGES
-from gui.widgets.section_workspace import SectionWorkspace
 from gui.controllers.navigation import NavigationController
 from gui.controllers.layout import LayoutController
 from gui.widgets.dialogs import ConfigurationsDialog
@@ -142,7 +140,7 @@ class MainWindow(QMainWindow):
         self._pending_example_id = None
         self._pending_parent_id = None
         self._reproduction_source = None
-        self._current_page = "dashboard"
+        self._current_page = "simulation"
         self._history = []
         self._pending_detail_id = None
         self._pending_comparison = None
@@ -193,7 +191,8 @@ class MainWindow(QMainWindow):
         self.page_settings.restore_backup_requested.connect(self.workspace_backup.restore)
         self.layout_controller = LayoutController(self)
         self.page_settings.layout_reset_requested.connect(self.layout_controller.reset)
-        self._show_page("dashboard")
+        active = self.projects.active
+        self._show_page("circuit" if active and active["kind"] == "circuit" else "simulation")
         if self._storage_error:
             self.statusBar().showMessage(
                 "Armazenamento indisponível: " + self._storage_error
@@ -203,35 +202,28 @@ class MainWindow(QMainWindow):
         root = QWidget()
         root.setObjectName("RootWidget")
         self.setCentralWidget(root)
-        layout = QVBoxLayout(root)
+        layout = QHBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.topbar = Topbar()
-        layout.addWidget(self.topbar)
-        workspace = QWidget()
-        workspace_layout = QHBoxLayout(workspace)
-        workspace_layout.setContentsMargins(0, 0, 0, 0)
-        workspace_layout.setSpacing(0)
-        layout.addWidget(workspace, 1)
         self.sidebar = Sidebar()
-        self.sidebar.brand_box.hide()
-        workspace_layout.addWidget(self.sidebar)
-        self.sidebar.hide()
+        layout.addWidget(self.sidebar)
         right = QWidget()
         body = QVBoxLayout(right)
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
-        body.addWidget(self.topbar.page_header)
+        body.addWidget(self.topbar)
         self.stack = QStackedWidget()
         body.addWidget(self.stack, 1)
         self.job_monitor = JobMonitor()
         body.addWidget(self.job_monitor)
-        workspace_layout.addWidget(right, 1)
+        layout.addWidget(right, 1)
         self.page_dashboard = DashboardPage()
         self.page_examples = ExamplesPage()
         self.page_simulation = SimulationPage()
         self.page_circuit = CircuitPage()
-        self.page_circuit.results_requested.connect(lambda: self._show_page('results'))
+        self.page_circuit.results_requested.connect(lambda: self.navigation.open_page('results'))
+        self.page_circuit.editor_requested.connect(lambda: self.navigation.open_page('circuit'))
         self.page_results = ResultsPage()
         self.page_bloch = BlochPage()
         self.page_mitigation = MitigationPage()
@@ -258,19 +250,10 @@ class MainWindow(QMainWindow):
         self.pages.update(analysis=self.page_analysis, library=self.page_library)
         self.pages["documentation"]=self.page_documentation
         self.page_workspace = ExperimentWorkspace({key: self.pages[key] for key in WORKSPACE_PAGES})
-        self.page_workspace.global_navigation = True
-        self.page_simulation.experiment_name.textChanged.connect(lambda text: self.page_workspace.set_draft_name('simulation', text))
-        self.page_circuit.editor.circuit_name.textChanged.connect(lambda text: self.page_workspace.set_draft_name('circuit:edit', text))
-        self.page_workspace.add_context_action(self.page_simulation.examples_button, "simulation")
+        self.page_simulation.add_setup_action(self.page_workspace.templates_button)
         self.page_simulation._header.hide()
         self.stack.addWidget(self.page_workspace)
-        self.section_workspaces = {}
-        grouped = set(WORKSPACE_PAGES)
-        for root, entries in SECTION_PAGES.items():
-            section = SectionWorkspace(self.pages, entries)
-            self.section_workspaces[root] = section
-            self.stack.addWidget(section)
-            grouped.update(key for key, _ in entries)
+        grouped = {*WORKSPACE_PAGES, "examples", "library", "documentation"}
         for key, page in self.pages.items():
             page.use_workspace_context()
             if key not in grouped:
@@ -313,13 +296,11 @@ class MainWindow(QMainWindow):
     def _wire_signals(self):
         self.job_monitor.cancel_requested.connect(self._cancel_simulation)
         self.sidebar.compact_requested.connect(self._toggle_sidebar)
-        self.sidebar.navigate.connect(self.navigation.open_page)
+        self.sidebar.navigate.connect(self._open_destination)
+        self.sidebar.search_requested.connect(self._open_commands)
+        self.sidebar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
         self.page_history.configure_requested.connect(lambda: self._show_page("simulation"))
-        self.topbar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
-        self.topbar.commands_requested.connect(self._open_commands)
         self.page_workspace.page_selected.connect(self._show_page)
-        for section in self.section_workspaces.values():
-            section.page_selected.connect(self._show_page)
         self.page_workspace.template_requested.connect(self._load_template)
         self.page_workspace.recent_requested.connect(self._open_experiment)
         self.page_workspace.configurations_requested.connect(self._show_saved_configurations)
@@ -385,8 +366,6 @@ class MainWindow(QMainWindow):
         self.export_bloch_view.setToolTip("Exporta as esferas de Bloch em PNG, SVG ou PDF, com câmera, estado e metadados da execução selecionada.")
         self.export_bloch_view.clicked.connect(self._export_bloch_view)
         self.page_workspace.add_context_action(self.export_bloch_view, "bloch")
-        self.page_workspace.toolbar.layout().removeWidget(self.export_bloch_view)
-        self.topbar.title_row.layout().addWidget(self.export_bloch_view)
         self.page_results.rerun_requested.connect(self._rerun_current)
         self.page_results.report_requested.connect(lambda: self._open_export_dialog("pdf"))
         self.page_library.template_save_requested.connect(self._save_template)
@@ -397,6 +376,9 @@ class MainWindow(QMainWindow):
         self.page_library.project_history_requested.connect(self._show_project_history)
         self.page_library.view_preferences_changed.connect(self._persist_library_view)
 
+    def _open_destination(self, key):
+        self.projects.open_tool(key)
+
     def _build_commands(self):
         self.command_palette = CommandPalette(self)
         self.command_palette.command_requested.connect(self._command)
@@ -405,7 +387,8 @@ class MainWindow(QMainWindow):
             ("Ctrl+N", self._new_experiment),
             ("Ctrl+O", self._import_experiment),
             ("Ctrl+Return", self._run_active_context),
-            ("F1", lambda: self._show_help("Início")),
+            ("Ctrl+K", self._open_commands),
+            ("F1", lambda: self._show_help(self.navigation.help_topic())),
             ("F11", self._toggle_presentation),
         ]:
             shortcut = QShortcut(QKeySequence(key), self)
@@ -495,8 +478,8 @@ class MainWindow(QMainWindow):
             self.page_analysis.btn_run.click()
         elif self._current_page in WORKSPACE_PAGES:
             if self._current_page != "simulation":
-                self._show_page("simulation")
-                self.statusBar().showMessage("Revise os parâmetros da próxima evolução e use Executar simulação.")
+                self._open_destination("simulation")
+                self.statusBar().showMessage("Revise a configuração e use Executar simulação ou Ctrl+Enter.")
             else:
                 self._run_simulation()
         else:
@@ -925,8 +908,8 @@ class MainWindow(QMainWindow):
         self.page_circuit.inspector.clear()
         self.page_circuit.editor.evidence.set_experiment(None)
         self.page_circuit.copy_button.setEnabled(False)
-        self.page_simulation.preview_tabs.setTabEnabled(2, False)
-        self.page_simulation.last_result_row.hide()
+        self.page_simulation.clear_experiment()
+        self.page_workspace.set_selected_experiment(None, None)
         self.page_analysis.experiment = None
         self.page_analysis.data = None
         self.page_analysis.table.setRowCount(0)
@@ -935,10 +918,7 @@ class MainWindow(QMainWindow):
         self.page_analysis.set_running(self._current_worker is not None)
         self.page_mitigation.has_experiment = False
         self.page_mitigation.context.setText('Abra ou execute uma simulação para estimar um observável.')
-        self.page_mitigation.summary.clear()
-        self.page_mitigation.table.setRowCount(0)
-        self.page_mitigation.canvas.reset_axes()
-        self.page_mitigation.canvas.draw_idle()
+        self.page_mitigation.reset_result()
         self.page_mitigation.set_running(self._current_worker is not None)
         if hasattr(self, 'drafts'):
             owner = self.projects.active_id if hasattr(self, 'projects') else None
@@ -1682,12 +1662,11 @@ class MainWindow(QMainWindow):
             if identifier:
                 title = experiment_title(current, data["annotations"])
                 self.page_workspace.set_selected_experiment(title, "circuit" if current.config.circuit is not None else "hamiltonian")
-                self.page_results.set_title(title, "Dados da execução selecionada")
-                self.page_results.set_experiment_title(title)
                 self.page_analysis.set_experiment_title(title)
                 self.page_mitigation.context.setText(title)
                 self.page_circuit.context.setText(title + " · " + system_label(current.config)
                     + f" · {current.config.system.num_qubits} qubits · {len(self.page_circuit.operations)} portas · profundidade {current.result.circuit_depth}")
+            self.navigation.update_heading()
         except (OSError, ValueError, TypeError, KeyError) as exc:
             self.page_workspace.set_templates([])
             self.page_library.set_unavailable(str(exc))
@@ -1872,11 +1851,15 @@ class MainWindow(QMainWindow):
             not self.page_settings.presentation.isChecked()
         )
         if self.page_settings.presentation.isChecked():
+            self._maximized_before_presentation = self.isMaximized()
             self.help_dock.hide()
             self.tutorial_dock.hide()
             self.showFullScreen()
         else:
-            self.showNormal()
+            if getattr(self, '_maximized_before_presentation', False):
+                self.showMaximized()
+            else:
+                self.showNormal()
 
     def _adaptive_sidebar(self):
         if not hasattr(self, "page_settings"):
@@ -2017,7 +2000,7 @@ class MainWindow(QMainWindow):
         if self._current_worker and self._current_worker.isInterruptionRequested():
             return
         self.page_comparison.set_full_data(data)
-        self.page_simulation.status.set_success("Comparação preparada; execuções de origem preservadas")
+        self.statusBar().showMessage("Comparação preparada. Os resultados A e B estão disponíveis para consulta.", 6000)
 
     def _documentation_sources(self):
         if self.page_documentation.use_comparison.isChecked():

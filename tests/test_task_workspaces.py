@@ -53,14 +53,14 @@ def test_laboratory_separates_preparation_from_selected_result(window, qt_app):
     workspace = window.page_workspace
     window._show_page('simulation')
     assert workspace.stages.currentIndex() == 0
-    assert workspace.draft_label.toolTip().startswith('Em edição:')
+    assert window.page_simulation.experiment_name.isVisible()
     window.page_simulation.config_panel.spin_J.setValue(.12345)
     draft = window.page_simulation.config_panel.get_config()
     workspace.stages.setCurrentIndex(1)
     assert window.is_page_active('results')
-    assert workspace.selected_label.isVisible()
-    for i in range(workspace.view_selector.count()):
-        workspace.view_selector.setCurrentIndex(i)
+    assert workspace.recent_button.isVisible()
+    for i in range(workspace.observation_tabs.count()):
+        workspace.observation_tabs.setCurrentIndex(i)
         settle(qt_app)
         assert window._current_experiment is source
         assert window.page_simulation.config_panel.get_config() == draft
@@ -206,8 +206,8 @@ def test_task_routes_fit_and_keep_execution_actions_reachable(window, qt_app, th
     button = window.page_simulation.btn_run
     assert button.isVisible()
     assert window.rect().contains(button.mapTo(window, button.rect().center()))
-    assert window.topbar.destinations['examples'].isVisible()
-    assert window.topbar.destinations['examples'].accessibleName() == 'Biblioteca'
+    assert window.sidebar.buttons['catalog'].isVisible()
+    assert window.sidebar.buttons['catalog'].accessibleName() == 'Biblioteca'
 
 
 def test_final_bloch_export_action_is_visible_and_preserves_provenance(window, qt_app, tmp_path, monkeypatch):

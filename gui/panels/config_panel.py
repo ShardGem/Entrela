@@ -42,7 +42,7 @@ SECTIONS = (
     (
         "noise",
         "Ruído",
-        "O simulador usa matrizes densidade para representar o ensemble ruidoso. T₂ deve ser ≤ 2T₁.",
+        "Escolha o canal de ruído e defina os parâmetros do modelo.",
     ),
     (
         "execution",
@@ -105,7 +105,7 @@ class ConfigPanel(QWidget):
         self.mode_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.mode_combo.setToolTip("Guiado mostra uma etapa por vez. Todos os parâmetros reúne as mesmas opções em seções recolhíveis, sem alterar valores.")
         self.mode_combo.setAccessibleName("Modo de configuração")
-        heading.addWidget(self.mode_combo,1)
+        heading.addWidget(self.mode_combo)
         self.section_selector = QComboBox()
         self.section_selector.setAccessibleName("Etapa da configuração guiada")
         self.section_selector.setMinimumContentsLength(10)
@@ -113,7 +113,8 @@ class ConfigPanel(QWidget):
         for index,(key,label,_) in enumerate(SECTIONS,1):
             self.section_selector.addItem(f"{index} · {label}",key)
             self.section_selector.setItemData(index-1, SECTIONS[index-1][2], Qt.ToolTipRole)
-        heading.addWidget(self.section_selector,1)
+        heading.addWidget(self.section_selector)
+        heading.addStretch(1)
         self.section_selector.hide()
         self._compact_sections = False
         root.addLayout(heading)
@@ -268,6 +269,7 @@ class ConfigPanel(QWidget):
         self.btn_next = QPushButton("Próxima etapa")
         self.btn_back.clicked.connect(lambda: self._step(-1))
         self.btn_next.clicked.connect(lambda: self._step(1))
+        bottom.addStretch(1)
         bottom.addWidget(self.btn_back)
         bottom.addWidget(self.btn_next)
         root.addLayout(bottom)
@@ -293,6 +295,7 @@ class ConfigPanel(QWidget):
         self.input_seed.textChanged.connect(self._changed)
         self._changed()
         self._present()
+        self._fit_fields()
 
     def _help(self, text):
         widget = QWidget()
@@ -367,7 +370,7 @@ class ConfigPanel(QWidget):
             if guided else
             "Abra as seções necessárias; o cabeçalho mantém os valores à vista."
         )
-        self.mode_explanation.setVisible(not guided)
+        self.mode_explanation.setVisible(not guided and not self.external_steps)
         for key, widget in self.sections.items():
             widget.setVisible(
                 self.current_mode == "advanced" or key == self.current_section
@@ -402,9 +405,9 @@ class ConfigPanel(QWidget):
         initial = self.combo_initial.currentData()
         n = self.spin_qubits.value()
         preview = {
-            "zero": f"Prévia ideal da preparação: {n} qubits em |0⟩. Antes de evoluir, uma medição em Z retorna apenas zeros.",
-            "plus": "Prévia ideal da preparação: cada qubit aponta para +X na esfera de Bloch. Antes de evoluir, os resultados em Z têm probabilidades iguais.",
-            "bell": "Prévia ideal da preparação: (|00⟩ + |11⟩)/√2. O par é emaranhado; cada vetor de Bloch local é nulo, embora o estado global seja puro.",
+            "zero": "Uma medição inicial na base Z retorna apenas zeros.",
+            "plus": "Cada qubit aponta para +X. Na base Z, 0 e 1 têm a mesma probabilidade.",
+            "bell": "O par é emaranhado. Cada vetor de Bloch local é nulo e o estado global é puro.",
         }[initial]
         if initial == "bell" and n != 2:
             preview = "O exemplo de Bell requer exatamente dois qubits. Ajuste Qubits para 2 antes de executar."
@@ -562,8 +565,18 @@ class ConfigPanel(QWidget):
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, 'forms'):
+            self._fit_fields()
             self._arrange_sections()
+
+    def _fit_fields(self):
+        scale = max(1, self.fontMetrics().height() / 19)
+        for form in self.forms.values():
+            for row in range(form.rowCount()):
+                item = form.itemAt(row, QFormLayout.FieldRole)
+                field = item.widget() if item else None
+                if isinstance(field, (QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit)):
+                    field.setMaximumWidth(round(320 * scale))
 
     def coletar_tudo(self):
         return {

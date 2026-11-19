@@ -23,12 +23,12 @@ LIGHT = {
 }
 NAVY = {
     **DARK,
-    "bg": "#101923", "bg_elevated": "#182831", "surface": "#20343f",
-    "surface_hover": "#29424f", "surface_active": "#304f5e",
-    "border": "#304654", "border_strong": "#698c9f",
+    "bg": "#101823", "bg_elevated": "#172332", "surface": "#203045",
+    "surface_hover": "#263c55", "surface_active": "#2c4763",
+    "border": "#30435a", "border_strong": "#6684a2",
     "text": "#EAF6FA", "text_muted": "#b9cfd9", "text_dim": "#9FBAC8",
     "primary": "#88D1E8", "primary_hover": "#b2e4f2", "primary_pressed": "#69b8d1",
-    "primary_muted": "#274957", "primary_faint": "#203c49",
+    "primary_muted": "#244762", "primary_faint": "#1e354c",
     "primary_on": "#0b202b", "text_on_primary": "#0b202b",
     "action_bg": "#88D1E8", "action_hover": "#b2e4f2", "action_pressed": "#69b8d1", "action_on": "#0b202b",
     "info": "#88D1E8", "info_bg": "#203c49", "q1": "#88D1E8", "q2": "#a9a7df",
@@ -45,6 +45,6 @@ THEME_CHOICES = (
 THEME_DESCRIPTIONS = {
     "dark": "Grafite: superfícies neutras, painéis contínuos e azul para destacar ações, foco e seleção.",
     "light": "Claro científico: fundo claro e destaque azul para leitura de parâmetros, tabelas e resultados.",
-    "navy": "Azul Entrela: superfícies azul-petróleo foscas e ciano suave para destacar a ação principal.",
+    "navy": "Azul Entrela: superfícies azul-marinho foscas e ciano suave para destacar a ação principal.",
     "auto": "Automático: alterna entre Grafite e Claro científico conforme a aparência do sistema operacional.",
 }

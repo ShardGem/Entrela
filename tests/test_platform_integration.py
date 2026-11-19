@@ -58,9 +58,12 @@ def test_history_detail_load_preserves_current_experiment(window):
     assert len(window.repository.list_summaries()) == 1
 
 
-def test_removed_shortcut_and_learning_demo_open_existing_editor(window):
+def test_search_and_learning_demo_reach_existing_tools(window):
     from core.learning import CONCEPTS
-    assert "Ctrl+K" not in [shortcut.key().toString() for shortcut in window.shortcuts]
+    assert "Ctrl+K" in [shortcut.key().toString() for shortcut in window.shortcuts]
+    window.sidebar.search.click()
+    assert window.command_palette.isVisible()
+    window.command_palette.close()
     concept = next(value for value in CONCEPTS if value.key == "bell")
     document = concept.demonstration
     window._load_demonstration(document)

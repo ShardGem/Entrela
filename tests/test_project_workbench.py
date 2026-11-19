@@ -147,15 +147,14 @@ def test_failed_draft_write_aborts_switch_and_preserves_recovery(window, monkeyp
     monkeypatch.setattr(window.projects.store.library, '_write', original_write)
 
 
-def test_activities_only_in_experiment_context(window):
-    for key in ('dashboard', 'catalog', 'examples', 'docs', 'settings', 'history', 'notebook', 'library', 'documentation', 'analysis', 'mitigation'):
-        window._show_page(key)
-        assert window.topbar.activities.isHidden(), key
-    window._show_page('simulation')
-    assert not window.topbar.activities.isHidden()
-    window.projects.open_activity(1)
-    assert 'Execute o rascunho' in window.statusBar().currentMessage()
-    assert window.topbar.activities.currentIndex() == 0
+def test_sidebar_results_remain_discoverable_before_an_experiment(window):
+    window.sidebar.buttons['simulation'].click()
+    assert window.page_workspace.toolbar.isHidden()
+    window.sidebar.buttons['results'].click()
+    assert window.is_page_active('results')
+    assert window.page_results.empty.isVisible()
+    assert window.page_workspace.recent_button.isVisible()
+    assert window.sidebar.buttons['results'].isChecked()
 
 
 def test_blue_default_and_existing_profile_priority(window):

@@ -47,7 +47,7 @@ def test_named_record_report_and_zne_reproduction(window, tmp_path, monkeypatch)
     source = execute(window)
     window.page_library.run_title.setText("Bell · referência da pesquisa")
     window._annotate_current("TCC", "Controle ideal", ["referência"])
-    assert window.page_results._title.text() == "Bell · referência da pesquisa"
+    assert window.topbar.title.text() == "Bell · referência da pesquisa"
     window.page_history.search.setText("referência da pesquisa")
     assert window.page_history.table.rowCount() == 1
     destination = tmp_path / "report.pdf"

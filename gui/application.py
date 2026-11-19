@@ -2,7 +2,7 @@
 
 import sys
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from gui.branding import configure_application_identity
 from gui.splash import SplashScreen
 from gui.main_window import MainWindow
@@ -19,5 +19,6 @@ def main():
     splash.show()
     app.processEvents()
     window = MainWindow()
+    window.setWindowState(window.windowState() | Qt.WindowMaximized)
     splash.finish_after_minimum(window)
     return app.exec()

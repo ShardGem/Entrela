@@ -110,7 +110,7 @@ def test_projector_layout_does_not_compress_summary_text(window, qt_app):
     page = window.page_simulation
     page.config_panel.set_mode("advanced")
     page.compact_tabs.setCurrentIndex(1)
-    page.preview_tabs.setCurrentIndex(1)
+    page.protocol.set_expanded(True, animate=False)
     qt_app.processEvents()
     qt_app.processEvents()
     for label in page._summary_rows.values():

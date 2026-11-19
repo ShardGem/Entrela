@@ -151,21 +151,30 @@ def test_expanded_sections_and_presentation_survive_restart(window, qt_app):
         other.close()
 
 
-def test_result_actions_use_available_width_and_stay_inside_header(window, qt_app):
+def test_result_actions_stay_with_the_inspector_and_leave_space_for_the_chart(window, qt_app):
     page = window.page_results
+    record = run_experiment(replace(create_example_config('bell'), shots=16))
+    window._current_experiment = record
+    window._display_experiment(record)
     window._show_page('results')
     try:
-        for size, width in [(15, 1440), (24, 920)]:
+        for size, width in [(15, 1440), (24, 1024)]:
             apply_appearance(window, 'dark', size)
             window.resize(width, 900)
             for _ in range(4):
                 qt_app.processEvents()
-            buttons = [item.widget() for item in page._actions_slot.items]
+            buttons = [page.btn_rerun, page.btn_save, page.btn_edit, page.export_button]
             for index, button in enumerate(buttons):
-                assert page._header.rect().contains(button.geometry())
-                assert all(not button.geometry().intersects(other.geometry()) for other in buttons[index+1:])
+                assert page.inspector.rect().contains(button.geometry())
+                assert all(not button.geometry().intersects(other.geometry()) for other in buttons[index + 1:])
             if size == 15:
-                assert len({button.y() for button in buttons}) == 1
+                assert page.tabs.width() > page.inspector.width()
+                chart_width = page.tabs.width()
+                page.inspector_toggle.click()
+                qt_app.processEvents()
+                assert page.inspector_scroll.isHidden()
+                assert page.tabs.width() > chart_width
+                page.inspector_toggle.click()
     finally:
         apply_appearance(window)
 

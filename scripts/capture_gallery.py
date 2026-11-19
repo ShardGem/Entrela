@@ -287,14 +287,13 @@ def main():
         panel.set_mode('advanced')
         panel.set_section('noise')
         gallery.capture('03-laboratorio/06-configuracao-avancada.png', 'Parâmetros no modo avançado', 'simulation')
-        window.page_simulation.preview_tabs.setCurrentIndex(1)
+        window.page_simulation.protocol.set_expanded(True, animate=False)
         gallery.capture('03-laboratorio/14-bancada-protocolo.png', 'Revisão do protocolo do rascunho', 'simulation')
-        window.page_simulation.preview_tabs.setCurrentIndex(2)
-        gallery.capture('03-laboratorio/13-bancada-execucao.png', 'Evidência da execução selecionada na bancada', 'simulation')
-        window.page_simulation.preview_tabs.setCurrentIndex(0)
+        window.page_simulation.protocol.set_expanded(False, animate=False)
+        gallery.capture('03-laboratorio/13-bancada-execucao.png', 'Acesso à execução selecionada na preparação', 'simulation')
         panel.set_mode('guided')
         select(custom)
-        gallery.show('circuit')
+        window.page_workspace._detail_actions['circuit:inspect'].trigger()
         window.page_circuit.select_operation(0)
         gallery.capture('03-laboratorio/07-circuito-inspecao.png', 'Circuito executado · inspeção das portas', 'circuit')
         window.page_circuit._copy_to_editor()
@@ -318,16 +317,20 @@ def main():
         select(noisy)
         gallery.show('results')
         results = window.page_results
+        workspace = window.page_workspace
         for index, slug in [(0, 'distribuicao'), (1, 'evolucao')]:
-            results.results_tab.chart_views.setCurrentIndex(index)
+            workspace.observation_tabs.setCurrentIndex(index)
             gallery.capture(f'04-resultados/resultados-{slug}.png', results.results_tab.chart_views.tabText(index), 'results')
-        results.results_tab.chart_views.setCurrentIndex(2)
-        for widget, key, title in [(results.results_tab, 'graficos', 'Distribuição observada e evolução'),
-                                    (results.interpretation, 'interpretacao', 'Interpretação dos resultados'),
-                                    (results.table, 'dados', 'Contagens, frequências e probabilidades'),
-                                    (results.metadata, 'reprodutibilidade', 'Metadados de reprodutibilidade'),
-                                    (results.state_inspector, 'estado-global', 'Matriz densidade do estado global')]:
-            results.tabs.setCurrentWidget(widget)
+        workspace._paired_charts()
+        gallery.capture('04-resultados/resultados-graficos.png', 'Distribuição observada e evolução', 'results')
+        for route, key, title in [('results:interpretation', 'interpretacao', 'Interpretação dos resultados'),
+                                  ('results:data', 'dados', 'Contagens, frequências e probabilidades'),
+                                  ('results:metadata', 'reprodutibilidade', 'Metadados de reprodutibilidade'),
+                                  ('results:state', 'estado-global', 'Matriz densidade do estado global')]:
+            if route in workspace._detail_actions:
+                workspace._detail_actions[route].trigger()
+            else:
+                workspace.observation_tabs.setCurrentIndex(4 if route == 'results:data' else 3)
             gallery.capture(f'04-resultados/resultados-{key}.png', title, 'results')
         gallery.show('bloch')
         bloch = window.page_bloch
@@ -471,7 +474,7 @@ def main():
         panel.set_section('noise')
         gallery.capture('07-preferencias/texto-ampliado-preparar.png', '1024 × 768 · campos e execução com texto de 24 px', 'simulation', expected_size=(1024, 768))
         window.page_simulation.compact_tabs.setCurrentIndex(1)
-        window.page_simulation.preview_tabs.setCurrentIndex(1)
+        window.page_simulation.protocol.set_expanded(True, animate=False)
         gallery.capture('07-preferencias/texto-ampliado-simulacao.png', '1024 × 768 · revisão com texto ampliado', 'simulation', expected_size=(1024, 768))
         window.navigation.open_page('circuit')
         gallery.idle()

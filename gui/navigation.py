@@ -11,40 +11,29 @@ ROOT_FOR_PAGE = {key: key for key, _ in ROOT_ITEMS}
 ROOT_FOR_PAGE.update(circuit='simulation', results='simulation', bloch='simulation',
                      mitigation='analysis', comparison='analysis', library='history',
                      documentation='history', examples='docs')
-SECTION_PAGES = {
-    'analysis': [('analysis', 'Estudos e varreduras'), ('mitigation', 'Mitigação ZNE'), ('comparison', 'Comparações')],
-    'history': [('history', 'Execuções salvas'), ('library', 'Anotações'), ('documentation', 'Evidências e relatórios')],
-    'docs': [('examples', 'Exemplos prontos'), ('docs', 'Conceitos e manual')],
-}
-
 # Destinos visíveis: as áreas de trabalho são contêineres, não substitutos
 # dos acessos às funcionalidades. A ordem também define o percurso por teclado.
 NAV_ITEMS = [
-    ('dashboard', 'Início'),
-    ('simulation', 'Configurar simulação'),
-    ('circuit', 'Editor de circuitos'),
+    ('simulation', 'Simulação'),
+    ('circuit', 'Circuitos'),
     ('results', 'Resultados'),
-    ('bloch', 'Estados quânticos 3D'),
+    ('bloch', 'Estados 3D'),
+    ('comparison', 'Comparar execuções'),
     ('analysis', 'Estudos e varreduras'),
     ('mitigation', 'Mitigação ZNE'),
-    ('comparison', 'Comparar execuções'),
-    ('history', 'Histórico de execuções'),
-    ('library', 'Anotações da execução'),
-    ('configurations', 'Configurações salvas'),
-    ('documentation', 'Relatórios e exportações'),
-    ('examples', 'Exemplos prontos'),
-    ('docs', 'Conceitos e manual'),
+    ('dashboard', 'Projetos'),
+    ('history', 'Histórico'),
+    ('notebook', 'Caderno'),
+    ('catalog', 'Biblioteca'),
+    ('docs', 'Aprender'),
     ('settings', 'Preferências'),
 ]
 NAV_LABELS = dict(NAV_ITEMS)
 NAV_GROUPS = [
     ('lab', 'Laboratório', 'group-lab', ('simulation', 'circuit', 'results', 'bloch')),
-    ('research', 'Investigação', 'group-research', ('analysis', 'mitigation', 'comparison')),
-    ('records', 'Registros', 'group-organize', ('history', 'library', 'configurations', 'documentation')),
-    ('learning', 'Aprendizado', 'group-start', ('examples', 'docs')),
+    ('research', 'Investigação', 'group-research', ('comparison', 'analysis', 'mitigation')),
+    ('records', 'Acervo', 'group-organize', ('dashboard', 'history', 'notebook', 'catalog')),
 ]
-NAV_ACTIONS = {'configurations'}
 
 ROOT_FOR_PAGE.update(catalog="catalog", notebook="notebook")
-PAGE_LABELS.update(catalog="Biblioteca", notebook="Caderno do projeto", dashboard="Projetos")
-NAV_LABELS.update(catalog="Biblioteca", notebook="Caderno do projeto", dashboard="Projetos")
+PAGE_LABELS.update(catalog="Biblioteca", notebook="Caderno", dashboard="Projetos", history="Histórico de execuções", analysis="Estudos e varreduras", docs="Aprender")

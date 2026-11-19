@@ -169,7 +169,7 @@ class BlochPage(PageBase):
         self.speed_label = QLabel("Velocidade")
         controls.add_group(self.speed_label, self.speed_combo)
         controls.addWidget(self.loop)
-        layout.addWidget(self.selection_label)
+
         self.canvas = BlochCanvas()
         self.canvas.qubit_selected.connect(self._select_qubit)
         self.camera_panel = BlochCameraPanel(self.canvas)
@@ -219,7 +219,10 @@ class BlochPage(PageBase):
         self.local_qubit.setObjectName('ExecutionIdentity')
         self.local_qubit.setWordWrap(True)
         self.local_qubit.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        inspector_layout.addWidget(self.visual_choice)
+        view_row = QHBoxLayout()
+        view_row.addWidget(self.visual_choice)
+        view_row.addWidget(self.selection_label, 1)
+        layout.addLayout(view_row)
         inspector_layout.addWidget(self.focus_combo)
         inspector_layout.addWidget(self.local_qubit)
         self.overlay.setText('Mesmo circuito sem ruído')
@@ -351,7 +354,6 @@ class BlochPage(PageBase):
     def _adapt_transport(self):
         if not hasattr(self, 'snapshot_label'): return
         compact = self.width() < 1180*max(1,self.font().pixelSize()/15)
-        self.selection_label.setVisible(not compact)
         self.speed_label.setVisible(not compact)
         self.loop.setVisible(not compact)
         self.snapshot_label.setText('#' if compact else 'Ir ao snapshot')

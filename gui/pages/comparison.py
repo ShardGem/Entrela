@@ -5,13 +5,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QHBoxLayout,
+    QGridLayout,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QTabWidget, QTabBar, QWidget, QVBoxLayout, QSlider, QCheckBox, QPushButton, QPlainTextEdit,
 )
 from gui.pages.base import PageBase
-from gui.widgets.flow_layout import FlowLayout
 from gui.formatting import quantity, timestamp
 from gui.widgets.plot_canvas import MplCanvas,style_axes
 from gui.theme import PALETTE
@@ -31,44 +31,48 @@ class ComparisonPage(PageBase):
             "Compare execuções com o mesmo sistema e protocolo, variando ruído e amostragem.",
             parent,
         )
-        row = FlowLayout()
+        self.body().setSpacing(12)
+        sources = QGridLayout()
+        sources.setHorizontalSpacing(16)
+        sources.setVerticalSpacing(5)
         self.first_run, self.second_run = QComboBox(), QComboBox()
-        self.first_run.setAccessibleName("Execução A")
-        self.second_run.setAccessibleName("Execução B")
-        self.first_run.setMinimumContentsLength(12)
-        self.second_run.setMinimumContentsLength(12)
-        self.first_run.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.second_run.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        row.addWidget(QLabel("A"))
-        row.addWidget(self.first_run)
-        row.addWidget(QLabel("B"))
-        row.addWidget(self.second_run)
-        self.body().addLayout(row)
         self.comparison_mode = QComboBox()
-        self.comparison_mode.setMinimumContentsLength(18)
-        self.comparison_mode.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.comparison_mode.addItem("Comparação controlada · mesmo circuito e protocolo","controlled")
-        self.comparison_mode.addItem("Convergência · variar passos ou ordem de Trotter","trotter")
-        self.comparison_mode.setAccessibleName("Critério científico da comparação")
-        row.add_group(QLabel("Critério"), self.comparison_mode)
+        self.comparison_mode.addItem("Mesmo circuito e protocolo", "controlled")
+        self.comparison_mode.addItem("Convergência de Trotter", "trotter")
+        for column, (label, combo) in enumerate(zip(
+            ("Execução A", "Execução B", "Critério científico"),
+            (self.first_run, self.second_run, self.comparison_mode),
+        )):
+            caption = QLabel(label)
+            caption.setObjectName('FieldHint')
+            caption.setBuddy(combo)
+            combo.setAccessibleName(label)
+            combo.setMinimumContentsLength(10)
+            combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            sources.addWidget(caption, 0, column)
+            sources.addWidget(combo, 1, column)
+            sources.setColumnStretch(column, 2 if column < 2 else 1)
+        self.body().addLayout(sources)
         self.comparison_mode.setToolTip(self.comparison_mode.currentText())
         self.comparison_mode.currentIndexChanged.connect(lambda *_: self.comparison_mode.setToolTip(self.comparison_mode.currentText()))
         self.comparison_mode.currentIndexChanged.connect(self._compare)
         self.message = QLabel("São necessárias duas execuções.")
         self.message.setWordWrap(True)
-        self.body().addWidget(self.message)
+        self.message.setObjectName('FieldHint')
         self.summary = QLabel()
         self.summary.setWordWrap(True)
         self.summary.setObjectName('SectionSubtitle')
-        self.body().addWidget(self.summary)
+
         tools=QHBoxLayout()
         self.btn_prepare=QPushButton("Carregar estados e curvas")
         self.btn_prepare.clicked.connect(self._request_prepare)
         self.btn_document=QPushButton("Documentar comparação")
         self.btn_document.clicked.connect(self.documentation_requested.emit)
+        tools.addWidget(self.message, 1)
         tools.addWidget(self.btn_prepare)
         tools.addWidget(self.btn_document)
         self.body().addLayout(tools)
+        self.body().addWidget(self.summary)
         self.metrics_table = QTableWidget(0, 4)
         self.metrics_table.setHorizontalHeaderLabels(["Métrica", "A", "B", "B − A"])
         self.metrics_table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -83,7 +87,8 @@ class ComparisonPage(PageBase):
         self.hist_layout.addItems(["Distribuições sobrepostas","Distribuições lado a lado"])
         self.hist_layout.currentIndexChanged.connect(self._compare)
         hist_tools=QHBoxLayout()
-        hist_tools.addWidget(self.hist_layout,1)
+        hist_tools.addWidget(self.hist_layout)
+        hist_tools.addStretch(1)
         hist_tools.addWidget(self.canvas.exploration_button(hist))
         layout.addLayout(hist_tools)
         self.canvas.set_value_lookup(self._histogram_value)
@@ -147,6 +152,7 @@ class ComparisonPage(PageBase):
         self.view_tabs = QTabBar()
         self.view_tabs.setObjectName("ViewTabs")
         self.view_tabs.setUsesScrollButtons(True)
+        self.view_tabs.setExpanding(False)
         self.view_tabs.setAccessibleName("Visualização da comparação")
         for title in ("Distribuições", "Curvas", "Bloch", "Configuração", "ZNE", "Métricas"):
             self.view_tabs.addTab(title)
@@ -234,6 +240,7 @@ class ComparisonPage(PageBase):
             self.btn_prepare.setEnabled(False)
             self.btn_document.setEnabled(False)
             self.message.setText(error)
+            self.message.setToolTip(error)
             self.canvas.draw()
             return
         note = "Comparação compatível. Distribuições normalizadas pelo total observado de cada execução; escala comum de 0 a 1. "
@@ -242,7 +249,8 @@ class ComparisonPage(PageBase):
             note += "As curvas comparam com a evolução exata do Hamiltoniano. Grades temporais diferentes não são interpoladas. "
         if a.result.mitigation or b.result.mitigation:
             note += " Os registros ZNE mantêm as métricas da simulação de origem; não são estados mitigados."
-        self.message.setText(note)
+        self.message.setToolTip(note)
+        self.message.setText("Comparação compatível · escala comum de 0 a 1")
         if not (a.result.mitigation or b.result.mitigation):
             self._placeholder(self.observable_canvas, "Nenhuma das execuções contém uma análise ZNE.\nSelecione um registro com mitigação para comparar observáveis.")
         if a.result.mitigation or b.result.mitigation:
@@ -318,6 +326,7 @@ class ComparisonPage(PageBase):
         if identifiers!=(self.first_run.currentData(),self.second_run.currentData()) or data.get("mode","controlled") != self.comparison_mode.currentData():
             return
         self.full_data=data
+        self.message.setText('Execuções prontas para consulta')
         self._requested_pair = None
         self._load_timer.stop()
         self.focus.setEnabled(True)
@@ -493,10 +502,10 @@ class ComparisonPage(PageBase):
 
     def set_running(self,running):
         self._running = running
-        for widget in (self.first_run,self.second_run,self.hist_layout):
+        for widget in (self.first_run, self.second_run, self.comparison_mode, self.hist_layout):
             widget.setEnabled(not running)
         a, b = self.records.get(self.first_run.currentData()), self.records.get(self.second_run.currentData())
-        self.btn_prepare.setEnabled(not running and a is not None and b is not None and not incompatibility(a,b))
+        self.btn_prepare.setEnabled(not running and a is not None and b is not None and not incompatibility(a, b, mode=self.comparison_mode.currentData()))
         self.btn_document.setEnabled(not running and self.full_data is not None)
         if not running:
             if self._requested_pair is not None and self.full_data is None:

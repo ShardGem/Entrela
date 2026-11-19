@@ -8,11 +8,11 @@ from tests.qt_helpers import wait_until
 def test_groups_start_open_and_navigation_preserves_independent_choices(window, qt_app):
     sidebar = window.sidebar
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
-    sidebar.group_buttons['learning'].click()
-    wait_until(lambda: sidebar.group_bodies['learning'].isHidden())
-    assert all(not sidebar.group_bodies[key].isHidden() for key in ('lab', 'research', 'records'))
+    sidebar.group_buttons['records'].click()
+    wait_until(lambda: sidebar.group_bodies['records'].isHidden())
+    assert all(not sidebar.group_bodies[key].isHidden() for key in ('lab', 'research'))
     window._show_page('comparison')
-    assert sidebar.group_bodies['learning'].isHidden()
+    assert sidebar.group_bodies['records'].isHidden()
     assert not sidebar.group_bodies['research'].isHidden()
     window._show_page('examples')
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
@@ -25,7 +25,6 @@ def test_narrow_menu_preserves_visible_names_and_destinations(window, qt_app):
     sidebar.set_compact(True)
     qt_app.processEvents()
     assert sidebar.width() < full_width
-    assert sidebar.toggle.text() == 'Expandir menu'
     assert 'Expandir navegação' == sidebar.toggle.accessibleName()
     for page, button in sidebar.buttons.items():
         assert ' '.join(button.text().split()) == expected[page]
@@ -36,7 +35,7 @@ def test_narrow_menu_preserves_visible_names_and_destinations(window, qt_app):
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
     sidebar.set_compact(False)
     assert all(button.text() == expected[key] for key, button in sidebar.buttons.items())
-    assert sidebar.toggle.text() == 'Recolher'
+    assert sidebar.toggle.accessibleName() == 'Recolher navegação'
 
 
 def test_navigation_stays_readable_after_theme_font_and_width_changes(window, qt_app):

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayou
 from gui.icons import get_icon
 from gui.theme import PALETTE
 from gui.branding import application_icon
-from gui.navigation import NAV_ITEMS, NAV_GROUPS, NAV_ACTIONS
+from gui.navigation import NAV_ITEMS, NAV_GROUPS
 
 
 class NavButton(QPushButton):
@@ -16,15 +16,15 @@ class NavButton(QPushButton):
         self.setCheckable(True)
         self.setAutoExclusive(False)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(44)
+        self.setMinimumHeight(38)
         self.setAccessibleName(label)
         self.setToolTip(label)
         self.setText('  '+label)
         self._refresh_icon()
 
     def _refresh_icon(self):
-        self.setIcon(get_icon(self.icon_name,PALETTE.primary if self.isChecked() else PALETTE.text_muted))
-        self.setIconSize(QSize(22,22))
+        self.setIcon(get_icon(self.icon_name, PALETTE.primary if self.isChecked() else PALETTE.text_muted))
+        self.setIconSize(QSize(18,18))
 
     def setChecked(self,checked):
         super().setChecked(checked)
@@ -34,6 +34,8 @@ class NavButton(QPushButton):
 class Sidebar(QFrame):
     navigate=Signal(str)
     compact_requested=Signal(bool)
+    search_requested=Signal()
+    help_requested=Signal()
     ITEMS = NAV_ITEMS
     GROUPS = NAV_GROUPS
     DESCRIPTIONS = {
@@ -46,10 +48,8 @@ class Sidebar(QFrame):
         'mitigation': 'Configure ZNE para extrapolar um observável e avaliar seu erro e sua incerteza.',
         'comparison': 'Compare métricas, gráficos e estados de duas execuções compatíveis.',
         'history': 'Pesquise, inspecione e reabra execuções salvas, ou selecione duas para comparar.',
-        'library': 'Registre identificação, projeto, hipóteses e interpretação da execução selecionada.',
-        'configurations': 'Reutilize parâmetros salvos do formulário Hamiltoniano. Abrir uma configuração não executa a simulação.',
-        'documentation': 'Organize evidências e exporte dados, figuras, animações e relatórios científicos.',
-        'examples': 'Explore modelos prontos e abra cópias editáveis para aprender e experimentar.',
+        'notebook': 'Registre anotações, reúna evidências e exporte relatórios.',
+        'catalog': 'Explore exemplos, configurações salvas e circuitos reutilizáveis.',
         'docs': 'Consulte conceitos, exemplos explicados, manual e referências científicas.',
         'settings': 'Ajuste aparência, acessibilidade, exportação e backup do espaço de trabalho.',
     }
@@ -87,23 +87,20 @@ class Sidebar(QFrame):
         self.logo_title.setObjectName('SidebarLogo')
         brand.addWidget(self.logo_title,1)
         outer.addWidget(self.brand_box)
-        navigation = QHBoxLayout()
-        navigation.setContentsMargins(16, 0, 12, 4)
-        caption = QLabel('Navegação')
-        self.navigation_caption = caption
-        caption.setObjectName('SectionSubtitle')
-        navigation.addWidget(caption,1)
+        brand.setContentsMargins(16, 4, 8, 6)
         self.toggle=QToolButton()
         self.toggle.setObjectName('SidebarToggle')
-        self.toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
         self.toggle.setCursor(Qt.PointingHandCursor)
-        self.toggle.setMinimumHeight(38)
-        self.toggle.setIconSize(QSize(22,22))
+        self.toggle.setMinimumSize(28, 34)
+        self.toggle.setIconSize(QSize(17,17))
         self.toggle.clicked.connect(lambda:self.compact_requested.emit(not self._compact))
-        navigation.addWidget(self.toggle)
-        outer.addLayout(navigation)
-        self.buttons['dashboard'] = self._make_button('dashboard')
-        outer.addWidget(self.buttons['dashboard'])
+        brand.addWidget(self.toggle)
+        self.search = NavButton('search', 'Buscar')
+        self.search.setCheckable(False)
+        self.search.setToolTip('Buscar funções, experimentos e conceitos (Ctrl+K)')
+        self.search.clicked.connect(self.search_requested.emit)
+        outer.addWidget(self.search)
         self.scroll=QScrollArea()
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setWidgetResizable(True)
@@ -115,7 +112,7 @@ class Sidebar(QFrame):
         for key,title,icon,items in self.GROUPS:
             header=QPushButton()
             header.setObjectName('NavGroup')
-            header.setMinimumHeight(30)
+            header.setMinimumHeight(26)
             header.setIconSize(QSize(22,22))
             header.setCursor(Qt.PointingHandCursor)
             header.setAccessibleName(title+' — expandir ou recolher grupo')
@@ -140,15 +137,20 @@ class Sidebar(QFrame):
         layout.addStretch()
         self.scroll.setWidget(content)
         outer.addWidget(self.scroll,1)
+        self.buttons['docs'] = self._make_button('docs')
+        outer.addWidget(self.buttons['docs'])
+        self.help_button = NavButton('help', 'Ajuda contextual')
+        self.help_button.setCheckable(False)
+        self.help_button.setToolTip('Ajuda da área em uso (F1)')
+        self.help_button.clicked.connect(self.help_requested.emit)
+        outer.addWidget(self.help_button)
         self.buttons['settings'] = self._make_button('settings')
         outer.addWidget(self.buttons['settings'])
 
     def _make_button(self, key, group=None):
         label = dict(self.ITEMS)[key]
-        icon = {'library': 'annotations'}.get(key, key)
+        icon = {'notebook': 'annotations', 'catalog': 'examples'}.get(key, key)
         button = NavButton(icon, label)
-        if key in NAV_ACTIONS:
-            button.setCheckable(False)
         context = f'{group} · {label}' if group else label
         button.setToolTip(context + '\n' + self.DESCRIPTIONS[key])
         button.setAccessibleDescription(self.DESCRIPTIONS[key])
@@ -202,9 +204,8 @@ class Sidebar(QFrame):
             button.setIconSize(QSize(16,16))
 
     def _on_click(self,key):
-        if key not in NAV_ACTIONS:
-            self.set_active(key)
         self.navigate.emit(key)
+        self.buttons[key].setChecked(key == self._active)
 
     def set_active(self,key):
         self._active=key
@@ -220,15 +221,11 @@ class Sidebar(QFrame):
 
     def set_compact(self,compact):
         self._compact=bool(compact)
-        self.logo_title.show()
-        self.navigation_caption.setVisible(not compact)
-        self.toggle.setText('Expandir menu' if compact else 'Recolher')
         self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.text_muted))
         self.toggle.setToolTip('Expandir navegação' if compact else 'Recolher navegação')
         self.toggle.setAccessibleName(self.toggle.toolTip())
-        for key,label in self.ITEMS:
-            button=self.buttons[key]
-            button.setText(label)
+        for button in (*self.buttons.values(), self.search, self.help_button):
+            button.setText(button.label)
             button.setProperty('compact',bool(compact))
             button.style().unpolish(button)
             button.style().polish(button)
@@ -242,24 +239,25 @@ class Sidebar(QFrame):
             word_width = max(button.fontMetrics().horizontalAdvance(word)
                              for button in self.buttons.values() for word in button.label.split())
             heading_width = max(button.sizeHint().width() for button in self.group_buttons.values())
-            width = max(184, word_width+92, heading_width+40)
+            gutters = 54 + self.scroll.verticalScrollBar().sizeHint().width()
+            width = max(155, word_width + gutters, heading_width + 20)
             self.setFixedWidth(width)
             for button in self.buttons.values():
                 lines = ['']
                 for word in button.label.split():
                     candidate = (lines[-1]+' '+word).strip()
-                    if lines[-1] and button.fontMetrics().horizontalAdvance(candidate) > width-92:
+                    if lines[-1] and button.fontMetrics().horizontalAdvance(candidate) > width - gutters:
                         lines.append(word)
                     else:
                         lines[-1] = candidate
                 button.setText('\n'.join(lines))
-                button.setMinimumHeight(max(44, len(lines)*button.fontMetrics().height()+16))
+                button.setMinimumHeight(max(38, len(lines)*button.fontMetrics().height()+12))
         else:
             for button in self.buttons.values():
                 button.setText(button.label)
-                button.setMinimumHeight(44)
+                button.setMinimumHeight(38)
             text_width = max(button.sizeHint().width() for button in self.buttons.values())
-            self.setFixedWidth(max(280, text_width+32))
+            self.setFixedWidth(max(208, text_width+18))
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -272,3 +270,5 @@ class Sidebar(QFrame):
             self.set_compact(self._compact)
             for button in self.buttons.values():
                 button._refresh_icon()
+            self.search._refresh_icon()
+            self.help_button._refresh_icon()

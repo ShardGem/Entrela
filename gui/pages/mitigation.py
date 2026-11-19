@@ -6,10 +6,13 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
+    QHeaderView, QHBoxLayout, QScrollArea,
 )
 from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton
+from gui.widgets.collapsible import CollapsibleSection
+from gui.widgets.content_tabs import ContentTabs
+from gui.design_system import Surface
 
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
@@ -28,9 +31,27 @@ class MitigationPage(PageBase):
             parent,
         )
         self.has_experiment = False
+        self.body().setSpacing(12)
+        workbench = QHBoxLayout()
+        workbench.setSpacing(20)
+        self.body().addLayout(workbench, 1)
+        self.views = ContentTabs()
+        workbench.addWidget(self.views, 1)
+        inspector = Surface('Configurar extrapolação', role='WorkbenchInspector')
+        scroll = QScrollArea()
+        scroll.setObjectName('InspectorScroll')
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(inspector)
+        self.inspector_scroll = scroll
+        workbench.addWidget(scroll)
         self.context = QLabel("Execute ou abra um experimento.")
-        self.body().addWidget(self.context)
+        self.context.setTextFormat(Qt.PlainText)
+        self.context.setWordWrap(True)
+        self.context.setObjectName('FieldHint')
+        inspector.add(self.context)
         form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.qubit = QSpinBox()
         self.method = QComboBox()
         self.method.addItem("Linear", "linear")
@@ -42,15 +63,16 @@ class MitigationPage(PageBase):
             "Medições independentes por fator. Mais shots reduzem flutuações de amostragem, "
             "mas não eliminam viés do modelo ou da extrapolação."
         )
-        form.addRow("Qubit observado (q0 à direita)", self.qubit)
+        form.addRow("Qubit observado", self.qubit)
+        self.qubit.setToolTip("Índice do qubit. q0 fica à direita no estado binário.")
         form.addRow("Ajuste", self.method)
         form.addRow("Shots por fator", self.shots)
-        self.body().addLayout(form)
+        inspector.body().addLayout(form)
         self.sampling_advice = QLabel()
         self.sampling_advice.setWordWrap(True)
         self.sampling_advice.setAccessibleName("Orientação sobre quantidade de shots")
         self.shots.valueChanged.connect(self._update_sampling_advice)
-        self.body().addWidget(self.sampling_advice)
+        inspector.add(self.sampling_advice)
         self._update_sampling_advice(self.shots.value())
         self.btn_run = PrimaryButton("Executar ZNE")
         self.btn_run.clicked.connect(
@@ -58,7 +80,7 @@ class MitigationPage(PageBase):
                 self.qubit.value(), self.method.currentData(), self.shots.value()
             )
         )
-        self.body().addWidget(self.btn_run)
+        inspector.add(self.btn_run)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
             ["Fator\nefetivo", "⟨Z⟩\nobservado", "Erro padrão\nplug-in", "Intervalo Wilson\n95% por fator"]
@@ -74,17 +96,19 @@ class MitigationPage(PageBase):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAccessibleName("Medições e incerteza de amostragem por fator")
-        self.body().addWidget(self.table)
         self.canvas = MplCanvas(height=3)
         self.canvas.setMinimumHeight(250)
-        self.body().addWidget(self.canvas)
+        self.views.addTab(self.canvas, 'Extrapolação')
+        self.views.addTab(self.table, 'Medições por fator')
         self.summary = QLabel()
         self.summary.setWordWrap(True)
-        self.body().addWidget(self.summary)
+        self.summary.setObjectName("FieldHint")
+        inspector.add(self.summary)
         self.sampling_warning = QLabel()
         self.sampling_warning.setWordWrap(True)
         self.sampling_warning.setAccessibleName("Limitações da amostragem")
-        self.body().addWidget(self.sampling_warning)
+        self.sampling_warning.setObjectName("FieldHint")
+        inspector.add(self.sampling_warning)
         note = QLabel(
             "ZNE estima um observável e não garante melhora. Não produz automaticamente um estado mitigado. "
             "Valores extrapolados não são truncados a [-1,1]. Fidelidade e pureza permanecem as da simulação original. "
@@ -92,8 +116,28 @@ class MitigationPage(PageBase):
             "ao alvo de ruído zero. Nenhuma das incertezas mostradas cobre viés do modelo ou do ajuste."
         )
         note.setWordWrap(True)
-        self.body().addWidget(note)
+        method = CollapsibleSection("Como interpretar")
+        method.content_layout.addWidget(note)
+        inspector.add(method)
+        inspector.body().addStretch(1)
+        self.reset_result()
         self.set_running(False)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.inspector_scroll.setFixedWidth(min(round(310 * max(1, self.fontMetrics().height() / 19)), self.width() * 2 // 5))
+
+    def reset_result(self):
+        self.table.setRowCount(0)
+        self.summary.clear()
+        self.sampling_warning.clear()
+        self.views.setCurrentIndex(0)
+        self.views.setTabEnabled(1, False)
+        ax = self.canvas.reset_axes()
+        ax.set_axis_off()
+        ax.text(.5, .5, 'Execute ZNE para visualizar o observável extrapolado.',
+                transform=ax.transAxes, ha='center', va='center', color=PALETTE.text_muted, wrap=True)
+        self.canvas.draw_idle()
 
     def _update_sampling_advice(self, shots):
         self.sampling_advice.setText(
@@ -108,12 +152,11 @@ class MitigationPage(PageBase):
         self.context.setText(experiment_title(experiment))
         self.qubit.setRange(0, experiment.config.system.num_qubits - 1)
         self.shots.setValue(experiment.config.shots)
-        self.table.setRowCount(0)
-        self.summary.setText("Nenhuma extrapolação neste registro.")
-        self.sampling_warning.clear()
-        ax = self.canvas.reset_axes()
         m = experiment.result.mitigation
+        self.reset_result()
         if m:
+            self.views.setTabEnabled(1, True)
+            ax = self.canvas.reset_axes()
             self.qubit.setValue(m["qubit"])
             self.shots.setValue(m["shots"])
             self.method.setCurrentIndex(max(0, self.method.findData(m["method"])))

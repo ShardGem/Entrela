@@ -178,7 +178,8 @@ class BlochCanvas(StableFigureCanvas):
                 center[2] - half[2], center[2] + half[2], emit=False, auto=False
             )
             # set_box_aspect normalizes its ndarray argument in-place.
-            self.ax.set_box_aspect(base_half.copy(), zoom=1.45)
+            single_sphere = self.focus >= 0 or len(self._sphere_centers) == 1
+            self.ax.set_box_aspect(base_half.copy(), zoom=1.85 if single_sphere else 1.45)
             self.ax.set_proj_type(self.projection)
             self._sync_visibility()
         finally:

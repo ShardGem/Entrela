@@ -18,6 +18,7 @@ class DashboardPage(PageBase):
     experiment_selected = Signal(str)
     project_selected = Signal(str)
     project_create_requested = Signal()
+    all_projects_requested = Signal()
     work_selected = Signal(str)
     notebook_requested = Signal()
     ideal_requested = Signal()
@@ -46,12 +47,20 @@ class DashboardPage(PageBase):
         creation.addAction('Evolução por Hamiltoniano', self.new_simulation.emit)
         creation.addAction('Circuito livre de portas', self.new_circuit.emit)
         self.new_experiment.setMenu(creation)
-        actions.addWidget(self.create_project); actions.addWidget(self.new_experiment); actions.addStretch()
+        self.all_projects = SecondaryButton('Todos os projetos')
+        self.all_projects.clicked.connect(self.all_projects_requested.emit)
+        self.all_projects.hide()
+        self.show_works = SecondaryButton('Ver experimentos')
+        self.show_works.clicked.connect(self._toggle_work_list)
+        self.show_works.hide()
+        for button in (self.all_projects, self.create_project, self.new_experiment, self.show_works):
+            actions.addWidget(button)
+        actions.addStretch()
         self.body().addLayout(actions)
         self.dashboard_splitter = QSplitter(Qt.Horizontal)
         self.dashboard_splitter.setChildrenCollapsible(False)
         self.dashboard_splitter.setHandleWidth(3)
-        self.project_surface = Surface('Suas investigações')
+        self.project_surface = Surface('Investigações', role='WorkbenchInspector')
         self.project_list = QListWidget()
         self.project_list.setAccessibleName('Projetos recentes')
         self.project_list.setMinimumHeight(180)
@@ -61,7 +70,7 @@ class DashboardPage(PageBase):
         self.project_list.itemClicked.connect(lambda item: self.project_selected.emit(item.data(Qt.UserRole)))
         self.project_surface.add(self.project_list)
         self.dashboard_splitter.addWidget(self.project_surface)
-        self.overview = Surface('Retomar o trabalho')
+        self.overview = Surface('Experimento em andamento', role='FlatSection')
         self.resume_title = QLabel('Comece com uma pergunta científica')
         self.resume_title.setObjectName('PanelTitle'); self.resume_title.setWordWrap(True)
         self.overview.add(self.resume_title)
@@ -70,9 +79,10 @@ class DashboardPage(PageBase):
         self.overview.add(self.resume_description)
         self.resume = PrimaryButton('Abrir na bancada', icon='arrow-right')
         self.resume.clicked.connect(self._resume)
-        self.overview.add(self.resume)
+        self.overview.body().addWidget(self.resume, 0, Qt.AlignLeft)
         self.question = QLabel(); self.question.setWordWrap(True); self.question.setObjectName('SectionSubtitle')
-        self.overview.add(self.question)
+        self.question.setTextFormat(Qt.PlainText)
+        self.overview.body().insertWidget(1, self.question)
         self.works_label = QLabel('Experimentos'); self.works_label.setObjectName('PanelTitle'); self.overview.add(self.works_label)
         self.works = QListWidget()
         self.works.setMinimumHeight(150)
@@ -80,7 +90,8 @@ class DashboardPage(PageBase):
         self.works.itemActivated.connect(lambda item: self.work_selected.emit(item.data(Qt.UserRole)))
         self.works.itemClicked.connect(lambda item: self.work_selected.emit(item.data(Qt.UserRole)))
         self.overview.add(self.works)
-        self.recent = Surface('Execuções recentes')
+        self.recent = Surface('Execuções recentes', role='FlatSection')
+        self.recent.body().setContentsMargins(0, 10, 0, 0)
         self.recent_list = QListWidget()
         self.recent_list.setAccessibleName('Execuções recentes com sua modalidade e data')
         self.recent_list.setMinimumHeight(150)
@@ -93,7 +104,9 @@ class DashboardPage(PageBase):
         self.notebook.clicked.connect(self.notebook_requested.emit)
         self.ideal = SecondaryButton('Comparar com a referência ideal', icon='comparison')
         self.ideal.clicked.connect(self.ideal_requested.emit)
-        links.addWidget(self.notebook); links.addWidget(self.ideal)
+        links.addWidget(self.notebook)
+        links.addWidget(self.ideal)
+        links.addStretch(1)
         self.overview.body().addLayout(links)
         self.overview.body().addStretch()
         self.dashboard_splitter.addWidget(self.overview)
@@ -155,15 +168,20 @@ class DashboardPage(PageBase):
         item = QListWidgetItem('Sem projeto\nExecuções e rascunhos ainda não associados')
         item.setData(Qt.UserRole, ''); self.project_list.addItem(item)
         self.question.setText((metadata or {}).get('objective') or (metadata or {}).get('description', ''))
+        self.question.setVisible(bool(self.question.text()))
         self.ideal_pair = ideal_pair
         self.ideal.setVisible(bool(ideal_pair))
         if ideal_pair:
             self.ideal.setToolTip('A: ' + ideal_pair[2] + '\nB: ' + ideal_pair[3] + '\nReferência: mesmo circuito sem ruído; não é evolução exata.')
+        self.all_projects.setVisible(project is not None)
         self.project_surface.setVisible(project is None)
         self.intro.setVisible(project is None)
         self.create_project.setVisible(project is None)
         self.notebook.setEnabled(bool(project))
         self._render()
+
+    def _toggle_work_list(self):
+        self.set_mode('overview' if self.mode == 'experiments' else 'experiments')
 
     def _resume(self):
         if self._works:
@@ -179,9 +197,14 @@ class DashboardPage(PageBase):
             status = 'Rascunho em edição' if not work.get('executions') else 'Rascunho · execução disponível'
             item = QListWidgetItem(f"{work['title']}\n{kind} · {status}")
             item.setData(Qt.UserRole, work['id']); item.setToolTip(item.text()); self.works.addItem(item)
-        show_works = bool(self._works) and (self.mode == 'experiments' or len(self._works) > 1)
+        show_works = bool(self._works) and self.mode == 'experiments'
+        self.show_works.setVisible(bool(self._works))
+        self.show_works.setText('Ver resumo' if show_works else 'Ver experimentos')
         self.works_label.setVisible(show_works); self.works.setVisible(show_works)
         self.resume_title.setText(self._works[0]['title'] if self._works else 'Comece uma investigação')
+        self.resume_title.setVisible(not show_works)
+        self.resume_description.setVisible(not show_works)
+        self.resume.setVisible(not show_works)
         if self._works:
             work = self._works[0]
             self.resume_description.setText(('Circuito livre' if work['kind'] == 'circuit' else 'Evolução por Hamiltoniano') + ' · ' + ('Última execução disponível; o rascunho permanece editável.' if work.get('executions') else 'Rascunho em edição · ainda sem execução.'))
@@ -198,7 +221,9 @@ class DashboardPage(PageBase):
             item = QListWidgetItem(f"{label}\n{modality} · {status} · {exp.created_at.astimezone().strftime('%d/%m/%Y %H:%M')}" + metrics)
             item.setData(Qt.UserRole, exp.id); item.setToolTip(item.text()); self.recent_list.addItem(item)
         self.recent.setVisible(bool(records))
-        self.first_use.setVisible(not self._works or self.project_name is None)
+        self.first_use.setVisible(not self._works and not records)
+        if not self._works:
+            self.resume_description.setText('Crie um experimento ou abra um modelo editável da biblioteca.')
         self._size_lists()
 
     def resizeEvent(self, event):

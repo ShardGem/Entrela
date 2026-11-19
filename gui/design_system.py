@@ -1,6 +1,6 @@
 """Superfícies e hierarquia do estúdio científico, sem estado de experimento."""
 from dataclasses import dataclass
-from PySide6.QtWidgets import QApplication, QFrame, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
 
 
 @dataclass(frozen=True)
@@ -42,19 +42,15 @@ class Surface(QFrame):
 
 def studio_qss(p):
     """Hierarquia de plataforma: cabeçalho, comandos, painéis e dados."""
-    app = QApplication.instance()
-    activity_padding = 12 if app and int(app.property('entrelaFontSize') or 15) >= 20 else 24
     return f'''
-QFrame#GlobalHeader {{ background: {p.bg}; border: none; border-bottom: 1px solid {p.border}; }}
-QLabel#GlobalBrand {{ color: {p.text}; font-size: 18px; font-weight: 600; }}
-QLabel#GlobalProduct {{ color: {p.text_dim}; font-size: 12px; border-left: 1px solid #525252; padding-left: 16px; }}
-QLabel#BackendBadge {{ color: #a6c8ff; background: #243a5e; padding: 4px 8px; font-size: 11px; }}
-QPushButton#GlobalAction {{ background: transparent; color: {p.text}; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; }}
-QPushButton#GlobalAction:hover {{ background: {p.surface}; }}
-QPushButton#GlobalAction:focus {{ border: 2px solid {p.primary}; }}
-QFrame#PageHeader {{ background: {p.bg}; border-bottom: 1px solid {p.border}; }}
-QLabel#TopbarTitle {{ font-size: 25px; font-weight: 600; }}
-QLabel#TopbarBreadcrumb {{ font-size: 13px; color: {p.text_dim}; }}
+QFrame#PageHeader {{ background: {p.bg}; border: none; }}
+QLabel#TopbarTitle {{ color: {p.text}; font-size: 30px; font-weight: 600; }}
+QLabel#TopbarBreadcrumb {{ color: {p.text_dim}; font-size: 13px; }}
+QLabel#SidebarLogo {{ color: {p.text}; font-size: 22px; font-weight: 600; }}
+QFrame#WorkbenchInspector {{ background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: 12px; }}
+QFrame#FlatSection, QScrollArea#InspectorScroll {{ background: transparent; border: none; }}
+QLabel#WorkspaceSectionTitle {{ color: {p.text}; font-size: 21px; font-weight: 600; }}
+QFrame#RunMetric {{ background: transparent; border: none; border-bottom: 1px solid {p.border}; }}
 QWidget#PageSurface {{ background: {p.bg}; }}
 QFrame#StudioPanel, QWidget#InspectorPanel, QFrame#EvidencePanel {{ background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: 8px; }}
 QFrame#DocumentHeader {{ background: transparent; border: none; }}
@@ -68,10 +64,10 @@ QFrame#Card {{ background: transparent; border: none; border-radius: 0; }}
 QFrame#MetricTile {{ background: {p.bg_elevated}; border: none; border-left: 1px solid {p.border}; border-radius: 0; }}
 QFrame#SectionCard {{ background: transparent; border: none; border-bottom: 1px solid {p.border}; border-radius: 0; }}
 QFrame#ExecutionBar, QFrame#TransportBar, QFrame#CommandBar {{ background: {p.bg_elevated}; border: none; border-top: 1px solid {p.border}; border-radius: 0; }}
-QFrame#Sidebar {{ background: {p.bg}; border-right: 1px solid {p.border}; }}
+QFrame#Sidebar {{ background: {p.bg_elevated}; border-right: 1px solid {p.border}; }}
 QPushButton#NavButton {{ color: {p.text_muted}; background: transparent; border: none; border-left: 3px solid transparent; border-radius: 8px; padding: 8px 16px; font-weight: 400; }}
-QPushButton#NavButton:checked {{ background: {p.surface}; border-left: 3px solid {p.primary}; color: {p.text}; font-weight: 600; }}
-QPushButton#NavButton:hover {{ background: {p.bg_elevated}; color: {p.text}; }}
+QPushButton#NavButton:checked {{ background: {p.primary_faint}; border-left: 3px solid {p.primary}; color: {p.text}; font-weight: 600; }}
+QPushButton#NavButton:hover {{ background: {p.surface}; color: {p.text}; }}
 QPushButton#NavButton[compact="true"] {{ padding: 8px 12px; }}
 QPushButton#NavGroup {{ color: {p.text_dim}; font-size: 11px; font-weight: 600; padding: 12px 12px 6px 12px; border-radius: 8px; }}
 QToolButton#SidebarToggle {{ border-radius: 8px; }}
@@ -91,7 +87,7 @@ QPushButton[gateFamily="controlled"] {{ border-left-color: {p.q3}; }}
 QPushButton[gateFamily="rotation"] {{ border-left-color: {p.q1}; }}
 QPushButton[gateFamily]:hover {{ background: {p.surface_hover}; border-color: {p.primary}; }}
 QPushButton[gateFamily]:disabled {{ background: {p.bg_elevated}; color: {p.text_dim}; border-color: {p.border}; }}
-QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.border_strong}; border-radius: 8px; selection-background-color: {p.primary_muted}; padding: 8px 10px; }}
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{ background: {p.bg_elevated}; color: {p.text}; border: 1px solid {p.border}; border-radius: 8px; selection-background-color: {p.primary_muted}; padding: 8px 10px; }}
 QLineEdit:hover, QSpinBox:hover, QDoubleSpinBox:hover, QComboBox:hover {{ background: {p.surface_hover}; }}
 QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{ border: 2px solid {p.primary}; }}
 QTabWidget::pane {{ border: none; background: transparent; }}
@@ -114,14 +110,8 @@ QListWidget#PreferenceCategories::item:selected {{ background: {p.surface}; colo
 QPushButton:focus, QToolButton:focus, QTableView:focus, QListView:focus {{ border: 2px solid {p.primary}; }}
 QPushButton#PrimaryButton:focus {{ border: 2px solid {p.text}; }}
 
-QPushButton#GlobalDestination {{ background: transparent; border: none; border-bottom: 3px solid transparent; padding: 12px 16px; color: {p.text_muted}; border-radius: 0; }}
-QPushButton#GlobalDestination:checked {{ color: {p.text}; border-bottom-color: {p.primary}; font-weight: 600; }}
-QPushButton#GlobalDestination:hover {{ background: {p.surface}; }}
-QPushButton#GlobalDestination:focus {{ border: 2px solid {p.primary}; }}
-QTabBar#ActivityTabs::tab {{ border: 1px solid {p.border_strong}; border-radius: 10px; padding: 8px {activity_padding}px; margin-right: 6px; background: {p.bg_elevated}; }}
-QTabBar#ActivityTabs::tab:selected {{ background: {p.action_bg}; color: {p.action_on}; border-color: {p.action_bg}; }}
-QTabBar#ObservationTabs::tab, QTabBar#ProjectTabs::tab {{ background: transparent; border-top: none; border-bottom: 2px solid transparent; }}
-QTabBar#ObservationTabs::tab:selected, QTabBar#ProjectTabs::tab:selected {{ border-bottom-color: {p.primary}; color: {p.text}; }}
+QTabBar#ObservationTabs::tab {{ background: transparent; border-top: none; border-bottom: 2px solid transparent; padding: 9px 13px; }}
+QTabBar#ObservationTabs::tab:selected {{ border-bottom-color: {p.primary}; color: {p.text}; }}
 QFrame#ProjectCard {{ background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: 10px; }}
 QLabel#ExecutionIdentity {{ color: {p.text}; font-weight: 600; }}
 QPushButton#Breadcrumb {{ color: {p.primary}; background: transparent; border: 1px solid transparent; padding: 2px 4px; text-align: left; min-height: 24px; }}

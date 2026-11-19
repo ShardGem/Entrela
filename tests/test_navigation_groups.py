@@ -11,7 +11,7 @@ def test_groups_do_not_navigate_until_page_chosen(window):
     assert window._current_page == before
     from tests.qt_helpers import wait_until
     wait_until(lambda: sidebar.group_bodies['research'].isHidden())
-    assert not sidebar.group_bodies['learning'].isHidden()
+    assert sidebar.buttons['docs'].isVisible()
     sidebar.buttons['comparison'].click()
     assert window._current_page == 'comparison'
     assert sidebar.buttons['comparison'].isChecked()

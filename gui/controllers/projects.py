@@ -33,19 +33,15 @@ class ProjectController(QObject):
         page.project_create_requested.connect(self.create_project)
         page.project_selected.connect(self.open_project)
         page.work_selected.connect(self.open_work)
+        page.all_projects_requested.connect(lambda: self.open_project(None))
         page.notebook_requested.connect(lambda: window._show_page('notebook'))
         page.ideal_requested.connect(self.compare_ideal)
-        header = window.topbar
-        header.destination_requested.connect(self.open_global)
-        header.breadcrumb_requested.connect(self.open_breadcrumb)
-        header.project_area_requested.connect(self.open_area)
-        header.activity_requested.connect(self.open_activity)
-        header.tool_requested.connect(self.open_tool)
         key = window.settings.value('projects/active_work', '')
         try:
             raw = self.store.read()
             if key in raw.get('workbench', {}):
                 self.active_id = key
+                self.project = raw['workbench'][key].get('project', '') or None
                 if window.drafts.state.get('active_work_id') != key:
                     window.drafts.restore_workbench(raw['workbench'][key]['draft'])
             elif window.drafts.state.get('simulation') or window.drafts.state.get('editor'):
@@ -139,20 +135,6 @@ class ProjectController(QObject):
         self.refresh()
         self.window._show_page('dashboard')
 
-    def open_global(self, key):
-        if key == 'dashboard':
-            self.open_project(None)
-        elif key == 'examples':
-            self.refresh(); self.window._show_page('catalog')
-        else:
-            self.window.navigation.open_page(key)
-
-    def open_breadcrumb(self, key):
-        if key == 'projects': self.open_project(None)
-        elif key == 'project': self.open_project(self.project)
-        elif key.startswith('project:'): self.open_project(key[8:])
-        else: self.open_global(key)
-
     def open_tool(self, key):
         if key in ('simulation', 'circuit'):
             kind = 'circuit' if key == 'circuit' else 'hamiltonian'
@@ -163,15 +145,6 @@ class ProjectController(QObject):
                 else: self.create_work(kind)
                 return
         self.window.navigation.open_page(key)
-
-    def open_area(self, index):
-        w = self.window
-        if index in (0, 1):
-            w.page_dashboard.set_mode('overview' if index == 0 else 'experiments')
-            w._show_page('dashboard')
-        else:
-            w._show_page('notebook')
-            w.page_notebook.tabs.setCurrentIndex(0 if index == 2 else 1)
 
     def choose_new(self):
         kind, accepted = QInputDialog.getItem(self.window, 'Novo experimento', 'Como deseja preparar o sistema?',
@@ -223,7 +196,6 @@ class ProjectController(QObject):
             w._unsaved_result = False
             w._pending_example_id = None
             w.clear_execution_context()
-            w.page_workspace.set_selected_experiment('Ainda sem execução', work['kind'])
             w.page_workspace._apply_route('circuit:edit' if work['kind'] == 'circuit' else 'simulation')
             latest = work.get('latest_execution')
             if load_result and latest:
@@ -276,21 +248,6 @@ class ProjectController(QObject):
                 w.page_circuit.editor.replace_document(document, 'Usar configuração registrada')
             self.persist_active()
         except (OSError, ValueError, TypeError, KeyError) as exc: self.error(exc)
-
-    def open_activity(self, index):
-        w = self.window
-        if index == 0:
-            route = w.page_workspace._last_preparation
-            w._show_page('circuit' if route == 'circuit:edit' else 'simulation')
-        elif w._current_experiment is None:
-            w.statusBar().showMessage('Execute o rascunho ou abra uma execução do histórico para observar ou comparar dados.')
-            w.topbar.set_activity(0, False)
-        else:
-            w._show_page('results' if index == 1 else 'comparison')
-            if index == 2:
-                pair = self.ideal_pair()
-                if pair and w._current_experiment.id in pair[:2]:
-                    w._compare_from_history(*pair[:2])
 
     def capture_launch(self, worker):
         kind = 'circuit' if worker.config.circuit is not None else 'hamiltonian'

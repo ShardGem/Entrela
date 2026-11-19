@@ -26,21 +26,17 @@ def circuit_source(window):
     return source
 
 
-def test_global_header_and_local_context_are_separate_without_hiding_tools(window, qt_app):
+def test_sidebar_keeps_navigation_visible_and_header_shows_the_page(window, qt_app):
     window.resize(1920, 1080)
     window.navigation.open_page('circuit')
     settle(qt_app)
-    assert window.topbar.width() == window.centralWidget().width()
-    assert window.topbar.page_header.parent() is not window.topbar
+    assert window.topbar.width() + window.sidebar.width() == window.centralWidget().width()
     assert window.topbar.title.text() == 'Editor de circuitos'
-    assert not window.sidebar.brand_box.isVisible()
-    assert window.sidebar.isHidden()
-    assert window.topbar.tools.isVisible()
-    assert set(window.topbar.destinations) == {'dashboard', 'examples', 'docs'}
+    assert window.sidebar.brand_box.isVisible()
     assert window.sidebar._expanded_groups == {key for key, *_ in window.sidebar.GROUPS}
     assert 'IBM Plex Sans' in QFontInfo(window.topbar.title.font()).family()
-    assert window.topbar.commands.accessibleName() == 'Buscar'
-    assert window.topbar.preferences.accessibleName() == 'Preferências'
+    assert window.sidebar.search.accessibleName() == 'Buscar'
+    assert window.sidebar.buttons['settings'].accessibleName() == 'Preferências'
 
 
 def test_primary_action_contrast_and_customization_work_in_each_theme(window):
@@ -62,6 +58,9 @@ def test_editor_evidence_uses_recorded_counts_and_preserves_state_when_draft_cha
     editor.replace_document(source.config.circuit)
     settle(qt_app)
     panel = editor.evidence
+    assert not panel.isVisible()
+    editor.evidence_toggle.click()
+    settle(qt_app)
     assert panel.experiment is source
     assert panel.data_view.isVisible()
     assert panel.open_results.isVisible()
@@ -91,6 +90,8 @@ def test_hamiltonian_source_does_not_appear_as_a_free_circuit_result(window, qt_
     window._current_experiment = hamiltonian
     window._display_experiment(hamiltonian)
     window.navigation.open_page('circuit')
+    settle(qt_app)
+    window.page_circuit.editor.evidence_toggle.click()
     settle(qt_app)
     panel = window.page_circuit.editor.evidence
     assert panel.experiment is None

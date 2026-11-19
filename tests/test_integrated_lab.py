@@ -29,7 +29,7 @@ def test_navigation_uses_existing_pages_and_keeps_independent_drafts(window, qt_
     workspace.tabs.setCurrentIndex(0)
     assert window._current_page == 'simulation'
     window._show_page('history')
-    assert window.stack.currentWidget() is window.section_workspaces['history']
+    assert window.stack.currentWidget() is window.page_history
     assert window.is_page_active('history')
     window._show_page('circuit')
     assert workspace.tabs.currentWidget() is window.page_circuit
@@ -117,7 +117,7 @@ def test_recent_execution_menu_preserves_identity_and_notebook_link(window):
     assert window.is_page_active('results')
     assert window._current_experiment.id == source.id
     assert window.page_library.identifier == source.id
-    assert source.id not in window.page_workspace.selected_label.text()
+    assert source.id not in window.page_workspace.recent_button.toolTip()
     assert window.repository.load(source.id).result.counts == source.result.counts
 
 
@@ -177,7 +177,7 @@ def test_loaded_result_does_not_add_global_configuration_scroll_at_large_font(wi
             for _ in range(5):
                 qt_app.processEvents()
             assert window.page_simulation._scroll.verticalScrollBar().maximum() == 0
-        assert window.topbar.destinations['examples'].isVisible()
+        assert window.sidebar.buttons['catalog'].isVisible()
         assert window.page_simulation.btn_run.isVisible()
     finally:
         apply_appearance(window)

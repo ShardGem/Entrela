@@ -1,6 +1,6 @@
 """One notebook context, reusing execution annotations and the report composer."""
 from PySide6.QtCore import Qt, Signal, QSignalBlocker
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QComboBox, QFormLayout, QPlainTextEdit, QLabel, QStackedWidget, QScrollArea, QFrame, QSplitter, QTextBrowser, QSizePolicy
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QFormLayout, QPlainTextEdit, QLabel, QStackedWidget, QScrollArea, QFrame, QSplitter, QTextBrowser, QSizePolicy
 from gui.pages.base import PageBase
 from gui.widgets.content_tabs import ContentTabs
 from gui.widgets.button import SecondaryButton
@@ -24,9 +24,12 @@ class NotebookPage(PageBase):
         self.tabs = ContentTabs(); self.tabs.setDocumentMode(True)
         notes = QWidget(); body = QVBoxLayout(notes)
         self.scope = QComboBox()
-        self.scope.addItems(['Projeto · pergunta e interpretação da investigação', 'Execução selecionada · identificação e anotações'])
+        self.scope.addItems(['Anotações do projeto', 'Anotações da execução'])
         self.scope.setAccessibleName('Escopo das anotações')
-        body.addWidget(self.scope)
+        scope_row = QHBoxLayout()
+        scope_row.addWidget(self.scope)
+        scope_row.addStretch(1)
+        body.addLayout(scope_row)
         self.notes_stack = QStackedWidget()
         project_notes = QScrollArea(); project_notes.setWidgetResizable(True); project_notes.setFrameShape(QFrame.NoFrame)
         host = QWidget(); form = QFormLayout(host); form.setRowWrapPolicy(QFormLayout.WrapLongRows)

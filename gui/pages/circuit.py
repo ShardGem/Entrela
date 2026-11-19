@@ -10,6 +10,7 @@ from gui.widgets.content_tabs import ContentTabs
 
 class CircuitPage(PageBase):
     results_requested = Signal()
+    editor_requested = Signal()
     snapshot_requested = Signal(int)
     run_requested = Signal(object)
     cancel_requested = Signal()
@@ -101,6 +102,7 @@ class CircuitPage(PageBase):
             ):
                 widget.setValue(value)
             self.tabs.setCurrentWidget(self.editor)
+            self.editor_requested.emit()
         except ValueError as exc:
             self.details.setText(
                 str(exc) + "\nO circuito executado continua disponível para inspeção."

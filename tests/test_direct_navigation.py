@@ -4,7 +4,8 @@ from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 from core.examples import create_example_config
 from core.simulation import run_experiment
-from gui.navigation import NAV_LABELS, NAV_ACTIONS
+from PySide6.QtWidgets import QAbstractButton
+from gui.navigation import NAV_LABELS
 
 
 def settle(app):
@@ -13,10 +14,9 @@ def settle(app):
 
 
 def test_every_existing_page_has_a_named_direct_access(window, qt_app):
-    assert window.sidebar.isHidden()
-    assert [b.text() for b in window.topbar.destinations.values()] == ['Projetos', 'Biblioteca', 'Aprender']
-    tools = {a.text() for a in window.topbar.tools.menu().actions()}
-    assert {'Editor de circuitos', 'Histórico de execuções', 'Mitigação ZNE', 'Estudos e varreduras', 'Configurações salvas', 'Relatórios e exportações'} <= tools
+    assert window.sidebar.isVisible()
+    assert set(window.sidebar.buttons) == set(NAV_LABELS)
+    assert not window.topbar.findChildren(QAbstractButton)
     for key in window.pages:
         window.navigation.open_page(key)
         settle(qt_app)
@@ -28,17 +28,16 @@ def test_clicking_a_function_does_not_resume_a_different_function(window, qt_app
     window._show_page('comparison')
     window.sidebar.buttons['analysis'].click()
     assert window.is_page_active('analysis')
-    window.sidebar.buttons['examples'].click()
+    window.sidebar.buttons['catalog'].click()
     window.sidebar.buttons['docs'].click()
     assert window.is_page_active('docs')
-    assert all(section.selector.isHidden() for section in window.section_workspaces.values())
 
 
 def test_editor_entry_always_opens_editor_and_inspection_belongs_to_results(window, qt_app):
     window.page_workspace._apply_route('circuit:inspect')
     window._show_page('circuit')
-    assert window.topbar.activities.currentIndex() == 1
-    assert window.page_workspace.observation_tabs.currentIndex() == 4
+    assert window.sidebar.buttons['results'].isChecked()
+    assert window.page_workspace._detail_actions['circuit:inspect'].isChecked()
     assert window.topbar.title.text() == 'Circuito da execução'
     window.sidebar.buttons['circuit'].click()
     assert window.page_circuit.tabs.currentWidget() is window.page_circuit.editor
@@ -57,8 +56,6 @@ def test_named_navigation_preserves_the_selected_run_and_both_drafts(window, qt_
     config = window.page_simulation.config_panel.get_config()
     circuit = window.page_circuit.editor.document
     for key, button in window.sidebar.buttons.items():
-        if key in NAV_ACTIONS:
-            continue
         button.click()
         settle(qt_app)
         assert window._current_experiment is source
@@ -71,24 +68,23 @@ def test_named_navigation_preserves_the_selected_run_and_both_drafts(window, qt_
 def test_saved_configurations_is_an_action_and_keeps_page_selection(window, qt_app):
     window.sidebar.buttons['simulation'].click()
     window.page_simulation.experiment_name.setText('Rascunho preservado')
-    window.sidebar.buttons['configurations'].click()
+    window.page_workspace.templates_menu.actions()[-1].trigger()
     settle(qt_app)
     assert window.configuration_dialog.isVisible()
     assert window.is_page_active('simulation')
     assert window.sidebar.buttons['simulation'].isChecked()
-    assert not window.sidebar.buttons['configurations'].isChecked()
     assert window.page_simulation.experiment_name.text() == 'Rascunho preservado'
     window.configuration_dialog.close()
 
 
 def test_keyboard_opens_named_destination_without_folding_its_group(window, qt_app):
-    button = window.topbar.destinations['docs']
+    button = window.sidebar.buttons['docs']
     button.setFocus()
     QTest.keyClick(button, Qt.Key_Space)
     settle(qt_app)
     assert window.is_page_active('docs')
     assert window.rect().contains(button.mapTo(window, button.rect().center()))
-    window.topbar.preferences.setFocus()
-    QTest.keyClick(window.topbar.preferences, Qt.Key_Space)
+    window.sidebar.buttons['settings'].setFocus()
+    QTest.keyClick(window.sidebar.buttons['settings'], Qt.Key_Space)
     assert window.is_page_active('settings')
-    assert window.topbar.preferences.accessibleName() == 'Preferências'
+    assert window.sidebar.buttons['settings'].accessibleName() == 'Preferências'

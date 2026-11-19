@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from PySide6.QtCore import Qt, QSignalBlocker, Signal, QEvent, QTimer
-from PySide6.QtWidgets import QLabel, QMenu, QTabWidget, QTabBar, QComboBox, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QSignalBlocker, Signal
+from PySide6.QtWidgets import QMenu, QTabBar, QVBoxLayout, QWidget
 
 from gui.widgets.button import SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
@@ -33,10 +33,6 @@ class ExperimentWorkspace(QWidget):
 
     def __init__(self, pages: Mapping[str, QWidget], parent=None):
         super().__init__(parent)
-        self._selected_label_timer = QTimer(self)
-        self._selected_label_timer.setSingleShot(True)
-        self._selected_label_timer.setInterval(0)
-        self._selected_label_timer.timeout.connect(self._fit_selected_label)
         keys = [key for key, _, _ in self.TABS]
         if any(key not in pages or not isinstance(pages[key], QWidget) for key in keys):
             raise ValueError("O laboratório precisa das quatro páginas existentes.")
@@ -44,12 +40,10 @@ class ExperimentWorkspace(QWidget):
             raise ValueError("Cada aba do laboratório precisa de uma página distinta.")
         self._keys = keys
         self._running = False
-        self.global_navigation = False
         self._route = "simulation"
         self._last_preparation = "simulation"
         self._last_result = "results:graphs"
         self._context_actions = []
-        self._draft_names = {"simulation": "Hamiltoniano", "circuit:edit": "circuito de portas"}
         self.setObjectName("PageSurface")
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -66,15 +60,6 @@ class ExperimentWorkspace(QWidget):
         self.stages.setAccessibleName('Preparação ou consulta da execução')
         tools.addWidget(self.stages)
         self.stages.hide()
-        self.view_selector = QComboBox()
-        self.view_selector.setAccessibleName('Atividade do laboratório')
-        self.view_selector.setMinimumContentsLength(17)
-        self.view_selector.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        tools.addWidget(self.view_selector)
-        self.draft_label = QLabel('Configuração em edição')
-        self.draft_label.setObjectName('FieldHint')
-        self.draft_label.setMaximumWidth(350)
-        tools.addWidget(self.draft_label)
         self.templates_button = SecondaryButton("Configurações salvas")
         self.templates_button.setAccessibleName("Abrir configurações salvas")
         self.templates_button.setToolTip(
@@ -83,35 +68,13 @@ class ExperimentWorkspace(QWidget):
         self.templates_menu = QMenu(self.templates_button)
         self.templates_menu.setToolTipsVisible(True)
         self.templates_button.setMenu(self.templates_menu)
-        tools.addWidget(self.templates_button)
 
-        self.recent_button = SecondaryButton("Escolher execução")
+        self.recent_button = SecondaryButton("Execuções…")
         self.recent_button.setAccessibleName("Abrir execuções recentes")
         self.recent_button.setToolTip("Abra resultados de uma execução salva sem procurar outra tela.")
         self.recent_menu = QMenu(self.recent_button)
         self.recent_menu.setToolTipsVisible(True)
         self.recent_button.setMenu(self.recent_menu)
-        tools.addWidget(self.recent_button)
-
-        self.status_label = QLabel("Tarefa em andamento…")
-        self.status_label.setTextFormat(Qt.PlainText)
-        self.status_label.setObjectName("FieldHint")
-        self.status_label.setAccessibleName("Estado do laboratório")
-        self.status_label.hide()
-        tools.addWidget(self.status_label)
-        self.selected_label = QLabel("Nenhuma execução selecionada")
-        self.selected_label.setObjectName("FieldHint")
-        self.selected_label.setTextFormat(Qt.PlainText)
-        self.selected_label.setWordWrap(False)
-        self.selected_label.setMaximumWidth(440)
-        self._selected_text = "Nenhuma execução selecionada"
-        self.selected_label.setAccessibleName("Execução selecionada no laboratório")
-        self.selected_label.setToolTip(
-            "Resultados, estados 3D e caderno pertencem à execução selecionada. "
-            "Os formulários de configuração e circuito são rascunhos independentes."
-        )
-        tools.addWidget(self.selected_label)
-        root.addWidget(self.toolbar)
 
         self.tabs = ContentTabs()
         self.tabs.setObjectName("WorkbenchTabs")
@@ -130,7 +93,6 @@ class ExperimentWorkspace(QWidget):
         self.set_templates([])
         self.set_recent([])
         self.stages.currentChanged.connect(lambda index: self._apply_route(self._last_preparation if index == 0 else self._last_result, True))
-        self.view_selector.currentIndexChanged.connect(lambda *_: self._apply_route(self.view_selector.currentData(), True))
         self._pages = pages
         if hasattr(pages["results"], "results_tab"):
             pages["results"].results_tab.chart_views.hide()
@@ -142,7 +104,22 @@ class ExperimentWorkspace(QWidget):
         self.observation_tabs.setAccessibleName('Visualizações da execução')
         for text in ('Medições', 'Evolução', 'Bloch', 'Estado global', 'Dados'):
             self.observation_tabs.addTab(text)
-        root.insertWidget(0, self.observation_tabs)
+        tools.addWidget(self.observation_tabs)
+        details = SecondaryButton('Mais visualizações')
+        menu = QMenu(details)
+        menu.addAction('Medições e evolução lado a lado', self._paired_charts)
+        menu.addSeparator()
+        self._detail_actions = {}
+        for route, title in self.RESULTS:
+            if route in ('circuit:inspect', 'results:interpretation', 'results:metadata'):
+                action = menu.addAction(title, lambda checked=False, key=route: self._apply_route(key, True))
+                action.setCheckable(True)
+                self._detail_actions[route] = action
+        details.setMenu(menu)
+        tools.addWidget(details)
+        tools.addWidget(self.recent_button)
+        root.insertWidget(0, self.toolbar)
+        self.observation_tabs.tabBarClicked.connect(self._observation_clicked)
         self.observation_tabs.currentChanged.connect(self._observation_selected)
         self._apply_route('simulation')
 
@@ -176,12 +153,6 @@ class ExperimentWorkspace(QWidget):
         stage_block = QSignalBlocker(self.stages)
         self.stages.setCurrentIndex(0 if preparation else 1)
         del stage_block
-        view_block = QSignalBlocker(self.view_selector)
-        self.view_selector.clear()
-        for value, label in self.PREPARATION if preparation else self.RESULTS:
-            self.view_selector.addItem(label, value)
-        self.view_selector.setCurrentIndex(self.view_selector.findData(route))
-        del view_block
         if key == 'circuit' and hasattr(self._pages[key], 'tabs'):
             page = self._pages[key]
             page.tabs.tabBar().hide()
@@ -198,12 +169,22 @@ class ExperimentWorkspace(QWidget):
         if emit:
             self.page_selected.emit(key)
 
+    def _observation_clicked(self, index):
+        if index >= 0 and index == self.observation_tabs.currentIndex():
+            self._observation_selected(index)
+
     def _observation_selected(self, index):
+        if index < 0:
+            return
         if index in (0, 1):
             self._pages['results'].results_tab.chart_views.setCurrentIndex(index)
             self._apply_route('results:graphs', True)
         else:
             self._apply_route({2:'bloch', 3:'results:state', 4:'results:data'}[index], True)
+
+    def _paired_charts(self):
+        self._pages['results'].results_tab.chart_views.setCurrentIndex(2)
+        self._apply_route('results:graphs', True)
 
     def add_context_action(self, widget: QWidget, key: str):
         """Reutiliza uma ação existente na faixa comum, somente no seu contexto."""
@@ -217,27 +198,21 @@ class ExperimentWorkspace(QWidget):
         for widget, key in self._context_actions:
             widget.setVisible(key == self.current_page_key)
         preparation = self._route in ('simulation', 'circuit:edit')
-        compact = self.width() < 1180 * max(1, self.font().pixelSize()/15)
-        self.toolbar.setVisible(not compact or not self.global_navigation)
-        self.selected_label.setVisible(not preparation)
-        self.draft_label.hide()
-        self.view_selector.setVisible(self._route in ('results:data', 'results:metadata', 'results:interpretation', 'circuit:inspect'))
-        if hasattr(self, 'observation_tabs'):
-            self.observation_tabs.setVisible(not preparation)
-            route_index = 2 if self._route == 'bloch' else 3 if self._route == 'results:state' else 4 if self._route in ('results:data', 'results:metadata', 'results:interpretation', 'circuit:inspect') else (self._pages['results'].results_tab.chart_views.currentIndex() if hasattr(self._pages['results'], 'results_tab') else 0)
-            with QSignalBlocker(self.observation_tabs):
-                self.observation_tabs.setCurrentIndex(min(route_index, 4))
-        self.templates_button.setVisible(self._route == 'simulation')
-        self.recent_button.setVisible(not preparation)
-        context = 'Em edição: ' + self._draft_names.get(self._route, '')
-        self.draft_label.setText(self.draft_label.fontMetrics().elidedText(context, Qt.ElideRight, 350))
-        self.draft_label.setToolTip(context)
-
-    def set_draft_name(self, kind, name):
-        if kind not in self._draft_names:
-            raise ValueError('Modalidade de preparação desconhecida')
-        self._draft_names[kind] = name.strip() or ('Hamiltoniano' if kind == 'simulation' else 'circuito de portas')
-        self._update_context_actions()
+        self.toolbar.setVisible(not preparation)
+        for route, action in self._detail_actions.items():
+            action.setChecked(self._route == route)
+        chart_views = getattr(self._pages['results'], 'results_tab', None)
+        chart_index = chart_views.chart_views.currentIndex() if chart_views else 0
+        route_index = {
+            'bloch': 2, 'results:state': 3, 'results:data': 4,
+            'results:graphs': chart_index if chart_index < 2 else 0,
+        }.get(self._route, -1)
+        with QSignalBlocker(self.observation_tabs):
+            current = self.observation_tabs.currentIndex()
+            if route_index >= 0:
+                self.observation_tabs.setCurrentIndex(route_index)
+            elif current >= 0:
+                self.observation_tabs.setCurrentIndex(0)
 
     def _selected(self, index: int):
         if 0 <= index < len(self._keys):
@@ -287,39 +262,12 @@ class ExperimentWorkspace(QWidget):
         self._running = bool(running)
         self.templates_button.setEnabled(not running)
         self.recent_button.setEnabled(not running)
-        self.status_label.setVisible(bool(running))
 
     def set_selected_experiment(self, title: str | None, kind: str | None):
-        """Mostra o contexto recebido do controlador, sem armazenar o experimento."""
-        explanation = (
-            "Resultados, estados 3D e caderno pertencem à execução selecionada. "
-            "Os formulários de configuração e circuito são rascunhos independentes; "
-            "mudar de aba ou editar parâmetros não altera essa execução."
-        )
-        if not title:
-            self._selected_text = "Nenhuma execução selecionada"
-            self._fit_selected_label()
-            self.selected_label.setAccessibleDescription(explanation)
-            self.selected_label.setToolTip(explanation)
-            return
-        kinds = {"ham": "Hamiltoniano", "hamiltonian": "Hamiltoniano", "circuit": "Circuito de portas"}
-        if kind not in kinds:
-            raise ValueError("Tipo de execução desconhecido no laboratório.")
-        context = f"{kinds[kind]} · {title}"
-        self._selected_text = context
-        self._fit_selected_label()
-        self.selected_label.setAccessibleDescription("Execução selecionada: " + context + ". " + explanation)
-        self.selected_label.setToolTip("Execução selecionada: " + context + "\n" + explanation)
-
-    def _fit_selected_label(self):
-        self.selected_label.setText(self.selected_label.fontMetrics().elidedText(self._selected_text, Qt.ElideRight, 430))
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if hasattr(self, "_pages"):
-            self._update_context_actions()
-
-    def changeEvent(self, event):
-        super().changeEvent(event)
-        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, "selected_label"):
-            self._selected_label_timer.start()
+        if title:
+            kinds = {"ham": "Hamiltoniano", "hamiltonian": "Hamiltoniano", "circuit": "Circuito de portas"}
+            if kind not in kinds:
+                raise ValueError("Tipo de execução desconhecido no laboratório.")
+            self.recent_button.setToolTip(f"Execução selecionada: {title} · {kinds[kind]}")
+        else:
+            self.recent_button.setToolTip("Abra um resultado salvo para explorar a execução.")

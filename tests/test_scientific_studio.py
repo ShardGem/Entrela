@@ -21,22 +21,20 @@ def source(window):
     return experiment
 
 
-def test_scientific_area_has_priority_and_parameters_are_in_the_inspector(window, qt_app):
+def test_parameters_have_priority_and_the_plan_keeps_steps_visible(window, qt_app):
     window.resize(1920,1080)
     window._show_page('simulation')
     settle(qt_app)
     page=window.page_simulation
     assert not page._compact
-    assert page.splitter.widget(0) is page.steps
-    assert page.splitter.widget(2) is page.summary_scroll
-    assert page.splitter.widget(1) is page.config_panel
+    assert page.splitter.count() == 2
+    assert page.splitter.widget(0) is page.config_panel
+    assert page.splitter.widget(1) is page.summary_scroll
     assert page.config_panel.width() > page.summary_scroll.width()
-    assert not window.page_workspace.stages.isVisible()
-    assert not window.page_workspace.view_selector.isVisible()
+    assert page.steps.isVisible()
+    assert not window.page_workspace.toolbar.isVisible()
     assert page.config_panel.external_steps
-    assert not page.config_panel._inspector_mode
-    assert window.topbar.activities.isVisible()
-    assert window.sidebar.isHidden()
+    assert window.sidebar.isVisible()
 
 
 def test_editing_preparation_does_not_change_the_evidence_on_the_workbench(window, qt_app):
@@ -47,12 +45,13 @@ def test_editing_preparation_does_not_change_the_evidence_on_the_workbench(windo
     original=experiment.result.final_state.data.copy()
     counts=dict(experiment.result.counts)
     page.config_panel.spin_J.setValue(.1234567890123)
-    page.preview_tabs.setCurrentIndex(2)
     settle(qt_app)
     assert page._source_experiment is experiment
-    assert page.source_view.isVisible()
-    assert page.source_metrics[0].toolTip() == str(experiment.result.fidelity)
-    assert sum(bar.get_height() for bar in page.source_plot.fig.axes[0].patches) == 1
+    assert page.last_results.isVisible()
+    page.last_results.click()
+    assert window.is_page_active('results')
+    assert window.page_results._experiment is experiment
+    assert window.page_results.results_tab._counts == counts
     assert experiment.result.counts == counts
     np.testing.assert_array_equal(experiment.result.final_state.data, original)
     assert page.config_panel.get_config() != experiment.config
@@ -153,12 +152,11 @@ def test_workbench_views_fit_small_windows_with_enlarged_text(window, qt_app):
     page = window.page_simulation
     settle(qt_app)
     page.compact_tabs.setCurrentIndex(1)
-    for tab in range(page.preview_tabs.count()):
-        page.preview_tabs.setCurrentIndex(tab)
-        settle(qt_app)
-        assert page._scroll.horizontalScrollBar().maximum() == 0
-        assert page.summary_scroll.horizontalScrollBar().maximum() == 0
-    assert all(metric.isVisible() for metric in page.source_metrics)
+    page.protocol.set_expanded(True, animate=False)
+    settle(qt_app)
+    assert page._scroll.horizontalScrollBar().maximum() == 0
+    assert page.summary_scroll.horizontalScrollBar().maximum() == 0
+    assert all(value.isVisible() for value in page._summary_rows.values())
 
 
 def test_wide_history_keeps_the_view_action_inside_the_master_pane(window, qt_app):

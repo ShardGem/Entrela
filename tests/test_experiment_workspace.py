@@ -1,7 +1,6 @@
 """O laboratório reutiliza páginas e solicita ações sem criar dados científicos."""
 
 import pytest
-from PySide6.QtCore import Qt
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QLineEdit, QVBoxLayout, QWidget
 
@@ -90,16 +89,14 @@ def test_selected_execution_is_a_received_context_and_not_the_draft(qt_app):
     try:
         title = "Bell & ruído < 0,1"
         workspace.set_selected_experiment(title, "circuit")
-        assert title in workspace.selected_label.text()
-        assert "Circuito de portas" in workspace.selected_label.text()
-        assert "rascunhos independentes" in workspace.selected_label.toolTip()
-        assert workspace.selected_label.textFormat() == Qt.PlainText
+        assert title in workspace.recent_button.toolTip()
+        assert "Circuito de portas" in workspace.recent_button.toolTip()
         for key in workspace.KEYS:
             workspace.select_page(key)
             assert fields[key].text() == key + " · rascunho"
-            assert title in workspace.selected_label.text()
+            assert title in workspace.recent_button.toolTip()
         workspace.set_selected_experiment(None, None)
-        assert workspace.selected_label.text() == "Nenhuma execução selecionada"
+        assert title not in workspace.recent_button.toolTip()
     finally:
         workspace.close()
 
@@ -114,13 +111,12 @@ def test_toolbar_stays_inside_a_narrow_workspace(qt_app, font_size):
         workspace.show()
         for _ in range(4):
             qt_app.processEvents()
-        assert workspace.templates_button.isVisible() and not workspace.recent_button.isVisible()
-        assert workspace.toolbar.rect().contains(workspace.templates_button.geometry())
+        assert not workspace.toolbar.isVisible()
         assert workspace.tabs.currentWidget() is pages["simulation"]
         workspace.select_page('results')
         for _ in range(4):
             qt_app.processEvents()
-        assert workspace.recent_button.isVisible() and not workspace.templates_button.isVisible()
+        assert workspace.recent_button.isVisible()
         assert workspace.toolbar.rect().contains(workspace.recent_button.geometry())
     finally:
         apply_appearance(workspace)
