@@ -77,8 +77,8 @@ def test_dashboard_beginner_help_is_optional_and_shortcuts_keep_contract(qt_app)
         from PySide6.QtWidgets import QPushButton
 
         buttons = {button.text(): button for button in page.findChildren(QPushButton)}
-        buttons["Explorar exemplos"].click()
-        buttons["Aprender fazendo"].click()
+        buttons["Escolher um exemplo da biblioteca"].click()
+        buttons["Iniciar tutorial de Bell"].click()
         assert expected == ["examples", "tutorial"]
     finally:
         page.close()
@@ -86,24 +86,23 @@ def test_dashboard_beginner_help_is_optional_and_shortcuts_keep_contract(qt_app)
 
 def test_dashboard_names_preserve_technical_selection(qt_app):
     from core.simulation import run_experiment
-
-    source = run_experiment(create_example_config("bell"))
+    from PySide6.QtCore import Qt
+    source = run_experiment(create_example_config('bell'))
     page = DashboardPage()
     page.load_recent([source])
-    page.set_annotations({source.id: {"title": "Bell · referência da pesquisa"}})
-    button = page.recent.body().itemAt(1).widget()
-    assert "Bell · referência da pesquisa" in button.text()
-    assert source.id not in button.text()
-    assert source.id not in button.toolTip()
-    assert "Executado em" in button.toolTip()
+    page.set_annotations({source.id: {'title': 'Bell · referência da pesquisa'}})
+    item = page.recent_list.item(0)
+    assert 'Bell · referência da pesquisa' in item.text()
+    assert source.id not in item.text()
+    assert source.id not in item.toolTip()
+    assert item.data(Qt.UserRole) == source.id
     selected = []
     page.experiment_selected.connect(selected.append)
-    button.click()
+    page.recent_list.itemActivated.emit(item)
     assert selected == [source.id]
     page.set_annotations({})
-    assert "Bell · referência da pesquisa" not in page.recent.body().itemAt(1).widget().text()
+    assert 'Bell · referência da pesquisa' not in page.recent_list.item(0).text()
     page.close()
-
 
 def test_projector_layout_does_not_compress_summary_text(window, qt_app):
     window.resize(1024, 768)

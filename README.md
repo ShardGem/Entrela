@@ -12,41 +12,38 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
-## Interface de plataforma e galeria em alta resolução — 0.26.0
+## Bancada centrada em projetos — 0.27.0
 
-- Acessos diretos às funcionalidades, organizados em Laboratório, Investigação, Registros e Aprendizado; Início e Preferências permanecem fixos.
-- Configuração com área científica central, revisão do protocolo, dados da execução selecionada e parâmetros em um inspetor lateral.
-- Cabeçalho global e comandos locais, com a organização inspirada no IBM Quantum Platform.
-- Editor com portas e modelos à esquerda, desenho central, inspetor e resultados gravados no mesmo ambiente.
-- Botões arredondados, campos claros e fonte IBM Plex Sans incluída com licença aberta.
-- Gráficos amplos com modos Distribuição, Evolução e Lado a lado; reprodução 3D junto à linha do tempo.
-- Estudos por pergunta científica, exemplos em lista/detalhe e preferências com categorias visíveis.
-- Novas imagens e ícones do autor incorporados, preservando o comportamento da splash.
-- Capturas PNG nativas em **3840 × 2160**, organizadas por módulo, com índice, hashes e cenários realmente executados.
+- Cabeçalho com **Projetos, Biblioteca e Aprender**, busca global e Preferências; ferramentas científicas continuam acessíveis por nome.
+- Projetos com retomada, experimentos, execuções recentes, caderno e evidências. Rascunhos independentes preservam configurações e circuitos durante a navegação.
+- Bancada **Preparar → Observar → Comparar**, com campos centrais, revisão do protocolo, execução fixa e visualizações dos registros calculados.
+- Azul-petróleo, ciano suave, IBM Plex Sans, cantos discretos e adaptação a texto de 24 px em 1024 × 768.
+- Caderno com escopo de projeto ou execução, fontes dos arquivos exportados e roteiro do relatório A4.
+- Históricos, revisões, modelos, dados científicos, ícones do autor e splash preservados.
 
-**[Abrir a galeria completa da interface](docs/screenshots/0.26.0/README.md)** · [Antes/depois, validação e limites](docs/interface-0.26.md)
+**[Galeria completa: 84 capturas verificadas](docs/screenshots/0.27.0/README.md)** · [Arquitetura, fluxos e limites](docs/interface-0.27.md) · [Registro de validação](docs/validacao-0.27.json)
 
-[![Editor de circuitos com inspeção e resultados gravados](docs/screenshots/0.26.0/03-laboratorio/08-editor.png)](docs/screenshots/0.26.0/03-laboratorio/08-editor.png)
+[![Projeto e retomada da investigação](docs/screenshots/0.27.0/01-inicio/03-projeto.png)](docs/screenshots/0.27.0/01-inicio/03-projeto.png)
 
 <details>
 <summary>Configuração, circuitos e resultados</summary>
 
-![Configuração da simulação com prévia e parâmetros](docs/screenshots/0.26.0/03-laboratorio/04-configurar-ruido.png)
+![Configuração da simulação com prévia e parâmetros](docs/screenshots/0.27.0/03-laboratorio/04-configurar-ruido.png)
 
-![Editor de circuitos e biblioteca de portas](docs/screenshots/0.26.0/03-laboratorio/08-editor.png)
+![Editor de circuitos e biblioteca de portas](docs/screenshots/0.27.0/03-laboratorio/08-editor.png)
 
-![Distribuições e evolução da simulação](docs/screenshots/0.26.0/04-resultados/resultados-graficos.png)
+![Distribuições e evolução da simulação](docs/screenshots/0.27.0/04-resultados/resultados-graficos.png)
 
 </details>
 
 <details>
 <summary>Pesquisa, comparações e histórico</summary>
 
-![Mapa de calor calculado a partir da varredura de parâmetros](docs/screenshots/0.26.0/05-pesquisa/resultado-mapa-calor.png)
+![Mapa de calor calculado a partir da varredura de parâmetros](docs/screenshots/0.27.0/05-pesquisa/resultado-mapa-calor.png)
 
-![Comparação de estados de Bloch de duas execuções](docs/screenshots/0.26.0/05-pesquisa/comparacao-bloch.png)
+![Comparação de estados de Bloch de duas execuções](docs/screenshots/0.27.0/05-pesquisa/comparacao-bloch.png)
 
-![Consulta gráfica do circuito no histórico](docs/screenshots/0.26.0/06-acervo/historico-circuito.png)
+![Consulta gráfica do circuito no histórico](docs/screenshots/0.27.0/06-acervo/historico-circuito.png)
 
 </details>
 

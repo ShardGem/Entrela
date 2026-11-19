@@ -92,21 +92,21 @@ def test_saved_configuration_menu_uses_existing_draft_protection(window, monkeyp
     panel.spin_J.setValue(.4321)
     edited = panel.get_config()
     action = window.page_workspace.templates_menu.actions()[0]
-    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.No)
-    action.trigger()
-    assert panel.get_config() == edited
-    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.Yes)
     action.trigger()
     assert panel.get_config() == saved
-    assert window.is_page_active('simulation')
+    works = window.projects.store.works()
+    original = next(w for w in works if w['id'] != window.projects.active_id)
+    assert original['draft']['simulation']['controls']['J'] == edited.system.J
+    copy = window.projects.active_id
+    window.projects.open_work(original['id'])
+    assert panel.get_config() == edited
+    window.projects.open_work(copy)
+    assert panel.get_config() == saved
     assert window._current_worker is None
     window.page_workspace.templates_menu.actions()[-1].trigger()
-    assert window.is_page_active('simulation')
     assert window.configuration_dialog.isVisible()
-    assert window.page_library.templates_group.isVisible()
     assert window.configuration_dialog.isAncestorOf(window.page_library.templates_group)
     window.configuration_dialog.close()
-
 
 def test_recent_execution_menu_preserves_identity_and_notebook_link(window):
     panel = window.page_simulation.config_panel
@@ -177,7 +177,7 @@ def test_loaded_result_does_not_add_global_configuration_scroll_at_large_font(wi
             for _ in range(5):
                 qt_app.processEvents()
             assert window.page_simulation._scroll.verticalScrollBar().maximum() == 0
-        assert window.page_simulation.examples_button.isVisible()
+        assert window.topbar.destinations['examples'].isVisible()
         assert window.page_simulation.btn_run.isVisible()
     finally:
         apply_appearance(window)

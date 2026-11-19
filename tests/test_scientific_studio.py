@@ -27,13 +27,16 @@ def test_scientific_area_has_priority_and_parameters_are_in_the_inspector(window
     settle(qt_app)
     page=window.page_simulation
     assert not page._compact
-    assert page.splitter.widget(0) is page.summary_scroll
+    assert page.splitter.widget(0) is page.steps
+    assert page.splitter.widget(2) is page.summary_scroll
     assert page.splitter.widget(1) is page.config_panel
-    assert page.summary_scroll.width() > page.config_panel.width()
+    assert page.config_panel.width() > page.summary_scroll.width()
     assert not window.page_workspace.stages.isVisible()
     assert not window.page_workspace.view_selector.isVisible()
-    assert page.config_panel._inspector_mode
-    assert set(window.pages) <= set(window.sidebar.buttons)
+    assert page.config_panel.external_steps
+    assert not page.config_panel._inspector_mode
+    assert window.topbar.activities.isVisible()
+    assert window.sidebar.isHidden()
 
 
 def test_editing_preparation_does_not_change_the_evidence_on_the_workbench(window, qt_app):

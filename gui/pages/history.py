@@ -30,6 +30,7 @@ class HistoryPage(PageBase):
     experiment_deleted = Signal(str)
     detail_requested = Signal(str)
     edit_requested = Signal(str)
+    use_config_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(
@@ -123,6 +124,11 @@ class HistoryPage(PageBase):
         self.detail_title.setTextFormat(Qt.PlainText)
         detail_layout.addWidget(self.detail_title)
         self.open_result = QPushButton("Abrir resultados")
+        self.use_config = QPushButton("Usar configuração")
+        self.use_config.setToolTip("Cria uma base editável a partir dos parâmetros registrados. Os resultados consultados permanecem preservados.")
+        self.use_config.clicked.connect(lambda: self.use_config_requested.emit(self.selected_identifier) if self.selected_identifier else None)
+        self.use_config.setEnabled(False)
+        bar.addWidget(self.use_config)
         self.edit_annotation = QPushButton("Editar identificação")
         bar.addWidget(self.open_result)
         bar.addWidget(self.edit_annotation)
@@ -166,6 +172,7 @@ class HistoryPage(PageBase):
         self._layout_timer.timeout.connect(self._arrange_details)
         self.expand_details.clicked.connect(lambda *_: setattr(self, '_auto_detail_focus', False))
         self.open_result.setEnabled(False)
+        self.use_config.setEnabled(False)
         self.edit_annotation.setEnabled(False)
         self.open_result.clicked.connect(lambda: self.experiment_selected.emit(self.selected_identifier) if self.selected_identifier else None)
         self.edit_annotation.clicked.connect(lambda: self.edit_requested.emit(self.selected_identifier) if self.selected_identifier else None)
@@ -341,6 +348,7 @@ class HistoryPage(PageBase):
         name = experiment_title(experiment, self.annotations)
         self.detail_title.setText(name)
         self.open_result.setEnabled(True)
+        self.use_config.setEnabled(True)
         self.edit_annotation.setEnabled(True)
         self.expand_details.setEnabled(True)
         annotation = self.annotations.get(experiment.id, {})

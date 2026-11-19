@@ -6,6 +6,7 @@ from gui.widgets.button import SecondaryButton
 
 class JobMonitor(QFrame):
     cancel_requested = Signal()
+    open_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -27,10 +28,21 @@ class JobMonitor(QFrame):
         self.cancel.setToolTip("Solicita o cancelamento e aguarda a etapa atual terminar.")
         self.cancel.clicked.connect(self.cancel_requested.emit)
         layout.addWidget(self.cancel)
+        self.open_result = SecondaryButton('Abrir resultados', icon='results')
+        self.open_result.clicked.connect(lambda: self.open_requested.emit(self._completed_id) if self._completed_id else None)
+        layout.addWidget(self.open_result)
+        self.dismiss = SecondaryButton('Fechar aviso')
+        self.dismiss.clicked.connect(self._dismiss)
+        layout.addWidget(self.dismiss)
+        self._completed_id = None
+        self.open_result.hide(); self.dismiss.hide()
         self._task = ""
         self.hide()
 
     def start(self, task, context=""):
+        self._completed_id = None
+        self.open_result.hide(); self.dismiss.hide()
+        self.progress.show(); self.cancel.show()
         self._task = task
         self._context = context
         self.label.setText(task + (" · " + context if context else ""))
@@ -49,6 +61,22 @@ class JobMonitor(QFrame):
         self.label.setText("Cancelando: aguardando a etapa atual terminar…")
         self.cancel.setEnabled(False)
 
+    def completed_result(self, identifier, title):
+        self._completed_id = identifier
+        self.label.setText('Execução concluída · ' + title)
+        self.progress.hide(); self.cancel.hide()
+        self.open_result.show(); self.dismiss.show()
+        self.show()
+
+    def _dismiss(self):
+        self._completed_id = None
+        self.hide()
+
     def finish(self):
         self._task = ""
-        self.hide()
+        if self._completed_id:
+            self.progress.hide(); self.cancel.hide()
+            self.open_result.show(); self.dismiss.show()
+            self.show()
+        else:
+            self.hide()

@@ -11,6 +11,7 @@ class SectionWorkspace(QWidget):
     def __init__(self, pages, entries, parent=None):
         super().__init__(parent)
         self._keys = [key for key, _ in entries]
+        self._pages = pages
         self.setObjectName('PageSurface')
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -41,7 +42,7 @@ class SectionWorkspace(QWidget):
         blocker = QSignalBlocker(self.selector)
         self.selector.setCurrentIndex(self._keys.index(key))
         del blocker
-        self.stack.setCurrentIndex(self._keys.index(key))
+        self.stack.setCurrentWidget(self._pages[key])
         self.context.setText({
             'analysis': 'Escolha uma pergunta, defina a varredura e examine os resultados.',
             'mitigation': 'Extrapole um observável e confira o erro contra a referência ideal.',
@@ -55,7 +56,7 @@ class SectionWorkspace(QWidget):
 
     def _selected(self):
         key = self.selector.currentData()
-        self.stack.setCurrentIndex(self._keys.index(key))
+        self.stack.setCurrentWidget(self._pages[key])
         self.page_selected.emit(key)
 
     @property

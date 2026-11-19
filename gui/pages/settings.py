@@ -3,6 +3,8 @@
 from PySide6.QtCore import Signal, QSignalBlocker, Qt, QEvent
 from PySide6.QtWidgets import QFormLayout, QLabel, QSpinBox, QComboBox, QCheckBox, QScrollArea, QWidget, QVBoxLayout, QFrame, QListWidget, QSplitter, QMenu
 from gui.pages.base import PageBase
+from gui.design_system import Surface
+from gui.widgets.button import PrimaryButton
 from gui.widgets.card import Card
 from gui.widgets.button import SecondaryButton
 from gui.widgets.content_tabs import ContentTabs
@@ -16,7 +18,7 @@ class SettingsPage(PageBase):
     backup_requested = Signal()
     restore_backup_requested = Signal()
     DEFAULTS = {
-        "theme": "dark", "font_size": 15, "accent": "theme",
+        "theme": "navy", "font_size": 15, "accent": "theme",
         "density": "comfortable", "reduce_motion": False,
         "high_contrast": False, "completion_notifications": True,
         "export_dpi": 300, "presentation": False, "compact": False,
@@ -46,6 +48,22 @@ class SettingsPage(PageBase):
         self.preferences_splitter.addWidget(self.category_list)
         self.preferences_splitter.addWidget(self.sections)
         self.preferences_splitter.setStretchFactor(1, 1)
+        self.preview = Surface('Prévia da aparência')
+        hint = QLabel('Os controles e a tipografia abaixo acompanham suas preferências. As alterações são salvas automaticamente.')
+        hint.setWordWrap(True); hint.setObjectName('FieldHint'); self.preview.add(hint)
+        sample = QLabel('Resultados do experimento'); sample.setObjectName('PanelTitle'); self.preview.add(sample)
+        sample_button = PrimaryButton('Executar simulação', icon='play')
+        sample_button.setToolTip('Exemplo visual de botão; nenhuma simulação é iniciada nesta prévia.')
+        self.preview.add(sample_button)
+        self.preview_source = QLabel('Abra uma execução para incluir seus dados nesta prévia.')
+        self.preview_source.setWordWrap(True); self.preview_source.setObjectName('FieldHint'); self.preview.add(self.preview_source)
+        self.preview_values = QLabel(); self.preview_values.setWordWrap(True); self.preview.add(self.preview_values)
+        self.preview.body().addStretch()
+        self.preview.setMinimumWidth(260)
+        self.preferences_splitter.addWidget(self.preview)
+        self.preferences_splitter.setSizes([220, 760, 340])
+        self.category.currentIndexChanged.connect(lambda index: self.preview.setVisible(index == 0 and self.width() >= 1180*max(1,self.font().pixelSize()/15)))
+        self.compact_help = QLabel()
         self.body().addWidget(self.category)
         self.body().addWidget(self.preferences_splitter, 1)
         self.category_list.currentRowChanged.connect(self.category.setCurrentIndex)
@@ -63,12 +81,13 @@ class SettingsPage(PageBase):
         self.font_size.setSuffix(' px')
         self.font_size.setToolTip('Tamanho base da interface. Títulos e textos auxiliares acompanham esta escala.')
         self.theme.setToolTip('O modo automático acompanha a preferência de cores informada pelo sistema operacional.')
-        self.accent.setToolTip('Padrão do tema usa o ciano do Grafite ou o azul dos temas Claro científico e Azul escuro. As demais opções personalizam o destaque.')
+        self.accent.setToolTip('Padrão do tema usa o ciano suave no Azul Entrela. As demais opções personalizam o destaque sem alterar os dados.')
         self.density.setToolTip('Ajusta os espaços de botões, formulários e tabelas. Não altera a escala dos dados.')
         self.presentation = QCheckBox('Modo de apresentação')
         self.presentation.setToolTip('Usa fonte maior e navegação compacta. F11 alterna a tela cheia.')
         self.compact = QCheckBox('Menu estreito com nomes')
-        self.compact.setToolTip('Reduz a largura da navegação e preserva os nomes completos dos itens.')
+        self.compact.setToolTip('Preferência mantida para compatibilidade com perfis anteriores. A navegação atual usa o cabeçalho global.')
+        self.compact.hide()
         self._card('Aparência', [
             ('Tema', self.theme), ('Sobre o tema', self.theme_description), ('Cor de destaque', self.accent),
             ('Tamanho do texto', self.font_size), ('Densidade', self.density),
@@ -132,9 +151,18 @@ class SettingsPage(PageBase):
             signal.connect(lambda *_: self.appearance_changed.emit())
         self._arrange_preferences()
 
+    def set_preview_source(self, experiment, title):
+        from gui.formatting import quantity
+        r = experiment.result
+        self.preview_source.setText('Fonte: ' + title)
+        self.preview_values.setText('Fidelidade ao mesmo circuito sem ruído: ' + quantity(r.fidelity)
+            + '\nPureza global: ' + quantity(r.purity) + '\nEnergia ⟨H⟩: ' + quantity(r.energy))
+
     def _arrange_preferences(self):
         if not hasattr(self, 'preferences_splitter'):
             return
+        if hasattr(self, 'preview'):
+            self.preview.setVisible(self.category.currentIndex() == 0 and self.width() >= 1180*max(1,self.font().pixelSize()/15))
         narrow = self.width() < 1050 * max(1, self.font().pixelSize() / 15)
         self.category.setVisible(narrow)
         self.category_list.setVisible(not narrow)
@@ -167,6 +195,8 @@ class SettingsPage(PageBase):
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         form.setVerticalSpacing(12)
         for label, widget in rows:
+            if widget is self.compact:
+                continue  # Perfil legado preservado; a navegação atual usa o cabeçalho.
             widget.setAccessibleName(label)
             form.addRow(label, widget)
         card.add_layout(form)

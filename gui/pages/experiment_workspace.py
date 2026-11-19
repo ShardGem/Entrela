@@ -44,6 +44,7 @@ class ExperimentWorkspace(QWidget):
             raise ValueError("Cada aba do laboratório precisa de uma página distinta.")
         self._keys = keys
         self._running = False
+        self.global_navigation = False
         self._route = "simulation"
         self._last_preparation = "simulation"
         self._last_result = "results:graphs"
@@ -131,6 +132,18 @@ class ExperimentWorkspace(QWidget):
         self.stages.currentChanged.connect(lambda index: self._apply_route(self._last_preparation if index == 0 else self._last_result, True))
         self.view_selector.currentIndexChanged.connect(lambda *_: self._apply_route(self.view_selector.currentData(), True))
         self._pages = pages
+        if hasattr(pages["results"], "results_tab"):
+            pages["results"].results_tab.chart_views.hide()
+        self.observation_tabs = QTabBar()
+        self.observation_tabs.setObjectName('ObservationTabs')
+        self.observation_tabs.setDrawBase(False)
+        self.observation_tabs.setExpanding(False)
+        self.observation_tabs.setUsesScrollButtons(True)
+        self.observation_tabs.setAccessibleName('Visualizações da execução')
+        for text in ('Medições', 'Evolução', 'Bloch', 'Estado global', 'Dados'):
+            self.observation_tabs.addTab(text)
+        root.insertWidget(0, self.observation_tabs)
+        self.observation_tabs.currentChanged.connect(self._observation_selected)
         self._apply_route('simulation')
 
     @property
@@ -185,6 +198,13 @@ class ExperimentWorkspace(QWidget):
         if emit:
             self.page_selected.emit(key)
 
+    def _observation_selected(self, index):
+        if index in (0, 1):
+            self._pages['results'].results_tab.chart_views.setCurrentIndex(index)
+            self._apply_route('results:graphs', True)
+        else:
+            self._apply_route({2:'bloch', 3:'results:state', 4:'results:data'}[index], True)
+
     def add_context_action(self, widget: QWidget, key: str):
         """Reutiliza uma ação existente na faixa comum, somente no seu contexto."""
         if key not in self._keys:
@@ -197,9 +217,16 @@ class ExperimentWorkspace(QWidget):
         for widget, key in self._context_actions:
             widget.setVisible(key == self.current_page_key)
         preparation = self._route in ('simulation', 'circuit:edit')
+        compact = self.width() < 1180 * max(1, self.font().pixelSize()/15)
+        self.toolbar.setVisible(not compact or not self.global_navigation)
         self.selected_label.setVisible(not preparation)
         self.draft_label.hide()
-        self.view_selector.setVisible(self._route.startswith("results:") or self._route == "circuit:inspect")
+        self.view_selector.setVisible(self._route in ('results:data', 'results:metadata', 'results:interpretation', 'circuit:inspect'))
+        if hasattr(self, 'observation_tabs'):
+            self.observation_tabs.setVisible(not preparation)
+            route_index = 2 if self._route == 'bloch' else 3 if self._route == 'results:state' else 4 if self._route in ('results:data', 'results:metadata', 'results:interpretation', 'circuit:inspect') else (self._pages['results'].results_tab.chart_views.currentIndex() if hasattr(self._pages['results'], 'results_tab') else 0)
+            with QSignalBlocker(self.observation_tabs):
+                self.observation_tabs.setCurrentIndex(min(route_index, 4))
         self.templates_button.setVisible(self._route == 'simulation')
         self.recent_button.setVisible(not preparation)
         context = 'Em edição: ' + self._draft_names.get(self._route, '')

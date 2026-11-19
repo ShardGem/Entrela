@@ -81,7 +81,7 @@ class BlochCanvas(StableFigureCanvas):
         self._trail_data = []
         self._axis_artists = []
         self._qubit_artists = []
-        u, v = np.meshgrid(np.linspace(0, 2 * np.pi, 24), np.linspace(0, np.pi, 16))
+        u, v = np.meshgrid(np.linspace(0, 2 * np.pi, 49), np.linspace(0, np.pi, 25))
         for q, c in enumerate(self._sphere_centers):
             color = getattr(PALETTE, f"q{q + 1}")
             artists = []
@@ -90,8 +90,9 @@ class BlochCanvas(StableFigureCanvas):
                 c[1] + np.sin(u) * np.sin(v),
                 c[2] + np.cos(v),
                 color=PALETTE.border_strong,
-                linewidth=0.5,
-                alpha=0.65,
+                rstride=4, cstride=6,
+                linewidth=0.35,
+                alpha=0.4,
             )
             artists.append(wire)
             axes_start = len(self._axis_artists)
@@ -325,7 +326,7 @@ class BlochCanvas(StableFigureCanvas):
     def select_qubit(self, index):
         self.selected_qubit = index if 0 <= index < len(self._sphere_centers) else -1
         for q, artists in enumerate(self._qubit_artists):
-            artists[0].set_linewidth(0.95 if q == self.selected_qubit else 0.5)
+            artists[0].set_linewidth(0.6 if q == self.selected_qubit else 0.35)
             artists[0].set_color(
                 getattr(PALETTE, f"q{q + 1}")
                 if q == self.selected_qubit

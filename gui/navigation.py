@@ -44,3 +44,7 @@ NAV_GROUPS = [
     ('learning', 'Aprendizado', 'group-start', ('examples', 'docs')),
 ]
 NAV_ACTIONS = {'configurations'}
+
+ROOT_FOR_PAGE.update(catalog="catalog", notebook="notebook")
+PAGE_LABELS.update(catalog="Biblioteca", notebook="Caderno do projeto", dashboard="Projetos")
+NAV_LABELS.update(catalog="Biblioteca", notebook="Caderno do projeto", dashboard="Projetos")

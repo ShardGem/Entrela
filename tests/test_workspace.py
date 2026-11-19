@@ -119,9 +119,12 @@ def test_tutorial_resume_and_completed_restart_are_separate(window):
 def test_gallery_replacement_requires_confirmation(window,monkeypatch):
     window.page_simulation.config_panel.spin_J.setValue(2.5)
     original=window.page_simulation.config_panel.get_config()
-    monkeypatch.setattr(QMessageBox,"question",lambda *args:QMessageBox.No)
-    window._load_example("bell")
-    assert window.page_simulation.config_panel.get_config()==original
+    window._load_example('bell')
+    assert window.page_simulation.config_panel.get_config() == create_example_config('bell')
+    preserved = next(w for w in window.projects.store.works() if w['id'] != window.projects.active_id)
+    window.projects.open_work(preserved['id'])
+    assert window.page_simulation.config_panel.get_config() == original
+
 def test_reopen_preserves_original_when_form_edited(window):
     p=window.page_simulation.config_panel
     p.spin_shots.setValue(64)

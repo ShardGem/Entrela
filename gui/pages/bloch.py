@@ -27,6 +27,7 @@ from gui.pages.base import PageBase
 from gui.widgets.card import EmptyState
 from gui.widgets.button import PrimaryButton, GhostButton
 from gui.theme import PALETTE
+from gui.icons import get_icon
 from gui.widgets.plot_canvas import MplCanvas
 from gui.widgets.bloch_canvas import BlochCanvas
 from gui.widgets.bloch_controls import BlochCameraPanel
@@ -165,7 +166,8 @@ class BlochPage(PageBase):
         self.camera_toggle.clicked.connect(self._camera_chosen)
         self.camera_toggle.toggled.connect(lambda *_: self._visual_mode_changed(self.visual_tabs.currentIndex()))
         controls.addWidget(self.camera_toggle)
-        controls.add_group(QLabel("Velocidade"), self.speed_combo)
+        self.speed_label = QLabel("Velocidade")
+        controls.add_group(self.speed_label, self.speed_combo)
         controls.addWidget(self.loop)
         layout.addWidget(self.selection_label)
         self.canvas = BlochCanvas()
@@ -196,6 +198,12 @@ class BlochPage(PageBase):
         self.visual_tabs.addTab(self.probabilities_canvas, "Probabilidades no instante")
         self.state_inspector = StateInspector()
         self.visual_tabs.addTab(self.state_inspector, "Estado global")
+        self.visual_tabs.tabBar().hide()
+        self.visual_choice = QComboBox()
+        self.visual_choice.setAccessibleName('Visualização do snapshot')
+        self.visual_choice.addItems(['Esfera de Bloch', 'Probabilidades no instante', 'Estado global no instante'])
+        self.visual_choice.currentIndexChanged.connect(self.visual_tabs.setCurrentIndex)
+        self.visual_tabs.currentChanged.connect(self.visual_choice.setCurrentIndex)
         self.visual_tabs.currentChanged.connect(self._refresh_ui)
         self.visual_tabs.currentChanged.connect(self._visual_mode_changed)
         self.stage_splitter = QSplitter(Qt.Horizontal)
@@ -207,6 +215,17 @@ class BlochPage(PageBase):
         inspector_layout.setContentsMargins(8, 0, 0, 0)
         self.inspector_selector = QComboBox()
         self.inspector_selector.setAccessibleName("Conteúdo do inspetor da visualização")
+        self.local_qubit = QLabel('Selecione um qubit para inspecionar X, Y, Z e pureza local.')
+        self.local_qubit.setObjectName('ExecutionIdentity')
+        self.local_qubit.setWordWrap(True)
+        self.local_qubit.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        inspector_layout.addWidget(self.visual_choice)
+        inspector_layout.addWidget(self.focus_combo)
+        inspector_layout.addWidget(self.local_qubit)
+        self.overlay.setText('Mesmo circuito sem ruído')
+        self.trails.setText('Trajetória dos snapshots')
+        for option in (self.overlay, self.trails, self.axes_check):
+            inspector_layout.addWidget(option)
         inspector_layout.addWidget(self.inspector_selector)
         self.inspector_tabs = ContentTabs()
         self.inspector_tabs.tabBar().hide()
@@ -217,7 +236,9 @@ class BlochPage(PageBase):
         self.camera_scroll.setWidgetResizable(True)
         self.camera_scroll.setMinimumWidth(235)
 
-        self.camera_scroll.setWidget(self.camera_panel)
+        self.camera_section = CollapsibleSection('Câmera e enquadramento', expanded=False)
+        self.camera_section.content_layout.addWidget(self.camera_panel)
+        self.camera_scroll.setWidget(self.camera_section)
         self.inspector_tabs.addTab(self.camera_scroll, "Câmera e visualização")
         self.stage_splitter.addWidget(self.inspector)
         self.stage_splitter.setStretchFactor(0, 1)
@@ -232,7 +253,8 @@ class BlochPage(PageBase):
         self.frame_label.setWordWrap(True)
         frame_row = QHBoxLayout()
         frame_row.addWidget(self.frame_label, 1)
-        frame_row.addWidget(QLabel("Ir ao snapshot"))
+        self.snapshot_label = QLabel("Ir ao snapshot")
+        frame_row.addWidget(self.snapshot_label)
         self.snapshot_spin = QSpinBox()
         self.snapshot_spin.setRange(1, 1)
         self.snapshot_spin.setKeyboardTracking(False)
@@ -285,6 +307,13 @@ class BlochPage(PageBase):
         self._escape = escape
         self.body().addWidget(self._content, 1)
         self._content.hide()
+        self._scroll.takeWidget()
+        self._scroll.hide()
+        self._root.insertWidget(1, self._body_widget, 1)
+        self._body.setContentsMargins(20, 0, 20, 8)
+        self._body.setSpacing(0)
+        self.visual_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.stage_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
 
     def refresh_theme(self):
         if hasattr(self, "camera_scroll"):
@@ -294,8 +323,9 @@ class BlochPage(PageBase):
         global_state = self.visual_tabs.widget(index) is self.state_inspector
         self.inspector.setVisible(not self._maximized and self.camera_toggle.isChecked())
         self.camera_toggle.setVisible(not self._maximized)
-        self.selection_label.setVisible(not global_state)
-        self.maximize_button.setText("Restaurar painéis" if self._maximized else "Ampliar visualização")
+        compact = self.width() < 1180*max(1,self.font().pixelSize()/15)
+        self.selection_label.setVisible(not global_state and not compact)
+        self.maximize_button.setText('' if compact else ("Restaurar painéis" if self._maximized else "Ampliar visualização"))
 
     def _inspector_changed(self, index):
         self.inspector_tabs.setCurrentIndex(index)
@@ -316,6 +346,24 @@ class BlochPage(PageBase):
         if self._camera_auto:
             self.camera_toggle.setChecked(self.width() >= 1100 * max(1, self.font().pixelSize() / 15))
         self._visual_mode_changed(self.visual_tabs.currentIndex())
+        self._adapt_transport()
+
+    def _adapt_transport(self):
+        if not hasattr(self, 'snapshot_label'): return
+        compact = self.width() < 1180*max(1,self.font().pixelSize()/15)
+        self.selection_label.setVisible(not compact)
+        self.speed_label.setVisible(not compact)
+        self.loop.setVisible(not compact)
+        self.snapshot_label.setText('#' if compact else 'Ir ao snapshot')
+        for button, text, icon in [(self.btn_play,'Reproduzir','pause' if self.playing else 'play'),
+            (self.btn_stop,'Reiniciar','history'), (self.btn_prev,'Anterior','prev'), (self.btn_next,'Próximo','next'),
+            (self.maximize_button,'Ampliar visualização','expand'), (self.camera_toggle,'Inspetor','settings')]:
+            button.setText('' if compact else text)
+            button.setAccessibleName(text)
+            button.setToolTip(text)
+            button._icon_name = icon
+            button.setIcon(get_icon(icon, PALETTE.action_on if button is self.btn_play else PALETTE.primary))
+        if self.precomputed_bloch: self._refresh_ui()
 
     def _camera_chosen(self, *_):
         self._camera_auto = False
@@ -543,7 +591,7 @@ class BlochPage(PageBase):
         self.snapshot_spin.setValue(idx + 1)
         del blocker
         self.frame_label.setText(
-            f"Snapshot {idx + 1} / {len(self.precomputed_bloch)}"
+            f"Snapshot {idx + 1} de {len(self.precomputed_bloch)}"
             + (
                 f" · {'porta' if 'porta' in self.time_unit else 't'}={self.times[idx]:.6g} ({self.time_unit})"
                 if self.times is not None
@@ -551,6 +599,10 @@ class BlochPage(PageBase):
             )
             + " · reprodução didática"
         )
+        self.frame_label.setToolTip(self.frame_label.text())
+        if self.width() < 1180*max(1,self.font().pixelSize()/15):
+            unit = 'ℏ=1' if 'adimensional' in self.time_unit else self.time_unit
+            self.frame_label.setText(f"Snapshot {idx+1} de {len(self.precomputed_bloch)} · " + (f"{self.times[idx]:.6g} ({unit})" if self.times is not None else 'índice registrado'))
         if getattr(self, "final_only", False):
             self.frame_label.setText("Estado final · sem etapas intermediárias armazenadas")
         self.slider.blockSignals(True)
@@ -610,6 +662,7 @@ class BlochPage(PageBase):
             self._probability_annotation.set_visible(False)
             self.probabilities_canvas.draw_idle()
             self._probability_plot_key = plot_key
+        self._update_local_qubit()
         self.metrics.select_snapshot(idx)
         self.state_inspector.set_state(
             self.original_svs[idx],
@@ -661,9 +714,11 @@ class BlochPage(PageBase):
             self._pause()
 
     def _pause(self):
+        self.btn_play.setIcon(get_icon('play', PALETTE.action_on))
+        self.btn_play.setAccessibleName('Reproduzir snapshots')
         self.timer.stop()
         self.playing = False
-        self.btn_play.setText("Reproduzir")
+        self.btn_play.setText('' if self.width() < 1180*max(1,self.font().pixelSize()/15) else "Reproduzir")
 
     def _toggle_play(self):
         if self.playing:
@@ -674,7 +729,9 @@ class BlochPage(PageBase):
                 self._refresh_ui()
             self.playing = True
             self.timer.start()
-            self.btn_play.setText("Pausar")
+            self.btn_play.setIcon(get_icon('pause', PALETTE.action_on))
+            self.btn_play.setAccessibleName('Pausar reprodução')
+            self.btn_play.setText('' if self.width() < 1180*max(1,self.font().pixelSize()/15) else "Pausar")
 
     def _stop(self):
         self._pause()
@@ -737,3 +794,14 @@ class BlochPage(PageBase):
             )
         if valid:
             self.info_scroll.ensureWidgetVisible(self._qubit_panels[index])
+        self._update_local_qubit()
+
+    def _update_local_qubit(self):
+        if not hasattr(self, 'local_qubit'): return
+        index = self.canvas.selected_qubit
+        if not self.precomputed_bloch or index < 0:
+            self.local_qubit.setText('Selecione um qubit para inspecionar X, Y, Z e pureza local.')
+            return
+        vector = self.precomputed_bloch[self.current_frame][index]
+        x, y, z = vector
+        self.local_qubit.setText(f'Qubit q{index} · snapshot {self.current_frame+1}\n\nX     {x:+.6g}\nY     {y:+.6g}\nZ     {z:+.6g}\nPureza local     {purity_from_bloch(vector):.6g}')

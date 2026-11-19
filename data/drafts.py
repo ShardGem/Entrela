@@ -25,6 +25,12 @@ class DraftStore:
         state = raw.get("state")
         if not isinstance(state, dict):
             raise ValueError("Conteúdo de rascunho inválido")
+        return self.validate_state(state)
+
+    def validate_state(self, state):
+        """Shared validation for recovery files and per-experiment drafts."""
+        if not isinstance(state, dict):
+            raise ValueError('Conteúdo de rascunho inválido')
         json.dumps(state,allow_nan=False)
         self._text_fields(state,("template_name",))
         history = state.get("editor_history",[])

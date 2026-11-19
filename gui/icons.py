@@ -89,6 +89,12 @@ _BODIES = {
 }
 
 _BODIES.update({
+    "export": '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+    "save": '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM7 3v6h10V3M7 21v-8h10v8"/>',
+    "book": '<path d="M12 6C9 3 5 3 2 4v16c4-1 7-1 10 1 3-2 6-2 10-1V4c-3-1-7-1-10 2zm0 0v15"/>',
+    "arrow-right": '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+    "layers": '<path d="m12 3 10 5-10 5L2 8l10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/>',
+
     "group-start": '<circle cx="12" cy="12" r="9"/><path d="m16 8-3 5-5 3 3-5 5-3z"/>',
     "group-lab": '<path d="M9 3h6M10 3v6l-6 10a1.3 1.3 0 0 0 1 2h14a1.3 1.3 0 0 0 1-2L14 9V3M7 15h10M10 18h.01M14 12h.01"/>',
     "group-research": '<path d="m9 3 5 5-3 3-5-5 3-3zM13 7l3-3M9 11l-2 2M4 21h16M10 14a4 4 0 0 0 8 0V9M7 17v4M17 18v3"/>',

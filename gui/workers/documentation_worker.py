@@ -59,6 +59,12 @@ class DocumentationWorker(QThread):
                 export_documentation(self.experiments,self.path,analyses,self.annotations,self.protocols,
                                      self.include_gif,self.max_frames,self.frame_ms,
                                      report_options=self.report_options,raster_dpi=self.export_dpi,comparison_mode=self.comparison_mode,**callbacks)
+            from hashlib import sha256
+            from pathlib import Path
+            digest = sha256()
+            with Path(self.path).open('rb') as stream:
+                for chunk in iter(lambda: stream.read(1024*1024), b''): digest.update(chunk)
+            self.artifact_checksum = digest.hexdigest()
             self.completed.emit(str(self.path))
         except SimulationCancelled:
             self.cancelled.emit()

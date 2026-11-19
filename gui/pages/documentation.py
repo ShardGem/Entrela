@@ -11,6 +11,7 @@ class DocumentationPage(PageBase):
     cancel_requested=Signal()
     comparison_changed=Signal()
     analysis_selected=Signal(str,str)
+    artifact_requested=Signal(str)
 
     def __init__(self,parent=None):
         super().__init__("Documentação e evidências","Exporte dados, figuras, animações e a origem de cada resultado.",parent)
@@ -128,7 +129,10 @@ class DocumentationPage(PageBase):
     def open_export(self, kind=None):
         if kind is not None:
             self.format.setCurrentIndex(max(0, self.format.findData(kind)))
-        self.export_dialog.open()
+        if hasattr(self, 'embedded_export'):
+            self.embedded_export()
+        else:
+            self.export_dialog.open()
 
     def _format_changed(self, *_):
         kind = self.format.currentData()
@@ -140,13 +144,15 @@ class DocumentationPage(PageBase):
 
     def _generate(self):
         kind = self.format.currentData()
-        self.export_dialog.hide()
+        if not hasattr(self, 'embedded_export'):
+            self.export_dialog.hide()
         self.export_requested.emit(kind)
 
     def _open(self,row,column):
         data=self.table.item(row,0).data(Qt.UserRole)
         if data:
-            self.analysis_selected.emit(*data)
+            if data[0] == 'artifact': self.artifact_requested.emit(data[1])
+            else: self.analysis_selected.emit(*data)
 
     def _apply_template(self):
         complete=self.report_template.currentData()=="complete"
@@ -193,6 +199,18 @@ class DocumentationPage(PageBase):
                 if col==0:
                     item.setData(Qt.UserRole,payload)
                 self.table.setItem(row,col,item)
+
+    def add_artifacts(self, entries, annotations):
+        for entry in entries:
+            row = self.table.rowCount(); self.table.insertRow(row)
+            names = [annotations.get(key, {}).get('title') or 'Execução preservada' for key in entry.get('source_ids', [])]
+            values = [' · '.join(names), entry['name'], 'Arquivo · ' + entry.get('kind', ''),
+                      'Fontes registradas; localização original do arquivo', entry.get('created_at', '')]
+            for column, text in enumerate(values):
+                item = QTableWidgetItem(str(text))
+                item.setToolTip(str(entry.get('path', '')) if column == 1 else str(text))
+                if column == 0: item.setData(Qt.UserRole, ('artifact', entry['path']))
+                self.table.setItem(row, column, item)
 
     def set_running(self,running):
         self.import_button.setEnabled(not running)

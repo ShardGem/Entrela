@@ -6,14 +6,18 @@ from PySide6.QtWidgets import (
 )
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
-from PySide6.QtCore import QEvent, QTimer
+from PySide6.QtCore import QEvent, QTimer, Signal
 
 
 class ResultsTab(QScrollArea):
+    frame_requested = Signal(int)
     def __init__(self, parent=None):
         super().__init__(parent)
         self._counts = {}
+        self._final_probabilities = None
+        self._frame_index = 0
         self._hist_title = "Distribuição observada"
+        self.source_title = "Execução selecionada"
         self._probabilities = None
         self._times = None
         self._time_unit = "Tempo (adimensional, ℏ=1)"
@@ -41,7 +45,8 @@ class ResultsTab(QScrollArea):
         self.canvas_hist = MplCanvas(self)
         self.canvas_evol = MplCanvas(self)
         self.hist_measure = QComboBox()
-        self.hist_measure.addItems(["Contagens", "Frequência observada"])
+        self.hist_measure.addItems(["Contagens", "Frequência observada", "Probabilidade calculada · estado final"])
+        self.hist_measure.model().item(2).setEnabled(False)
         self.hist_measure.setAccessibleName("Unidade da distribuição observada")
         self.hist_measure.setToolTip("Contagens são medições observadas. Frequência divide cada contagem pelo total observado; não é uma probabilidade exata do estado.")
         self.hist_measure.currentIndexChanged.connect(self._render_histogram)
@@ -77,6 +82,11 @@ class ResultsTab(QScrollArea):
         self._show_plot(0)
         self.canvas_hist.set_value_lookup(self._histogram_value)
         self.canvas_evol.set_value_lookup(self._evolution_value)
+        self.canvas_evol.mpl_connect('button_press_event', self._pick_snapshot)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._render_evolution()
 
     def _show_plot(self, index):
         for i, pane in enumerate(self._figure_panes):
@@ -108,11 +118,37 @@ class ResultsTab(QScrollArea):
     def _render_histogram(self, *_):
         from core.figures import draw_histograms
         from gui.widgets.plot_canvas import style_figure
-        draw_histograms(self.canvas_hist.fig, [self._counts],
-                        frequency=self.hist_measure.currentIndex() == 1,
-                        colors=(PALETTE.primary,), label_size=10, title=self._hist_title)
+        calculated = self.hist_measure.currentIndex() == 2 and self._final_probabilities is not None
+        values = self._counts
+        if calculated:
+            width = int(np.log2(len(self._final_probabilities)))
+            values = {f'{i:0{width}b}': float(p) for i, p in enumerate(self._final_probabilities)}
+        draw_histograms(self.canvas_hist.fig, [values], frequency=calculated or self.hist_measure.currentIndex() == 1,
+                        colors=(PALETTE.primary,), labels=[self.source_title], label_size=10,
+                        title='Probabilidade calculada do estado final' if calculated else self._hist_title)
+        if calculated:
+            self.canvas_hist.fig.axes[0].set_ylabel('Probabilidade calculada (%)')
         style_figure(self.canvas_hist.fig)
         self.canvas_hist.draw()
+
+    def set_source_title(self, title):
+        self.source_title = title
+        self._render_histogram()
+
+    def set_final_state(self, state):
+        self._final_probabilities = None if state is None else np.asarray(state.probabilities())
+        self.hist_measure.model().item(2).setEnabled(state is not None)
+        if state is None and self.hist_measure.currentIndex() == 2:
+            self.hist_measure.setCurrentIndex(0)
+        self._render_histogram()
+
+    def _pick_snapshot(self, event):
+        if event.inaxes is None or event.xdata is None or self._times is None or not len(self._times): return
+        self.frame_requested.emit(int(np.argmin(abs(self._times - event.xdata))))
+
+    def select_frame(self, index):
+        self._frame_index = index
+        if self.isVisible(): self._render_evolution()
 
     def exibir_evolucao_temporal(self, states, times=None, time_unit="Tempo (adimensional, ℏ=1)"):
         previous_dim = None if self._probabilities is None else self._probabilities.shape[1]
@@ -158,10 +194,22 @@ class ResultsTab(QScrollArea):
                            indices=self._manual_states if criterion == 2 else None,
                            criterion=("peak", "final", "manual")[criterion], time_unit=self._time_unit,
                            colors=(PALETTE.q1, PALETTE.q2, PALETTE.q3, PALETTE.q4, PALETTE.text_muted))
+        for line in self.canvas_evol.fig.axes[0].lines:
+            line.set_marker('o'); line.set_markersize(4)
+        if self._times is not None and len(self._times):
+            index = min(self._frame_index, len(self._times)-1)
+            self.canvas_evol.fig.axes[0].vlines(self._times[index], 0, 1, color=PALETTE.text_dim, linestyle=':', label='_snapshot')
         style_figure(self.canvas_evol.fig)
         self.canvas_evol.draw()
 
     def _histogram_value(self, event):
+        if self.hist_measure.currentIndex() == 2 and self._final_probabilities is not None:
+            for index, bar in enumerate(self.canvas_hist.fig.axes[0].patches):
+                if bar.contains(event)[0]:
+                    probability = self._final_probabilities[index]
+                    width = int(np.log2(len(self._final_probabilities)))
+                    return f'Estado |{index:0{width}b}⟩\nProbabilidade calculada: {probability:.16g} ({probability*100:.12g}%)\nFonte: estado final calculado; não é frequência de shots.'
+            return None
         total = sum(self._counts.values())
         for state, bar in zip(sorted(self._counts), self.canvas_hist.fig.axes[0].patches):
             if bar.contains(event)[0]:

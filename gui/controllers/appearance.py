@@ -94,6 +94,10 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", dens
 
     for widget in window.findChildren(QWidget):
         if isinstance(widget, QTableView):
+            numeric_font = QFont(window.font())
+            if hasattr(QFont, 'Tag'):
+                numeric_font.setFeature(QFont.Tag.fromString('tnum'), 1)
+            widget.setFont(numeric_font)
             widget.verticalHeader().setDefaultSectionSize(table_row_height(widget, density, font_size))
         if widget.styleSheet():
             current = widget.styleSheet()

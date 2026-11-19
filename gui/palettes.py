@@ -23,25 +23,28 @@ LIGHT = {
 }
 NAVY = {
     **DARK,
-    "bg": "#0c1524", "bg_elevated": "#121f32", "surface": "#1a2a40",
-    "surface_hover": "#21344d", "surface_active": "#29415b",
-    "border": "#2c405a", "border_strong": "#637f9e",
-    "text": "#e5eef9", "text_muted": "#adc0d7", "text_dim": "#9fb5cf",
-    "primary": "#86baff", "primary_hover": "#b0d2ff", "primary_pressed": "#659fea",
-    "primary_muted": "#203750", "primary_faint": "#203750",
-    "info": "#86baff", "info_bg": "#203750", "q1": "#86baff",
+    "bg": "#101923", "bg_elevated": "#182831", "surface": "#20343f",
+    "surface_hover": "#29424f", "surface_active": "#304f5e",
+    "border": "#304654", "border_strong": "#698c9f",
+    "text": "#EAF6FA", "text_muted": "#b9cfd9", "text_dim": "#9FBAC8",
+    "primary": "#88D1E8", "primary_hover": "#b2e4f2", "primary_pressed": "#69b8d1",
+    "primary_muted": "#274957", "primary_faint": "#203c49",
+    "primary_on": "#0b202b", "text_on_primary": "#0b202b",
+    "action_bg": "#88D1E8", "action_hover": "#b2e4f2", "action_pressed": "#69b8d1", "action_on": "#0b202b",
+    "info": "#88D1E8", "info_bg": "#203c49", "q1": "#88D1E8", "q2": "#a9a7df",
+    "q3": "#91bbce", "q4": "#d6bf95",
 }
 
 THEMES = {"dark": DARK, "light": LIGHT, "navy": NAVY}
 THEME_CHOICES = (
-    ("Grafite · padrão Entrela", "dark"),
+    ("Grafite", "dark"),
     ("Claro científico", "light"),
-    ("Azul escuro", "navy"),
+    ("Azul Entrela · padrão", "navy"),
     ("Automático · acompanhar o sistema", "auto"),
 )
 THEME_DESCRIPTIONS = {
     "dark": "Grafite: superfícies neutras, painéis contínuos e azul para destacar ações, foco e seleção.",
     "light": "Claro científico: fundo claro e destaque azul para leitura de parâmetros, tabelas e resultados.",
-    "navy": "Azul escuro: superfícies azuladas e destaque azul suave para explorar circuitos e visualizações.",
+    "navy": "Azul Entrela: superfícies azul-petróleo foscas e ciano suave para destacar a ação principal.",
     "auto": "Automático: alterna entre Grafite e Claro científico conforme a aparência do sistema operacional.",
 }

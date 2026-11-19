@@ -24,6 +24,7 @@ from gui.formatting import quantity
 
 class ResultsPage(PageBase):
     history_requested = Signal()
+    edit_config_requested = Signal()
     report_requested = Signal()
     rerun_requested = Signal()
     save_requested = Signal()
@@ -94,6 +95,11 @@ class ResultsPage(PageBase):
                 self.add_action(button)
             else:
                 button.hide()
+        self.btn_edit = SecondaryButton('Editar configuração', icon='settings')
+        self.btn_edit.setToolTip('Criar uma cópia editável da configuração desta execução. Não executa o rascunho atual.')
+        self.btn_edit.clicked.connect(self.edit_config_requested.emit)
+        self.add_action(self.btn_edit)
+        self.btn_rerun.setText('Reexecutar configuração registrada')
         self.export_menu = QMenu(self)
         self.export_button = QToolButton()
         self.export_button.setText('Exportar')
@@ -114,6 +120,7 @@ class ResultsPage(PageBase):
         for widget in (self.details, self.tabs, self.metric_grid, self.science_note, self.reproduction_status):
             widget.setVisible(available)
         self.export_button.setEnabled(available)
+        self.btn_edit.setEnabled(available)
 
     def _arrange_result_view(self, *_):
         summary = self.tabs.currentWidget() in (self.results_tab, self.interpretation)
@@ -139,6 +146,7 @@ class ResultsPage(PageBase):
 
     def set_experiment_title(self, title):
         self._display_title = title
+        self.results_tab.set_source_title(title)
         if getattr(self, "_experiment", None) is not None:
             self._update_details()
 
@@ -167,12 +175,16 @@ class ResultsPage(PageBase):
     def show_experiment(self, experiment):
         self._set_available(True)
         self._experiment = experiment
+        self.results_tab.set_final_state(experiment.result.final_state)
         self.state_inspector.set_state(experiment.result.final_state,
                                        experiment.result.ideal_final_state,
                                        "Estado final da execução · calculado pelo simulador")
         self._display_title = experiment_title(experiment)
         r, c = experiment.result, experiment.config
-        self.btn_rerun.setText("Reproduzir ZNE" if r.mitigation else "Reexecutar")
+        self.btn_rerun.setText("Reproduzir ZNE" if r.mitigation else "Reexecutar configuração registrada")
+        self.card_fid._label.setText('Fidelidade do estado de origem' if r.mitigation else 'Fidelidade ao circuito sem ruído')
+        self.card_pur._label.setText('Pureza global da origem' if r.mitigation else 'Pureza global')
+        self.card_erg._label.setText('Energia da origem ⟨H⟩' if r.mitigation else 'Energia ⟨H⟩')
         self.btn_rerun.setToolTip("Recalcula a análise ZNE com método, fatores, shots e seed registrados; preserva as métricas da fonte." if r.mitigation else "Executa novamente a configuração com a semente efetiva registrada.")
         self._update_details()
         self.update_metrics(r.fidelity, r.purity, r.energy)
@@ -194,8 +206,8 @@ class ResultsPage(PageBase):
                 [
                     bits,
                     str(count),
-                    f"{count / c.shots:.6f}",
-                    "—" if probabilities is None else f"{probabilities[index]:.6f}",
+                    f"{count / c.shots:.12g}",
+                    "—" if probabilities is None else f"{probabilities[index]:.12g}",
                 ]
             ):
                 self.table.setItem(index, column, QTableWidgetItem(text))

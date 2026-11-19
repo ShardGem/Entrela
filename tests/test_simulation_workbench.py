@@ -113,15 +113,13 @@ def test_example_menu_respects_draft_protection_and_never_runs(window, monkeypat
     panel.spin_J.setValue(.321)
     expected = panel.get_config()
     action = next(action for action in page.examples_button.menu().actions() if 'Bell' in action.text())
-    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.Cancel)
-    action.trigger()
-    assert panel.get_config() == expected
-    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.Yes)
     action.trigger()
     assert panel.get_config() == create_example_config('bell')
+    previous = next(w for w in window.projects.store.works() if w['id'] != window.projects.active_id)
+    window.projects.open_work(previous['id'])
+    assert panel.get_config() == expected
     assert window._current_worker is None
     assert not window.repository.list_summaries()
-
 
 def test_expanded_sections_and_presentation_survive_restart(window, qt_app):
     page = window.page_simulation

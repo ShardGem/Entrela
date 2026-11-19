@@ -165,8 +165,8 @@ class MitigationPage(PageBase):
                 [0],
                 [m["extrapolated"]],
                 yerr=[m["extrapolated_stderr"]],
-                fmt="s",
-                color=PALETTE.success,
+                fmt="D",
+                color=PALETTE.q2,
                 label="ZNE ± erro padrão plug-in",
             )
             if "ideal_observable" in m:
@@ -174,7 +174,7 @@ class MitigationPage(PageBase):
                     m["ideal_observable"],
                     color=PALETTE.text,
                     linestyle="--",
-                    label="Z ideal",
+                    label="Referência: mesmo circuito sem ruído",
                 )
                 self.summary.setText(
                     self.summary.text()
@@ -182,7 +182,7 @@ class MitigationPage(PageBase):
                     + f"Graus de liberdade residuais: {m['degrees_of_freedom']}. "
                     + "O erro padrão propagado é estimado; não é um intervalo de confiança do alvo de ruído zero."
                 )
-            ax.set_xlabel("Fator de ruído efetivo")
+            ax.set_xlabel("Fator de ruído efetivo (0 = ruído zero)")
             ax.set_ylabel("⟨Z⟩")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text, fontsize=8)
         self.canvas.draw_idle()

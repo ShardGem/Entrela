@@ -88,6 +88,7 @@ class ConfigPanel(QWidget):
         self._section_scroll_timer.setInterval(0)
         self._section_scroll_timer.timeout.connect(self._scroll_to_section)
         self._inspector_mode = False
+        self.external_steps = False
         self.current_mode, self.current_section = "guided", "system"
         root = QVBoxLayout(self)
         root.setSpacing(12)
@@ -354,8 +355,8 @@ class ConfigPanel(QWidget):
     def _present(self):
         guided = self.current_mode == "guided"
         compact = self._compact_sections or self._inspector_mode
-        self.section_nav.setVisible(guided and not compact)
-        self.section_selector.setVisible(guided and compact)
+        self.section_nav.setVisible(self.external_steps or (guided and not compact))
+        self.section_selector.setVisible(guided and compact and not self.external_steps)
         self.parameter_title.setVisible(not self._inspector_mode and not (guided and compact))
         blocker = QSignalBlocker(self.section_selector)
         self.section_selector.setCurrentIndex(self.section_selector.findData(self.current_section))
@@ -380,8 +381,8 @@ class ConfigPanel(QWidget):
             self.section_buttons[key].setChecked(key == self.current_section)
         for label in self.descriptions:
             label.setVisible(self.current_mode == "guided" and self.font().pixelSize() < 20)
-        self.btn_back.setVisible(self.current_mode == "guided")
-        self.btn_next.setVisible(self.current_mode == "guided")
+        self.btn_back.setVisible(self.current_mode == "guided" and self.font().pixelSize() < 20)
+        self.btn_next.setVisible(self.current_mode == "guided" and self.font().pixelSize() < 20)
         self.btn_back.setEnabled(self.current_section != "system")
         self.btn_next.setEnabled(self.current_section != "execution")
 
@@ -442,6 +443,8 @@ class ConfigPanel(QWidget):
             message = ""
         except ValueError as exc:
             message = str(exc)
+        if thermal and noise.t2_us > 2 * noise.t1_us:
+            message = f"T₂ = {noise.t2_us:g} µs excede 2T₁. Com T₁ = {noise.t1_us:g} µs, o máximo permitido é {2 * noise.t1_us:g} µs."
         self.validation_message.setText(message)
         self.validation_message.setVisible(bool(message))
         self.btn_fix_t2.setVisible(thermal and noise.t2_us > 2 * noise.t1_us)
@@ -481,6 +484,8 @@ class ConfigPanel(QWidget):
             self.spin_shots.value(),
             int(seed) if seed else None,
         )
+        if config.noise.enabled and config.noise.kind == 'Termico' and config.noise.t2_us > 2 * config.noise.t1_us:
+            raise ValueError(f"T₂ deve ser ≤ {2 * config.noise.t1_us:g} µs (2T₁ para T₁ = {config.noise.t1_us:g} µs).")
         config.validate()
         return config
 
@@ -538,6 +543,8 @@ class ConfigPanel(QWidget):
         columns = max(1, min(len(buttons), (max(1, self.width()) + 4) // (widest + 4)))
         if sum(button.sizeHint().width() for button in buttons)+4*(len(buttons)-1) <= self.width():
             columns = len(buttons)
+        if self.external_steps:
+            columns = 1
         if columns == self._section_columns:
             return
         for column in range(max(self._section_columns, columns)):

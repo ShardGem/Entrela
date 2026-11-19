@@ -121,7 +121,8 @@ def test_export_options_open_in_context_and_keep_the_source(window):
     window._show_page('results')
     window._open_export_dialog('pdf')
     dialog = window.page_documentation.export_dialog
-    assert dialog.isVisible() and window.is_page_active('results')
+    assert dialog.isVisible() and window.stack.currentWidget() is window.page_notebook
+    assert window.page_notebook.tabs.currentWidget() is window.page_notebook.report_workspace
     assert window._current_experiment is record
     assert window.page_documentation.format.currentData() == 'pdf'
     dialog.close()
@@ -202,9 +203,11 @@ def test_task_routes_fit_and_keep_execution_actions_reachable(window, qt_app, th
         assert window.pages[key]._scroll.horizontalScrollBar().maximum() == 0
     window._show_page('simulation')
     settle(qt_app)
-    for button in (window.page_simulation.btn_run, window.page_simulation.examples_button):
-        assert button.isVisible()
-        assert window.rect().contains(button.mapTo(window, button.rect().center()))
+    button = window.page_simulation.btn_run
+    assert button.isVisible()
+    assert window.rect().contains(button.mapTo(window, button.rect().center()))
+    assert window.topbar.destinations['examples'].isVisible()
+    assert window.topbar.destinations['examples'].accessibleName() == 'Biblioteca'
 
 
 def test_final_bloch_export_action_is_visible_and_preserves_provenance(window, qt_app, tmp_path, monkeypatch):

@@ -45,7 +45,15 @@ class NavigationController:
         w._current_page = key
         root = ROOT_FOR_PAGE[key]
         self.last_for_root[root] = key
-        if root == 'simulation':
+        if key in ('catalog', 'examples'):
+            w.stack.setCurrentWidget(w.page_catalog)
+            if key == 'examples': w.page_catalog.tabs.setCurrentIndex(0)
+        elif key in ('notebook', 'library', 'documentation'):
+            w.stack.setCurrentWidget(w.page_notebook)
+            if key == 'library':
+                w.page_notebook.tabs.setCurrentIndex(0); w.page_notebook.scope.setCurrentIndex(1)
+            elif key == 'documentation': w.page_notebook.tabs.setCurrentIndex(1)
+        elif root == 'simulation':
             w.stack.setCurrentWidget(w.page_workspace)
             w.page_workspace.select_page(key)
         elif root in w.section_workspaces:
@@ -54,21 +62,47 @@ class NavigationController:
             w.stack.setCurrentWidget(section)
         else:
             w.stack.setCurrentWidget(w.pages[key])
-        selected = key
-        circuit_inspection = key == 'circuit' and w.page_workspace._route == 'circuit:inspect'
-        if circuit_inspection:
-            selected = 'results'
-        w.sidebar.set_active(selected)
-        detail = PAGE_LABELS[key]
-        if root == 'simulation':
-            detail = w.page_workspace.view_selector.currentText()
-        elif root in w.section_workspaces:
-            detail = w.section_workspaces[root].selector.currentText()
-        title = 'Circuito executado' if circuit_inspection else NAV_LABELS[key]
-        breadcrumb = PAGE_LABELS[root]
-        if detail != title and detail != breadcrumb:
-            breadcrumb += ' · ' + detail
-        w.topbar.set_context(title, breadcrumb)
+        w.sidebar.set_active(key)
+        title = NAV_LABELS.get(key, PAGE_LABELS.get(key, key))
+        controller = getattr(w, 'projects', None)
+        project = controller.project if controller else None
+        preparation = key == 'simulation' or (key == 'circuit' and w.page_workspace._route == 'circuit:edit')
+        activity = root == 'simulation' or (key == 'comparison' and w._current_experiment is not None)
+        active = controller.active if controller else None
+        if not preparation and key in ('results', 'bloch', 'comparison') and w._current_experiment is not None:
+            try:
+                project = w._workspace_library().read()['annotations'].get(w._current_experiment.id, {}).get('project', '')
+            except (OSError, ValueError, TypeError):
+                pass
+        destination = 'examples' if key in ('catalog', 'examples') else 'docs' if key == 'docs' else 'dashboard'
+        w.topbar.set_destination(destination if key != 'settings' else '')
+        path = [('Projetos', 'projects')]
+        if destination == 'examples': path = [('Biblioteca', 'examples')]
+        elif key == 'docs': path = [('Aprender', 'docs')]
+        elif key == 'settings': path = [('Preferências', '')]
+        else:
+            if project is not None: path.append((project or 'Sem projeto', 'project:' + project))
+            if activity:
+                name = ((w.page_circuit.editor.circuit_name.text() if key == 'circuit' else w.page_simulation.experiment_name.text()) or (active or {}).get('title', 'Rascunho')) if preparation else (w._experiment_name(w._current_experiment) if w._current_experiment else 'Ainda sem execução')
+                path.append((name, ''))
+        if key == 'dashboard': title = (project or ('Sem projeto' if project == '' else 'Projetos')) + (' · Experimentos' if w.page_dashboard.mode == 'experiments' else '')
+        if key in ('results', 'bloch'): title = 'Observar execução'
+        if key == 'simulation': title = 'Preparar simulação'
+        if key == 'circuit': title = 'Editor de circuitos' if preparation else 'Circuito da execução'
+        if hasattr(w, 'export_bloch_view'):
+            w.export_bloch_view.setVisible(key == 'bloch')
+            w.export_bloch_view.setText('' if w.width() < 1180*max(1, w.font().pixelSize()/15) else 'Exportar Bloch…')
+            w.export_bloch_view.setAccessibleName('Exportar a visualização de Bloch')
+        w.topbar.set_context(title)
+        w.topbar.set_path(path)
+        w.topbar.activities.setVisible(activity)
+        w.topbar.set_activity(0 if preparation else 2 if key == 'comparison' else 1, w._current_experiment is not None)
+        w.topbar.project_tabs.setVisible(project is not None and key in ('dashboard', 'history', 'notebook', 'library', 'documentation'))
+        from PySide6.QtCore import QSignalBlocker
+        blocker = QSignalBlocker(w.topbar.project_tabs)
+        w.topbar.project_tabs.setCurrentIndex((1 if w.page_dashboard.mode == 'experiments' else 0) if key == 'dashboard' else 1 if key == 'history' else 3 if key == 'documentation' else 2)
+        del blocker
+        w.topbar.tools.setVisible(destination == 'dashboard')
         if hasattr(w, 'layout_controller'):
             w.layout_controller.timer.start()
         w._update_tutorial()
@@ -77,6 +111,10 @@ class NavigationController:
         w = self.window
         if key not in w.pages:
             return False
+        if key in ('catalog', 'examples'):
+            return w.stack.currentWidget() is w.page_catalog and (key != 'examples' or w.page_catalog.tabs.currentIndex() == 0)
+        if key in ('notebook', 'library', 'documentation'):
+            return w.stack.currentWidget() is w.page_notebook and (key == 'notebook' or (w.page_notebook.tabs.currentIndex() == 0 if key == 'library' else w.page_notebook.tabs.currentIndex() in (1, 2)))
         root = ROOT_FOR_PAGE[key]
         if root == 'simulation':
             return w.stack.currentWidget() is w.page_workspace and w.page_workspace.current_page_key == key

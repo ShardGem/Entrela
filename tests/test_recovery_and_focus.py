@@ -190,17 +190,15 @@ def test_recovery_can_restore_replaced_named_circuit_after_restart(window):
 def test_replacing_form_checks_name_and_description_even_when_parameters_unchanged(window,monkeypatch):
     page = window.page_simulation
     config = page.config_panel.get_config()
-    page.experiment_name.setText("Planejamento independente")
-    page.experiment_description.setText("Não substituir silenciosamente")
-    monkeypatch.setattr(QMessageBox,"question",lambda *args: QMessageBox.No)
-    window._load_example("bell")
-    assert page.experiment_name.text() == "Planejamento independente"
+    page.experiment_name.setText('Planejamento independente')
+    page.experiment_description.setText('Não substituir silenciosamente')
+    window._load_example('bell')
+    assert page.config_panel.get_config() == create_example_config('bell')
+    original = next(w for w in window.projects.store.works() if w['title'] == 'Planejamento independente')
+    window.projects.open_work(original['id'])
+    assert page.experiment_name.text() == 'Planejamento independente'
+    assert page.experiment_description.text() == 'Não substituir silenciosamente'
     assert page.config_panel.get_config() == config
-    monkeypatch.setattr(QMessageBox,"question",lambda *args: QMessageBox.Yes)
-    window._load_example("bell")
-    assert page.config_panel.get_config() == create_example_config("bell")
-    assert not window.drafts.identity_dirty
-
 
 def test_editor_execution_keeps_the_other_form_draft_independent(window):
     page = window.page_simulation

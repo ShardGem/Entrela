@@ -214,6 +214,7 @@ def test_focus_isolates_qubit_and_axes_option_does_not_hide_state(scene):
 
 
 def test_orientation_panel_expands_without_changing_camera(scene, qt_app):
+    scene.camera_section.set_expanded(True, animate=False)
     before = scene.canvas.camera_state()
     scene.camera_panel.orientation_toggle.click()
     qt_app.processEvents()

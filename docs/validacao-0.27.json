@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "entrela_version": "0.27.0",
+  "validated_at_utc": "2026-11-18T11:35:20.985571+00:00",
+  "baseline_commit": "866b99f0a71c8cfc3dbf626a50a268f8ba94c4b7",
+  "branch": "evolucao_entrela",
+  "environment": {
+    "platform": "Linux",
+    "python": "3.12.14",
+    "qt_platform": "offscreen",
+    "versions": {
+      "PySide6": "6.11.1",
+      "qiskit": "2.4.1",
+      "qiskit-aer": "0.17.2",
+      "matplotlib": "3.10.9",
+      "numpy": "2.4.6"
+    }
+  },
+  "tests": {
+    "method": "Rodada final em quatro processos Python, com no máximo dois simultâneos.",
+    "collected": 700,
+    "passed": 700,
+    "failed": 0,
+    "groups": [
+      {
+        "group": 1,
+        "exit_code": 0,
+        "files": 16,
+        "log": "validacao/0.27.0/pytest-grupo-1.txt",
+        "cases": 138,
+        "duration_s": 107.29
+      },
+      {
+        "group": 2,
+        "exit_code": 0,
+        "files": 15,
+        "log": "validacao/0.27.0/pytest-grupo-2.txt",
+        "cases": 132,
+        "duration_s": 91.35
+      },
+      {
+        "group": 3,
+        "exit_code": 0,
+        "files": 15,
+        "log": "validacao/0.27.0/pytest-grupo-3.txt",
+        "cases": 212,
+        "duration_s": 206.81
+      },
+      {
+        "group": 4,
+        "exit_code": 0,
+        "files": 15,
+        "log": "validacao/0.27.0/pytest-grupo-4.txt",
+        "cases": 218,
+        "duration_s": 184.89
+      }
+    ],
+    "new_regressions": [
+      "test_additive_projects_keep_legacy_links_and_unknown_metadata",
+      "test_duplicate_project_is_explicit_and_keeps_data",
+      "test_thermal_validation_clears_every_surface_and_shortcut",
+      "test_switch_work_preserves_both_kinds_and_invalid_controls",
+      "test_history_consult_does_not_replace_draft",
+      "test_completion_in_other_project_keeps_context_and_opens_exact_record",
+      "test_failed_draft_write_aborts_switch_and_preserves_recovery",
+      "test_activities_only_in_experiment_context",
+      "test_blue_default_and_existing_profile_priority",
+      "test_observation_switch_keeps_selected_snapshot",
+      "test_report_composer_reuses_existing_options_and_sources",
+      "test_new_work_clears_all_source_views",
+      "test_study_finishes_with_its_source_after_consulting_another_record",
+      "test_unsaved_background_execution_is_protected_before_close",
+      "test_export_registry_uses_worker_sources_and_file_integrity",
+      "test_project_draft_validation_preserves_corrupt_source",
+      "test_unexecuted_protocol_follows_its_work_and_the_execution"
+    ],
+    "post_suite": {
+      "passed": 33,
+      "command": "python -m pytest -q tests/test_appearance_preferences.py tests/test_visual_profiles.py tests/test_task_workspaces.py",
+      "scope": "Após a suíte, removida a linha visual obsoleta de navegação nas preferências e reduzido o espaçamento das abas com texto ampliado.",
+      "log": "validacao/0.27.0/aparencia-e-navegacao.txt"
+    }
+  },
+  "workflows": {
+    "command": "python scripts/cloud_smoke.py",
+    "passed": true,
+    "log": "validacao/0.27.0/fluxo-desktop.txt"
+  },
+  "previews": [
+    {
+      "command": "python scripts/preview_interface.py --all-pages --width 1440 --height 900",
+      "images": 48,
+      "passed": true,
+      "log": "validacao/0.27.0/previas-1440.txt"
+    },
+    {
+      "command": "python scripts/preview_interface.py --all-pages --width 1024 --height 768 --font-size 24",
+      "images": 48,
+      "passed": true,
+      "log": "validacao/0.27.0/previas-1024-texto-24.txt"
+    }
+  ],
+  "gallery": {
+    "command": "python scripts/capture_gallery.py --output docs/screenshots/0.27.0 --scale 2 --width 1440 --height 900",
+    "verification": "python scripts/verify_gallery.py docs/screenshots/0.27.0",
+    "images": 84,
+    "pages": 16,
+    "manifest": "screenshots/0.27.0/manifesto.json",
+    "source_data": "screenshots/0.27.0/cenarios.json",
+    "main_pixels": [
+      2880,
+      1800
+    ],
+    "compact_pixels": [
+      2048,
+      1536
+    ],
+    "checksum": "d8edfdf910715bf82f89fc37af101b84ac152b68004f451e4b25bec794f7a074"
+  },
+  "package": {
+    "file": "entrela-0.27.0-py3-none-any.whl",
+    "sha256": "c965e3ea6c0c361097c12b8bfad3ffecb0192070e2d0c51c6e0e59bc7cd7271d",
+    "isolated_smoke": true,
+    "command": "python scripts/package_smoke.py dist/entrela-0.27.0-py3-none-any.whl",
+    "log": "validacao/0.27.0/pacote-isolado.txt"
+  },
+  "archive": {
+    "file": "entrela-0.27.0-galeria.zip",
+    "bytes": 24899026,
+    "sha256": "2c43e0e9f3254da3b05f67bb4422fb89d8ba841bac9e299233decde465950484"
+  },
+  "source_hashes": "validacao/0.27.0/fontes-sha256.json",
+  "identity": {
+    "assets_unchanged_from_baseline": true,
+    "splash_unchanged": true
+  },
+  "limitations": [
+    "Sem validação em sessão desktop nativa; a revisão no Windows nativo permanece pendente.",
+    "O roteiro do relatório não substitui uma prévia paginada exata do PDF A4.",
+    "O índice de arquivos exportados conserva os destinos originais. Arquivos externos não são copiados pelo backup do espaço de trabalho; o pacote ZIP científico transporta dados e figuras."
+  ]
+}

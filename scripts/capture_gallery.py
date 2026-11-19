@@ -1,6 +1,6 @@
 """Gera a galeria completa com capturas Qt nativas e cenários executados.
 
-Use --scale 2 para renderizar 3840 × 2160 a partir da janela de 1920 × 1080.
+Use --scale 2 para renderizar 2880 × 1800 a partir da janela de 1440 × 900.
 Os dados, configurações e preferências usados são temporários.
 """
 from __future__ import annotations
@@ -147,7 +147,7 @@ class Gallery:
                  f'Janela principal: {self.args.width} × {self.args.height} pixels lógicos, escala {self.args.scale:g}×, fonte {self.args.font_size} px.', '',
                  'Os cenários foram executados em armazenamento temporário, com sementes registradas. '
                  'São demonstrações do aplicativo; não substituem os experimentos do TCC. '
-                 'A splash e as janelas de configurações/exportação conservam seus tamanhos próprios, também na escala declarada.', '',
+                 'A splash e o diálogo de configurações conservam seus tamanhos próprios. O relatório aparece integrado ao caderno.', '',
                  'As capturas de texto ampliado usam janela de 1024 × 768 pixels lógicos e fonte de 24 px. '
                  'Tema, tamanho do texto, resolução e escala de cada imagem ficam registrados no manifesto.', '',
                  'Clique nos nomes para abrir os arquivos originais. '
@@ -159,7 +159,7 @@ class Gallery:
                     lines.append(f"| [{item['title']}]({item['file']}) | {item['pixels'][0]} × {item['pixels'][1]} |")
             lines.append('')
         lines += ['## Como regenerar', '', 'A partir da raiz do projeto:', '', '```bash',
-                  f'python scripts/capture_gallery.py --output docs/screenshots/{__version__} --scale 2',
+                  f'python scripts/capture_gallery.py --output docs/screenshots/{__version__} --scale 2 --width 1440 --height 900',
                   '```', '', 'Use `--overwrite` somente para atualizar os arquivos gerados. '
                   'Nenhum experimento ou preferência pessoal é lido. '
                   'A validação destas imagens utiliza Qt offscreen no Linux; a revisão nativa no Windows permanece pendente.', '']
@@ -170,8 +170,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'work/galeria')
     parser.add_argument('--scale', type=int, choices=(1, 2), default=2)
-    parser.add_argument('--width', type=int, default=1920)
-    parser.add_argument('--height', type=int, default=1080)
+    parser.add_argument('--width', type=int, default=1440)
+    parser.add_argument('--height', type=int, default=900)
     parser.add_argument('--font-size', type=int, choices=range(13, 19), default=15)
     parser.add_argument('--overwrite', action='store_true')
     args = parser.parse_args()
@@ -209,7 +209,7 @@ def main():
         experiments = [ideal, noisy, custom]
         for experiment in experiments:
             repository.save(experiment)
-            library.annotate(experiment.id, 'Galeria do Entrela',
+            library.annotate(experiment.id, 'Ruído em Ising',
                              'Comparação entre configurações com parâmetros e semente registrados.',
                              ['documentação', 'simulação'], title=names[experiment.id],
                              description='Evolução e preparação de estados quânticos para explorar os recursos do Entrela.',
@@ -246,13 +246,26 @@ def main():
         select(noisy)
         window.page_simulation.experiment_name.setText(names[noisy.id])
         window._apply_draft(config, names[noisy.id])
+        window.projects.project = 'Ruído em Ising'
+        work = window.projects.store.create_work('Ising · despolarizador', 'Ruído em Ising', 'hamiltonian', window.drafts.workbench_state())
+        window.projects.active_id = work['id']
+        for record in (ideal, noisy): window.projects.store.link_execution(work['id'], record.id)
+        window.projects.store.annotate_project('Ruído em Ising', dict(objective='Como o ruído afeta a evolução de Ising?',
+            hypothesis='A despolarização pode reduzir a fidelidade ao mesmo circuito ideal e a pureza global.',
+            methodology='Comparar o mesmo sistema e protocolo, com semente 42 e 4.096 shots; registrar todas as fontes.'))
+        window.projects.open_project(None)
         gallery.show('dashboard')
-        gallery.capture('01-inicio/01-visao-geral.png', 'Visão geral do laboratório', 'dashboard')
+        gallery.capture('01-inicio/01-visao-geral.png', 'Projetos e retomada do trabalho', 'dashboard')
+        window.projects.open_project('Ruído em Ising')
+        gallery.capture('01-inicio/03-projeto.png', 'Projeto · experimentos e execuções recentes', 'dashboard')
         splash = SplashScreen()
         splash.show()
         gallery.capture('01-inicio/02-splash.png', 'Tela de abertura · imagens atuais do autor', 'splash', splash)
         splash.close()
         splash.deleteLater()
+        window.projects.refresh()
+        gallery.show('catalog')
+        gallery.capture('02-aprendizado/00-biblioteca.png', 'Biblioteca · exemplos e modelos pessoais', 'catalog')
         gallery.show('examples')
         window.page_examples.select_example('bell')
         gallery.capture('02-aprendizado/01-exemplos.png', 'Galeria de exemplos · Bell', 'examples')
@@ -323,6 +336,10 @@ def main():
         gallery.settle()
         bloch.canvas.fit_scene()
         gallery.capture('04-resultados/bloch-quatro-qubits.png', 'Evolução de quatro qubits em uma linha', 'bloch')
+        bloch.canvas.set_focus(0)
+        bloch.canvas.fit_scene()
+        gallery.capture('04-resultados/bloch-qubit-foco.png', 'Bloch · qubit, trajetória e métricas locais', 'bloch')
+        bloch.canvas.set_focus(-1)
         bloch.camera_toggle.setChecked(False)
         bloch._camera_chosen()
         gallery.settle()
@@ -379,7 +396,7 @@ def main():
         if not mitigated.result.mitigation:
             raise RuntimeError('ZNE não foi concluída.')
         experiments.append(mitigated)
-        library.annotate(mitigated.id, 'Galeria do Entrela', 'Extrapolação de Z0; métricas de estado preservadas da fonte.', ['documentação', 'ZNE'], title='Ising · extrapolação ZNE de Z0')
+        library.annotate(mitigated.id, 'Ruído em Ising', 'Extrapolação de Z0; métricas de estado preservadas da fonte.', ['documentação', 'ZNE'], title='Ising · extrapolação ZNE de Z0')
         window._refresh_history()
         gallery.show('mitigation')
         gallery.capture('05-pesquisa/mitigacao-zne.png', 'ZNE · medições, ajuste e limites', 'mitigation')
@@ -415,14 +432,17 @@ def main():
         window.page_library.show_configurations()
         gallery.capture('06-acervo/configuracoes-salvas.png', 'Biblioteca de configurações reutilizáveis', 'library', window.configuration_dialog)
         window.configuration_dialog.close()
+        gallery.show('notebook')
+        window.page_notebook.scope.setCurrentIndex(0)
+        gallery.capture('06-acervo/projeto-anotacoes.png', 'Caderno · objetivo, hipótese e metodologia do projeto', 'notebook')
         gallery.show('documentation')
         gallery.capture('06-acervo/evidencias.png', 'Evidências do estudo', 'documentation')
         window.page_documentation.open_export('pdf')
-        gallery.capture('06-acervo/documentacao.png', 'Preparar relatório científico', 'documentation', window.page_documentation.export_dialog)
+        gallery.capture('06-acervo/documentacao.png', 'Preparar relatório científico', 'documentation')
         window.page_documentation.export_dialog.close()
         for kind, title in [('zip', 'Pacote científico completo'), ('gif', 'Animação com snapshots reais')]:
             window.page_documentation.open_export(kind)
-            gallery.capture(f'06-acervo/exportacao-{kind}.png', title, 'documentation', window.page_documentation.export_dialog)
+            gallery.capture(f'06-acervo/exportacao-{kind}.png', title, 'documentation')
             window.page_documentation.export_dialog.close()
         gallery.show('settings')
         for slug, title, category in [('aparencia', 'Aparência e tipografia', 'Aparência'), ('acessibilidade', 'Acessibilidade', 'Acessibilidade'), ('execucao-avisos', 'Execução e notificações', 'Execução e avisos'), ('exportacao', 'Preferências de exportação', 'Exportação'), ('backup-exportacao', 'Dados e backup', 'Dados e backup')]:
@@ -430,12 +450,12 @@ def main():
             assert index >= 0, category
             window.page_settings.category.setCurrentIndex(index)
             gallery.capture(f'07-preferencias/{slug}.png', title, 'settings')
-        for theme, label in [('light', 'claro'), ('navy', 'azul-escuro')]:
+        for theme, label in [('light', 'claro'), ('dark', 'grafite')]:
             window.page_settings.theme.setCurrentIndex(window.page_settings.theme.findData(theme))
             gallery.show('results')
             results.tabs.setCurrentWidget(results.results_tab)
             gallery.capture(f'07-preferencias/tema-{label}.png', 'Resultados · tema ' + label, 'results')
-        window.page_settings.theme.setCurrentIndex(window.page_settings.theme.findData('dark'))
+        window.page_settings.theme.setCurrentIndex(window.page_settings.theme.findData('navy'))
         gallery.show('simulation')
         window._begin_tutorial()
         gallery.capture('02-aprendizado/tutorial.png', 'Tutorial de Bell com etapas verificáveis', 'simulation')
@@ -447,6 +467,9 @@ def main():
         window.resize(1024, 768)
         window._apply_draft(config, names[noisy.id])
         gallery.show('simulation')
+        window.page_simulation.compact_tabs.setCurrentIndex(0)
+        panel.set_section('noise')
+        gallery.capture('07-preferencias/texto-ampliado-preparar.png', '1024 × 768 · campos e execução com texto de 24 px', 'simulation', expected_size=(1024, 768))
         window.page_simulation.compact_tabs.setCurrentIndex(1)
         window.page_simulation.preview_tabs.setCurrentIndex(1)
         gallery.capture('07-preferencias/texto-ampliado-simulacao.png', '1024 × 768 · revisão com texto ampliado', 'simulation', expected_size=(1024, 768))
@@ -462,6 +485,14 @@ def main():
         window.page_history.set_detail(noisy, files=[])
         window.page_history.detail_tabs.setCurrentIndex(0)
         gallery.capture('07-preferencias/texto-ampliado-historico.png', '1024 × 768 · detalhes do histórico', 'history', expected_size=(1024, 768))
+        gallery.show('bloch')
+        bloch.visual_tabs.setCurrentIndex(0)
+        bloch.camera_toggle.setChecked(False)
+        bloch.canvas.set_focus(0)
+        bloch.canvas.fit_scene()
+        gallery.capture('07-preferencias/texto-ampliado-bloch.png', '1024 × 768 · Bloch e reprodução acessíveis', 'bloch', expected_size=(1024, 768))
+        gallery.show('catalog')
+        gallery.capture('07-preferencias/texto-ampliado-biblioteca.png', '1024 × 768 · biblioteca com texto ampliado', 'catalog', expected_size=(1024, 768))
         gallery.finish(experiments)
         guard.stop()
         window._unsaved_result = False
@@ -469,7 +500,7 @@ def main():
         window.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
         app.processEvents()
-    print(f'PASS: {len(gallery.images)} capturas; todas as 14 páginas documentadas; dados temporários.', flush=True)
+    print(f'PASS: {len(gallery.images)} capturas; todas as {len(window.pages)} páginas documentadas; dados temporários.', flush=True)
 
 
 if __name__ == '__main__':

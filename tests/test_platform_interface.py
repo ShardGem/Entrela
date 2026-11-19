@@ -34,11 +34,13 @@ def test_global_header_and_local_context_are_separate_without_hiding_tools(windo
     assert window.topbar.page_header.parent() is not window.topbar
     assert window.topbar.title.text() == 'Editor de circuitos'
     assert not window.sidebar.brand_box.isVisible()
-    assert set(window.pages) <= set(window.sidebar.buttons)
+    assert window.sidebar.isHidden()
+    assert window.topbar.tools.isVisible()
+    assert set(window.topbar.destinations) == {'dashboard', 'examples', 'docs'}
     assert window.sidebar._expanded_groups == {key for key, *_ in window.sidebar.GROUPS}
     assert 'IBM Plex Sans' in QFontInfo(window.topbar.title.font()).family()
     assert window.topbar.commands.accessibleName() == 'Buscar'
-    assert window.topbar.backend.text() == 'Simulador local'
+    assert window.topbar.preferences.accessibleName() == 'Preferências'
 
 
 def test_primary_action_contrast_and_customization_work_in_each_theme(window):

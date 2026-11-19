@@ -28,10 +28,10 @@ class LayoutController(QObject):
         except (TypeError, ValueError):
             stage = 0
         workspace._apply_route(workspace._last_result if stage == 1 else workspace._last_preparation)
-        self.defaults = {'preparation': [850, LAYOUT.inspector_width], 'history': [450, 650], 'concepts': [270, 740], 'states': [900, 320]}
-        if window.settings.value('layout/studio_schema', 0, type=int) < 1:
+        self.defaults = {'preparation': [200, 780, 320], 'history': [450, 650], 'concepts': [270, 740], 'states': [900, 320]}
+        if window.settings.value('layout/studio_schema', 0, type=int) < 2:
             window.settings.remove('layout/preparation')
-            window.settings.setValue('layout/studio_schema', 1)
+            window.settings.setValue('layout/studio_schema', 2)
         for key, splitter in self.splitters.items():
             self.restore_splitter(key)
             splitter.splitterMoved.connect(lambda *_: self.timer.start())

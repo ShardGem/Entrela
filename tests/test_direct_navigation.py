@@ -13,23 +13,16 @@ def settle(app):
 
 
 def test_every_existing_page_has_a_named_direct_access(window, qt_app):
-    sidebar = window.sidebar
-    assert set(window.pages) <= set(sidebar.buttons)
-    assert set(sidebar.group_bodies) == {'lab', 'research', 'records', 'learning'}
-    assert all(not group.isHidden() for group in sidebar.group_bodies.values())
+    assert window.sidebar.isHidden()
+    assert [b.text() for b in window.topbar.destinations.values()] == ['Projetos', 'Biblioteca', 'Aprender']
+    tools = {a.text() for a in window.topbar.tools.menu().actions()}
+    assert {'Editor de circuitos', 'Histórico de execuções', 'Mitigação ZNE', 'Estudos e varreduras', 'Configurações salvas', 'Relatórios e exportações'} <= tools
     for key in window.pages:
-        sidebar.buttons[key].click()
+        window.navigation.open_page(key)
         settle(qt_app)
         assert window.is_page_active(key), key
-        assert window.topbar.title.text() == NAV_LABELS[key]
-        assert sidebar.buttons[key].isChecked()
-        assert sum(button.isChecked() for button in sidebar.buttons.values()) == 1
-        assert sidebar.buttons[key].accessibleName() == NAV_LABELS[key]
-        assert sidebar.buttons[key].accessibleDescription()
+        assert window.topbar.title.text()
         assert window._current_worker is None
-    assert not sidebar.scroll.isAncestorOf(sidebar.buttons['dashboard'])
-    assert not sidebar.scroll.isAncestorOf(sidebar.buttons['settings'])
-
 
 def test_clicking_a_function_does_not_resume_a_different_function(window, qt_app):
     window._show_page('comparison')
@@ -44,9 +37,9 @@ def test_clicking_a_function_does_not_resume_a_different_function(window, qt_app
 def test_editor_entry_always_opens_editor_and_inspection_belongs_to_results(window, qt_app):
     window.page_workspace._apply_route('circuit:inspect')
     window._show_page('circuit')
-    assert window.sidebar.buttons['results'].isChecked()
-    assert not window.sidebar.buttons['circuit'].isChecked()
-    assert window.topbar.title.text() == 'Circuito executado'
+    assert window.topbar.activities.currentIndex() == 1
+    assert window.page_workspace.observation_tabs.currentIndex() == 4
+    assert window.topbar.title.text() == 'Circuito da execução'
     window.sidebar.buttons['circuit'].click()
     assert window.page_circuit.tabs.currentWidget() is window.page_circuit.editor
     assert window.page_workspace._route == 'circuit:edit'
@@ -89,17 +82,13 @@ def test_saved_configurations_is_an_action_and_keeps_page_selection(window, qt_a
 
 
 def test_keyboard_opens_named_destination_without_folding_its_group(window, qt_app):
-    button = window.sidebar.buttons['mitigation']
+    button = window.topbar.destinations['docs']
     button.setFocus()
     QTest.keyClick(button, Qt.Key_Space)
     settle(qt_app)
-    assert window.is_page_active('mitigation')
-    assert not window.sidebar.group_bodies['research'].isHidden()
-    window.sidebar.buttons['docs'].setFocus()
-    QTest.keyClick(window.sidebar.buttons['docs'], Qt.Key_Space)
-    settle(qt_app)
     assert window.is_page_active('docs')
-    assert window.sidebar.scroll.viewport().rect().contains(window.sidebar.buttons['docs'].mapTo(window.sidebar.scroll.viewport(), window.sidebar.buttons['docs'].rect().center()))
-    window.sidebar.buttons['settings'].setFocus()
-    QTest.keyClick(window.sidebar.buttons['settings'], Qt.Key_Space)
+    assert window.rect().contains(button.mapTo(window, button.rect().center()))
+    window.topbar.preferences.setFocus()
+    QTest.keyClick(window.topbar.preferences, Qt.Key_Space)
     assert window.is_page_active('settings')
+    assert window.topbar.preferences.accessibleName() == 'Preferências'

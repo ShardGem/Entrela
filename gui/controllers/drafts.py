@@ -145,6 +145,9 @@ class DraftController(QObject):
             return
         panel = self.window.page_analysis.protocol
         saved = self.protocols.get(identifier, self.protocols.get("draft", {}) if self.source is None else {})
+        if identifier and not identifier.startswith('work:') and self.source and self.source.startswith('work:') and identifier not in self.protocols:
+            saved = deepcopy(self.protocols.get(self.source, {}))
+            self.protocols[identifier] = deepcopy(saved)
         if self.source is None and identifier not in self.protocols and "draft" in self.protocols:
             self.protocols[identifier] = self.protocols.pop("draft")
         self.source = identifier
@@ -156,24 +159,45 @@ class DraftController(QObject):
         finally:
             self.restoring = False
 
+    def workbench_state(self):
+        """The same serialized controls are used by recovery and project switching."""
+        page = self.window.page_simulation
+        panel = page.config_panel
+        return dict(editor=self.window.page_circuit.editor.draft_state(),
+                    simulation=dict(name=page.experiment_name.text(), description=page.experiment_description.text(),
+                        controls=panel.coletar_tudo(), mode=panel.current_mode, section=panel.current_section,
+                        initial=panel.combo_initial.currentData(), order=panel.combo_order.currentData(),
+                        expanded_sections=[key for key, section in panel.sections.items() if section.is_expanded],
+                        description_expanded=page.description_toggle.isChecked(), review_expanded=page.science.is_expanded,
+                        committed_name=self.identity_baseline[0], committed_description=self.identity_baseline[1]))
+
+    def restore_workbench(self, snapshot):
+        self.restoring = True
+        try:
+            self.state.update(deepcopy(snapshot))
+            saved = self.state.get("simulation", {})
+            self.identity_baseline = (saved.get("committed_name", ""), saved.get("committed_description", ""))
+            self.restore()
+        finally:
+            self.restoring = False
+        self.schedule()
+
     def flush(self):
         if self.restoring:
             return True
         self.timer.stop()
         page = self.window.page_simulation
         panel = page.config_panel
-        state = dict(editor=self.window.page_circuit.editor.draft_state(),
-                     simulation=dict(name=page.experiment_name.text(), description=page.experiment_description.text(),
-                                     controls=panel.coletar_tudo(), mode=panel.current_mode,
-                                     section=panel.current_section,
-                                     initial=panel.combo_initial.currentData(), order=panel.combo_order.currentData(),
-                                     expanded_sections=[key for key,section in panel.sections.items() if section.is_expanded],
-                                     description_expanded=page.description_toggle.isChecked(), review_expanded=page.science.is_expanded,
-                                     committed_name=self.identity_baseline[0],committed_description=self.identity_baseline[1]),
-                     annotations=self.annotations, protocols=self.protocols,template_name=self.window.page_library.name.text(),
-                     editor_history=self.history[-10:])
+        state = dict(**self.workbench_state(), annotations=self.annotations, protocols=self.protocols,
+                     template_name=self.window.page_library.name.text(), editor_history=self.history[-10:])
+        if hasattr(self.window, 'projects'):
+            state['active_work_id'] = self.window.projects.active_id
         try:
             self.store.save(state)
+            projects = getattr(self.window, "projects", None)
+            if projects is not None:
+                projects.persist_active(state)
+
         except (OSError, ValueError, TypeError) as exc:
             self.error = "Não foi possível proteger os rascunhos: " + str(exc)
             self.indicator.setText("Rascunhos ainda não protegidos")

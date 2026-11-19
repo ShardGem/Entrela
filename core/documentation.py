@@ -218,6 +218,18 @@ def export_pdf(experiments, filepath, analyses=(), annotations=None, progress=No
                 for start in range(0,len(lines),47):
                     page(_text_page(title,"\n".join(lines[start:start+47])),title,text_page=True)
             page(_cover(experiments,annotations),"Resultados do experimento" if len(experiments)==1 else "Comparação de experimentos",text_page=True)
+            documented_projects = set()
+            for source in experiments:
+                project = (annotations or {}).get(source.id, {}).get('project_context', {})
+                if not project or project.get('name') in documented_projects:
+                    continue
+                documented_projects.add(project.get('name'))
+                fields = [("Objetivo", project.get('objective')), ("Hipótese", project.get('hypothesis')),
+                          ("Metodologia", project.get('methodology')), ("Interpretação", project.get('interpretation')),
+                          ("Próximos passos", project.get('next_steps'))]
+                content = "Anotações do projeto; interpretação do pesquisador, distinta dos resultados calculados.\n\n"
+                content += "\n\n".join(label + "\n" + value for label, value in fields if value)
+                text_pages("Projeto: " + project.get('name', ''), content)
             for i,e in enumerate(experiments):
                 annotation=(annotations or {}).get(e.id) or {}
                 fields=[("Descrição",annotation.get("description")),("Objetivo",annotation.get("objective")),

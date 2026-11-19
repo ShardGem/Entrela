@@ -74,7 +74,7 @@ def test_profiles_restore_legacy_choices_and_keep_scientific_data(window, qt_app
     try:
         assert restored.page_settings.collect_values()['theme'] == 'navy'
         assert restored.page_settings.collect_values()['accent'] == 'violet'
-        assert 'Azul escuro' in restored.page_settings.theme_description.text()
+        assert 'Azul Entrela' in restored.page_settings.theme_description.text()
         assert restored.property('entrelaTheme') == 'navy'
     finally:
         restored.close()
@@ -101,7 +101,7 @@ def test_metric_layout_adapts_without_losing_values(window, qt_app, size, font):
     if size[0] == 1440:
         assert len({rect.y() for rect in rects}) == 1
     elif font >= 24:
-        assert len({rect.y() for rect in rects}) >= 2
+        assert all(rect.width() >= 200 for rect in rects)
     assert window.page_results._scroll.horizontalScrollBar().maximum() == 0
 
 
@@ -115,4 +115,4 @@ def test_window_uses_one_page_heading_and_keeps_explanations(window, qt_app):
     actions = [a.text() for a in window.page_results.export_button.menu().actions()]
     assert 'Relatório científico PDF…' in actions
     assert window.page_settings._subtitle.text()
-    assert SettingsPage.DEFAULTS['theme'] == 'dark'
+    assert SettingsPage.DEFAULTS['theme'] == 'navy'

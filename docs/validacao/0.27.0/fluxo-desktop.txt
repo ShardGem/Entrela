@@ -1,0 +1,7 @@
+PASS: navigation across 16 pages
+PASS: run and persisted states, noise= False snapshots= False
+PASS: run and persisted states, noise= True snapshots= False
+PASS: run and persisted states, noise= False snapshots= True
+PASS: run and persisted states, noise= True snapshots= True
+PASS: ZNE analysis as independent record
+PASS: action-gated tutorial, JSON export/import and reopen after restart
