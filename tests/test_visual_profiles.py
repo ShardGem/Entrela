@@ -82,7 +82,7 @@ def test_profiles_restore_legacy_choices_and_keep_scientific_data(window, qt_app
 
 
 @pytest.mark.parametrize('size,font', [((1440, 960), 15), ((1024, 768), 15), ((1024, 768), 24)])
-def test_metric_layout_adapts_without_losing_values(window, qt_app, size, font):
+def test_inspector_keeps_metrics_in_a_readable_column(window, qt_app, size, font):
     experiment = run_experiment(create_example_config('bell'))
     window._current_experiment = experiment
     window._display_experiment(experiment)
@@ -98,10 +98,8 @@ def test_metric_layout_adapts_without_losing_values(window, qt_app, size, font):
     for i, rect in enumerate(rects):
         assert all(not rect.intersects(other) for other in rects[i + 1:])
         assert rect.right() < window.page_results.metric_grid.width()
-    if size[0] == 1440:
-        assert len({rect.y() for rect in rects}) == 1
-    elif font >= 24:
-        assert all(rect.width() >= 200 for rect in rects)
+    assert len({rect.y() for rect in rects}) == len(cards)
+    assert all(rect.width() >= 200 for rect in rects)
     assert window.page_results._scroll.horizontalScrollBar().maximum() == 0
 
 

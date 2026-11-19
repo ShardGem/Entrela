@@ -209,13 +209,14 @@ def test_import_creates_independent_record(window,monkeypatch,tmp_path):
     assert imported.result.metadata["imported_from_id"]==source.id
     assert window.repository.load(imported.id).config==source.config
 def test_command_palette_search_and_action(window):
+    current_page = window._current_page
     window._open_commands()
     palette=window.command_palette
     palette.search.setText("fidelidade")
     assert palette.list.count()==1
     palette._activate()
     assert window.help_dock.isVisible()
-    assert window._current_page=="dashboard"
+    assert window._current_page == current_page
 def test_history_search_filters_records(window):
     exp=run_experiment(replace(create_example_config("bell"),shots=64))
     window.repository.save(exp)
