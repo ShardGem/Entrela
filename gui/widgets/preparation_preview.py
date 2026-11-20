@@ -1,6 +1,6 @@
 """Vector schematic of the configured ideal preparation; never simulated data."""
 from PySide6.QtCore import Qt, QRectF, QPointF, QSize, QEvent
-from PySide6.QtGui import QPainter, QPen, QColor
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QFontMetrics
 from PySide6.QtWidgets import QWidget
 from gui.theme import PALETTE
 
@@ -32,7 +32,9 @@ class PreparationPreview(QWidget):
             self._fit_metrics()
 
     def _fit_metrics(self):
-        metrics = self.fontMetrics()
+        self._diagram_font = QFont(self.font())
+        self._diagram_font.setFamily("IBM Plex Mono")
+        metrics = QFontMetrics(self._diagram_font)
         self._gate_size = max(24, metrics.height()+6)
         self._row_height = self._gate_size+12
         self._label_width = metrics.horizontalAdvance("q3  |0⟩")+4
@@ -43,12 +45,9 @@ class PreparationPreview(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.setFont(self.font())
+        painter.setFont(self._diagram_font)
         p = PALETTE
         rect = QRectF(self.rect()).adjusted(1,1,-1,-1)
-        painter.setBrush(QColor(p.bg_elevated))
-        painter.setPen(QPen(QColor(p.border),1))
-        painter.drawRoundedRect(rect, 6, 6)
         if self.initial == "bell" and self.qubits != 2:
             painter.setPen(QColor(p.warning))
             painter.drawText(rect.adjusted(12,8,-12,-8),Qt.AlignCenter|Qt.TextWordWrap,"Bell requer dois qubits.\nAjuste o sistema para visualizar a preparação.")
@@ -59,15 +58,18 @@ class PreparationPreview(QWidget):
         gate_size = self._gate_size * scale
         extra = self.fontMetrics().height()+12 if self.qubits > rows else 0
         top = (self.height()-extra-(rows-1)*row_height)/2
-        start,end = self._label_width+30,self.width()-24
+        start, end = self._label_width + 30, self.width() - 15
         gate_x = start+(end-start)*.33
         control_x = start+(end-start)*.68
         for q in range(rows):
             y = top+q*row_height
             painter.setPen(QColor(p.text_muted))
             painter.drawText(QRectF(12,y-row_height/2,self._label_width,row_height),Qt.AlignVCenter|Qt.AlignLeft,f"q{q}  |0⟩")
-            painter.setPen(QPen(QColor(p.border_strong),1.2))
-            painter.drawLine(QPointF(start,y),QPointF(end,y))
+            painter.setPen(QPen(QColor(p.border_strong),1.1))
+            painter.drawLine(QPointF(start, y), QPointF(end, y))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(p.q1))
+            painter.drawEllipse(QPointF(start, y), 2.5, 2.5)
             if self.initial == "plus" or (self.initial == "bell" and q == 0):
                 painter.setPen(QPen(QColor(p.primary),1.2))
                 painter.setBrush(QColor(p.primary_faint))

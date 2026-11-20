@@ -21,12 +21,14 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QApplication,
+    QFrame,
     QTableWidget,
 )
 from gui.theme import build_qss
 from gui.branding import application_icon
 from gui.manual import WELCOME_HTML
 from gui.widgets.sidebar import Sidebar
+from gui.design_system import LAYOUT
 from gui.controllers.navigation import NavigationController
 from gui.controllers.layout import LayoutController
 from gui.widgets.dialogs import ConfigurationsDialog
@@ -49,7 +51,8 @@ from gui.pages.analysis import AnalysisPage
 from gui.pages.library import LibraryPage
 from gui.pages.documentation import DocumentationPage
 from gui.pages.experiment_workspace import ExperimentWorkspace
-from gui.controllers.appearance import apply_appearance, DARK
+from gui.controllers.appearance import apply_appearance
+from gui.palettes import DARK
 from gui.controllers.drafts import DraftController
 from gui.controllers.projects import ProjectController
 from gui.pages.catalog import CatalogPage
@@ -203,14 +206,15 @@ class MainWindow(QMainWindow):
         root.setObjectName("RootWidget")
         self.setCentralWidget(root)
         layout = QHBoxLayout(root)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, LAYOUT.frame_margin, LAYOUT.frame_margin, LAYOUT.frame_margin)
         layout.setSpacing(0)
         self.topbar = Topbar()
         self.sidebar = Sidebar()
         layout.addWidget(self.sidebar)
-        right = QWidget()
+        right = QFrame()
+        right.setObjectName("Workbench")
         body = QVBoxLayout(right)
-        body.setContentsMargins(0, 0, 0, 0)
+        body.setContentsMargins(1, 1, 1, LAYOUT.control_gap)
         body.setSpacing(0)
         body.addWidget(self.topbar)
         self.stack = QStackedWidget()
@@ -251,6 +255,7 @@ class MainWindow(QMainWindow):
         self.pages["documentation"]=self.page_documentation
         self.page_workspace = ExperimentWorkspace({key: self.pages[key] for key in WORKSPACE_PAGES})
         self.page_simulation.add_setup_action(self.page_workspace.templates_button)
+        self.page_workspace.add_context_action(self.page_results.inspector_toggle, "results")
         self.page_simulation._header.hide()
         self.stack.addWidget(self.page_workspace)
         grouped = {*WORKSPACE_PAGES, "examples", "library", "documentation"}

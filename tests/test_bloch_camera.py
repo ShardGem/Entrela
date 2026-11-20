@@ -295,6 +295,6 @@ def test_zoom_draws_beyond_old_square_clip_in_wide_canvas(qt_app):
     pixels = np.asarray(canvas.buffer_rgba())
     # Exclude legend/top edge. A centered 400px square would clip this region.
     region = pixels[100:300, 260:380, :3]
-    bg = np.array(to_rgba(PALETTE.bg)[:3]) * 255
+    bg = np.array(to_rgba(PALETTE.bg_elevated)[:3]) * 255
     assert np.any(np.linalg.norm(region.astype(float) - bg, axis=2) > 15)
     canvas.close()

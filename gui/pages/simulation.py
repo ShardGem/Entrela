@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QLabel, QFrame,
+    QWidget, QHBoxLayout, QVBoxLayout, QBoxLayout, QSplitter, QLabel, QFrame,
     QProgressBar, QScrollArea, QLineEdit, QToolButton, QMenu,
     QGridLayout,
 )
@@ -82,8 +82,7 @@ class SimulationPage(PageBase):
         self._validation_error = False
         self._error_section = "system"
         self._compact = False
-        self.body().setSpacing(12)
-        self.body().setContentsMargins(20,4,20,16)
+        self.body().setSpacing(LAYOUT.section_gap)
         self._build()
         self._refresh_summary()
 
@@ -103,28 +102,33 @@ class SimulationPage(PageBase):
         identity.setObjectName("DocumentHeader")
         identity_body = QVBoxLayout(identity)
         identity_body.setContentsMargins(0, 0, 0, 0)
-        identity_body.setSpacing(2)
+        identity_body.setSpacing(LAYOUT.control_gap)
+        self.identity_row = QBoxLayout(QBoxLayout.LeftToRight)
+        self.identity_row.setSpacing(LAYOUT.section_gap)
+        identity_fields = QVBoxLayout()
+        identity_fields.setSpacing(3)
         role = QLabel("Rascunho")
         self.draft_role = role
         role.setObjectName("Eyebrow")
-        identity_body.addWidget(role)
-        row = QHBoxLayout()
+        identity_fields.addWidget(role)
         self.experiment_name = QLineEdit()
         self.experiment_name.setObjectName("DocumentTitle")
         self.experiment_name.setMaxLength(160)
         self.experiment_name.setPlaceholderText("Simulação sem título")
         self.experiment_name.setAccessibleName("Nome do experimento")
-        row.addWidget(self.experiment_name, 1)
+        identity_fields.addWidget(self.experiment_name)
         self.description_toggle = QToolButton()
+        self.description_toggle.setObjectName("QuietTool")
         self.description_toggle.setText("Descrição")
         self.description_toggle.setCheckable(True)
         self.description_toggle.setArrowType(Qt.RightArrow)
         self.description_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        identity_body.addLayout(row)
+        self.identity_row.addLayout(identity_fields, 1)
         self.setup_actions = FlowLayout(spacing=8)
         self.setup_actions.addWidget(self.examples_button)
         self.setup_actions.addWidget(self.description_toggle)
-        identity_body.addLayout(self.setup_actions)
+        self.identity_row.addLayout(self.setup_actions)
+        identity_body.addLayout(self.identity_row)
         self.description_row = QWidget()
         desc = QHBoxLayout(self.description_row)
         desc.setContentsMargins(0, 0, 0, 0)
@@ -146,11 +150,11 @@ class SimulationPage(PageBase):
         self.config_panel = ConfigPanel()
         self.config_panel.setObjectName("ParameterWorkspace")
         self.config_panel.setAttribute(Qt.WA_StyledBackground, True)
-        self.config_panel.layout().setContentsMargins(4, 14, 24, 8)
+        self.config_panel.layout().setContentsMargins(20, 16, 20, 13)
         self.config_panel.set_inspector_mode(False)
         self.inspector_title = QLabel("Sistema e estado inicial")
         self.inspector_title.setObjectName("WorkspaceSectionTitle")
-        self.config_panel.layout().insertWidget(0, self.inspector_title)
+        self.config_panel.heading.insertWidget(0, self.inspector_title, 1)
         self.config_panel.btn_executar.hide()
         self.config_panel.simulacao_acionada.connect(self._emit_run)
         self.config_panel.parametros_alterados.connect(self._refresh_summary)
@@ -170,7 +174,8 @@ class SimulationPage(PageBase):
         self.state_caption.setObjectName("StateFormula")
         self.state_caption.setWordWrap(True)
         self.state_caption.setTextFormat(Qt.PlainText)
-        self.initial_preview_section = CollapsibleSection('Prévia ideal de preparação', expanded=True)
+        self.initial_preview_section = CollapsibleSection('Preparação ideal', expanded=True)
+        self.initial_preview_section.setObjectName("PreparationPlate")
         self.initial_preview_section.content_layout.addWidget(self.preparation)
         self.initial_preview_section.content_layout.addWidget(self.state_caption)
         system_content = self.config_panel.sections['system'].content_layout
@@ -236,7 +241,7 @@ class SimulationPage(PageBase):
         self.execution_bar = QFrame()
         self.execution_bar.setObjectName("ExecutionBar")
         footer = QVBoxLayout(self.execution_bar)
-        footer.setContentsMargins(20,10,20,12)
+        footer.setContentsMargins(LAYOUT.page_margin, 12, LAYOUT.page_margin, 4)
         footer.setSpacing(8)
         self.configuration_feedback = QLabel()
         self.configuration_feedback.setObjectName("ValidationMessage")
@@ -393,7 +398,7 @@ class SimulationPage(PageBase):
         super()._arrange_header()
         if getattr(self, "_embedded_heading", False):
             self._header.hide()
-        self.body().setContentsMargins(LAYOUT.page_margin, 4, LAYOUT.page_margin, LAYOUT.control_gap)
+        self.body().setContentsMargins(LAYOUT.page_margin, LAYOUT.control_gap, LAYOUT.page_margin, LAYOUT.control_gap)
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.FontChange, QEvent.StyleChange):
@@ -403,7 +408,10 @@ class SimulationPage(PageBase):
         if not hasattr(self,'compact_tabs'):
             return
         scale = max(1, self.fontMetrics().height() / 19)
-        wide_preview = self.width() > 1110 * scale
+        self.identity_row.setDirection(
+            QBoxLayout.LeftToRight if self.width() > 960 * scale else QBoxLayout.TopToBottom
+        )
+        wide_preview = self.width() > 1090 * scale
         self.system_layout.setDirection(QHBoxLayout.LeftToRight if wide_preview else QHBoxLayout.TopToBottom)
         compact = self.width() < 900 * max(1, self.font().pixelSize() / 15)
         if compact == self._compact:

@@ -210,9 +210,10 @@ class BlochPage(PageBase):
         self.stage_splitter.setChildrenCollapsible(False)
         self.stage_splitter.setHandleWidth(3)
         self.stage_splitter.addWidget(self.visual_tabs)
-        self.inspector = QWidget()
+        self.inspector = QFrame()
+        self.inspector.setObjectName("WorkbenchInspector")
         inspector_layout = QVBoxLayout(self.inspector)
-        inspector_layout.setContentsMargins(8, 0, 0, 0)
+        inspector_layout.setContentsMargins(12, 12, 12, 8)
         self.inspector_selector = QComboBox()
         self.inspector_selector.setAccessibleName("Conteúdo do inspetor da visualização")
         self.local_qubit = QLabel('Selecione um qubit para inspecionar X, Y, Z e pureza local.')
@@ -623,7 +624,7 @@ class BlochPage(PageBase):
         for q, panel in enumerate(self._qubit_panels):
             panel.update_values(self.precomputed_bloch[idx][q])
             panel.setVisible(self.canvas.focus in (-1, q))
-        plot_key = (idx, self.overlay.isChecked(), PALETTE.primary, PALETTE.q2, PALETTE.surface, PALETTE.text)
+        plot_key = (idx, self.overlay.isChecked(), PALETTE.q1, PALETTE.q2, PALETTE.surface, PALETTE.text)
         if self.visual_tabs.currentIndex() == 1 and plot_key != self._probability_plot_key:
             ax = self.probabilities_canvas.reset_axes()
             probabilities = self.snapshot_probabilities[idx]
@@ -632,7 +633,7 @@ class BlochPage(PageBase):
                 positions - 0.18,
                 probabilities,
                 width=0.36,
-                color=PALETTE.primary,
+                color=PALETTE.q1,
                 label="Simulado",
             )
             self._probability_bars = [(bar, int(i), float(value), "Simulado")

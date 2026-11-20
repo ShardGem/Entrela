@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from gui.widgets.plot_canvas import MplCanvas
 from gui.theme import PALETTE
+from gui.design_system import Surface
 from PySide6.QtCore import QEvent, QTimer, Signal
 
 
@@ -65,9 +66,9 @@ class ResultsTab(QScrollArea):
             (self.canvas_hist, self.hist_measure, None),
             (self.canvas_evol, self.state_criterion, self.state_picker),
         ):
-            pane = QWidget(self)
-            column = QVBoxLayout(pane)
-            column.setContentsMargins(0, 0, 0, 0)
+            pane = Surface(role="PlotFrame", parent=self)
+            column = pane.body()
+            column.setContentsMargins(16, 12, 16, 10)
             tools = QHBoxLayout()
             tools.addWidget(control)
             tools.addStretch(1)
@@ -124,7 +125,7 @@ class ResultsTab(QScrollArea):
             width = int(np.log2(len(self._final_probabilities)))
             values = {f'{i:0{width}b}': float(p) for i, p in enumerate(self._final_probabilities)}
         draw_histograms(self.canvas_hist.fig, [values], frequency=calculated or self.hist_measure.currentIndex() == 1,
-                        colors=(PALETTE.primary,), label_size=10,
+                        colors=(PALETTE.q1,), label_size=10,
                         title='Probabilidade calculada do estado final' if calculated else self._hist_title)
         ax = self.canvas_hist.fig.axes[0]
         legend = ax.get_legend()

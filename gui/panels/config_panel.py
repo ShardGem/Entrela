@@ -94,6 +94,7 @@ class ConfigPanel(QWidget):
         root.setSpacing(12)
         root.setContentsMargins(0, 0, 0, 0)
         heading = QHBoxLayout()
+        self.heading = heading
         title = QLabel("Parâmetros")
         title.setObjectName("SectionTitle")
         heading.addWidget(title)
@@ -132,6 +133,7 @@ class ConfigPanel(QWidget):
         for index,(key, title, description) in enumerate(SECTIONS,1):
             button = QPushButton(f"{index} · {title}")
             button.setObjectName("ConfigStep")
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             button.setCheckable(True)
             button.setAccessibleName(f"Etapa {index}: {title}")
             button.setToolTip(description)
@@ -360,7 +362,7 @@ class ConfigPanel(QWidget):
         compact = self._compact_sections or self._inspector_mode
         self.section_nav.setVisible(self.external_steps or (guided and not compact))
         self.section_selector.setVisible(guided and compact and not self.external_steps)
-        self.parameter_title.setVisible(not self._inspector_mode and not (guided and compact))
+        self.parameter_title.setVisible(not self.external_steps and not self._inspector_mode and not (guided and compact))
         blocker = QSignalBlocker(self.section_selector)
         self.section_selector.setCurrentIndex(self.section_selector.findData(self.current_section))
         self.section_selector.setToolTip(self.section_selector.currentData(Qt.ToolTipRole) or "Etapa da configuração guiada")
@@ -550,7 +552,7 @@ class ConfigPanel(QWidget):
             columns = 1
         if columns == self._section_columns:
             return
-        for column in range(max(self._section_columns, columns)):
+        for column in range(self._section_layout.columnCount()):
             self._section_layout.setColumnStretch(column, 0)
         for index, button in enumerate(buttons):
             self._section_layout.removeWidget(button)

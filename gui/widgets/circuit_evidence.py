@@ -85,7 +85,7 @@ class CircuitEvidence(QFrame):
             self.plot._layout_minimum = QSize(200, 110)
             self.plot.setMinimumSize(200, 110)
             self.data_layout.insertWidget(0, self.plot, 3)
-        draw_histograms(self.plot.fig, [experiment.result.counts], frequency=True, colors=(PALETTE.primary,))
+        draw_histograms(self.plot.fig, [experiment.result.counts], frequency=True, colors=(PALETTE.q1,))
         ax = self.plot.fig.axes[0]
         ax.set_title('Frequências de medição registradas')
         if ax.get_legend() is not None:

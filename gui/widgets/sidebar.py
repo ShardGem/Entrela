@@ -23,7 +23,7 @@ class NavButton(QPushButton):
         self._refresh_icon()
 
     def _refresh_icon(self):
-        self.setIcon(get_icon(self.icon_name, PALETTE.primary if self.isChecked() else PALETTE.text_muted))
+        self.setIcon(get_icon(self.icon_name, PALETTE.chrome_accent if self.isChecked() else PALETTE.chrome_muted))
         self.setIconSize(QSize(18,18))
 
     def setChecked(self,checked):
@@ -74,20 +74,22 @@ class Sidebar(QFrame):
 
     def _build(self):
         outer=QVBoxLayout(self)
-        outer.setContentsMargins(0,8,0,8)
+        outer.setContentsMargins(11, 5, 10, 1)
         outer.setSpacing(4)
         self.brand_box = QWidget()
         brand=QHBoxLayout(self.brand_box)
         logo=QLabel()
         self.logo=logo
-        logo.setPixmap(application_icon().pixmap(28,28))
-        logo.setFixedSize(30,30)
+        logo.setObjectName("SidebarMark")
+        logo.setPixmap(application_icon().pixmap(23, 23))
+        logo.setAlignment(Qt.AlignCenter)
+        logo.setFixedSize(34, 34)
         brand.addWidget(logo)
         self.logo_title=QLabel('Entrela')
         self.logo_title.setObjectName('SidebarLogo')
         brand.addWidget(self.logo_title,1)
         outer.addWidget(self.brand_box)
-        brand.setContentsMargins(16, 4, 8, 6)
+        brand.setContentsMargins(3, 5, 0, 12)
         self.toggle=QToolButton()
         self.toggle.setObjectName('SidebarToggle')
         self.toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
@@ -97,6 +99,7 @@ class Sidebar(QFrame):
         self.toggle.clicked.connect(lambda:self.compact_requested.emit(not self._compact))
         brand.addWidget(self.toggle)
         self.search = NavButton('search', 'Buscar')
+        self.search.setObjectName("SearchButton")
         self.search.setCheckable(False)
         self.search.setToolTip('Buscar funções, experimentos e conceitos (Ctrl+K)')
         self.search.clicked.connect(self.search_requested.emit)
@@ -121,7 +124,7 @@ class Sidebar(QFrame):
             self.group_buttons[key]=header
             body=QWidget()
             children=QVBoxLayout(body)
-            children.setContentsMargins(8,0,0,0)
+            children.setContentsMargins(0, 0, 0, 0)
             children.setSpacing(2)
             for page in items:
                 button = self._make_button(page, title)
@@ -200,7 +203,7 @@ class Sidebar(QFrame):
             button.setProperty('expanded',expanded)
             button.style().unpolish(button)
             button.style().polish(button)
-            button.setIcon(get_icon('chevron-down' if expanded else 'next', PALETTE.primary if self._active in items else PALETTE.text_muted))
+            button.setIcon(get_icon('chevron-down' if expanded else 'next', PALETTE.chrome_accent if self._active in items else PALETTE.chrome_muted))
             button.setIconSize(QSize(16,16))
 
     def _on_click(self,key):
@@ -221,7 +224,7 @@ class Sidebar(QFrame):
 
     def set_compact(self,compact):
         self._compact=bool(compact)
-        self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.text_muted))
+        self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.chrome_muted))
         self.toggle.setToolTip('Expandir navegação' if compact else 'Recolher navegação')
         self.toggle.setAccessibleName(self.toggle.toolTip())
         for button in (*self.buttons.values(), self.search, self.help_button):
@@ -229,8 +232,6 @@ class Sidebar(QFrame):
             button.setProperty('compact',bool(compact))
             button.style().unpolish(button)
             button.style().polish(button)
-        for body in self.group_bodies.values():
-            body.layout().setContentsMargins(0 if compact else 8,0,0,0)
         self._refresh_groups()
         self._fit_width()
 
@@ -239,7 +240,8 @@ class Sidebar(QFrame):
             word_width = max(button.fontMetrics().horizontalAdvance(word)
                              for button in self.buttons.values() for word in button.label.split())
             heading_width = max(button.sizeHint().width() for button in self.group_buttons.values())
-            gutters = 54 + self.scroll.verticalScrollBar().sizeHint().width()
+            margins = self.layout().contentsMargins()
+            gutters = 46 + margins.left() + margins.right() + self.scroll.verticalScrollBar().sizeHint().width()
             width = max(155, word_width + gutters, heading_width + 20)
             self.setFixedWidth(width)
             for button in self.buttons.values():
@@ -257,7 +259,8 @@ class Sidebar(QFrame):
                 button.setText(button.label)
                 button.setMinimumHeight(38)
             text_width = max(button.sizeHint().width() for button in self.buttons.values())
-            self.setFixedWidth(max(208, text_width+18))
+            margins = self.layout().contentsMargins()
+            self.setFixedWidth(max(218, text_width + margins.left() + margins.right() + 12))
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -266,7 +269,7 @@ class Sidebar(QFrame):
 
     def refresh_theme(self):
         if hasattr(self,'toggle'):
-            self.logo.setPixmap(application_icon().pixmap(28,28))
+            self.logo.setPixmap(application_icon().pixmap(23, 23))
             self.set_compact(self._compact)
             for button in self.buttons.values():
                 button._refresh_icon()

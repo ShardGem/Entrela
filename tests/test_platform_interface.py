@@ -30,11 +30,14 @@ def test_sidebar_keeps_navigation_visible_and_header_shows_the_page(window, qt_a
     window.resize(1920, 1080)
     window.navigation.open_page('circuit')
     settle(qt_app)
-    assert window.topbar.width() + window.sidebar.width() == window.centralWidget().width()
+    workspace = window.topbar.parentWidget()
+    assert workspace.objectName() == "Workbench"
+    assert workspace.geometry().left() > window.sidebar.geometry().right()
+    assert window.centralWidget().rect().contains(workspace.geometry())
     assert window.topbar.title.text() == 'Editor de circuitos'
     assert window.sidebar.brand_box.isVisible()
     assert window.sidebar._expanded_groups == {key for key, *_ in window.sidebar.GROUPS}
-    assert 'IBM Plex Sans' in QFontInfo(window.topbar.title.font()).family()
+    assert 'Instrument Sans' == QFontInfo(window.topbar.title.font()).family()
     assert window.sidebar.search.accessibleName() == 'Buscar'
     assert window.sidebar.buttons['settings'].accessibleName() == 'Preferências'
 

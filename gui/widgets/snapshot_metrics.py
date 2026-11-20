@@ -119,7 +119,7 @@ class SnapshotMetrics(QFrame):
             [r["time"] for r in self.rows],
             [np.nan if r.get(key) is None else r[key] for r in self.rows],
             "o-",
-            color=PALETTE.primary,
+            color=PALETTE.q1,
             markersize=3,
         )
         ax.set_xlabel(self.time_unit)

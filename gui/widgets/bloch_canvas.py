@@ -12,6 +12,7 @@ from gui.widgets.bloch_projection import BlochAxes3D
 
 
 class BlochCanvas(StableFigureCanvas):
+    interface_surface = "bg_elevated"
     camera_changed = Signal()
     focus_changed = Signal(int)
     qubit_selected = Signal(int)
@@ -20,7 +21,7 @@ class BlochCanvas(StableFigureCanvas):
     MAX_ZOOM = 3.0
 
     def __init__(self, parent=None):
-        self.fig = Figure(figsize=(8, 5), facecolor=PALETTE.bg)
+        self.fig = Figure(figsize=(8, 5), facecolor=PALETTE.bg_elevated)
         super().__init__(self.fig, parent, minimum=(240, 280))
         self.ax = self.fig.add_subplot(111, projection=BlochAxes3D.name)
         self.fig.subplots_adjust(0, 0, 1, 1)
@@ -54,7 +55,7 @@ class BlochCanvas(StableFigureCanvas):
 
     def _configure_axes(self):
         self.ax.set_axis_off()
-        self.ax.set_facecolor(PALETTE.bg)
+        self.ax.set_facecolor(PALETTE.bg_elevated)
         # A single controller owns zoom, pan and rotation, including mouse input.
         self.ax.mouse_init(rotate_btn=[], pan_btn=[], zoom_btn=[])
         self.ax.set_autoscale_on(False)

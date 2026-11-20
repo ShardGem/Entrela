@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QTabWidget, QTabBar, QWidget, QVBoxLayout, QSlider, QCheckBox, QPushButton, QPlainTextEdit,
 )
 from gui.pages.base import PageBase
+from gui.design_system import Surface
+from gui.widgets.flow_layout import FlowLayout
 from gui.formatting import quantity, timestamp
 from gui.widgets.plot_canvas import MplCanvas,style_axes
 from gui.theme import PALETTE
@@ -47,7 +49,7 @@ class ComparisonPage(PageBase):
             caption.setObjectName('FieldHint')
             caption.setBuddy(combo)
             combo.setAccessibleName(label)
-            combo.setMinimumContentsLength(10)
+            combo.setMinimumContentsLength(9)
             combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
             sources.addWidget(caption, 0, column)
             sources.addWidget(combo, 1, column)
@@ -69,8 +71,10 @@ class ComparisonPage(PageBase):
         self.btn_document=QPushButton("Documentar comparação")
         self.btn_document.clicked.connect(self.documentation_requested.emit)
         tools.addWidget(self.message, 1)
-        tools.addWidget(self.btn_prepare)
-        tools.addWidget(self.btn_document)
+        actions = FlowLayout()
+        actions.addWidget(self.btn_prepare)
+        actions.addWidget(self.btn_document)
+        tools.addLayout(actions)
         self.body().addLayout(tools)
         self.body().addWidget(self.summary)
         self.metrics_table = QTableWidget(0, 4)
@@ -81,8 +85,8 @@ class ComparisonPage(PageBase):
 
         self.tabs=ContentTabs()
         self.canvas = MplCanvas()
-        hist=QWidget()
-        layout=QVBoxLayout(hist)
+        hist = Surface(role="PlotFrame")
+        layout = hist.body()
         self.hist_layout=QComboBox()
         self.hist_layout.addItems(["Distribuições sobrepostas","Distribuições lado a lado"])
         self.hist_layout.currentIndexChanged.connect(self._compare)
@@ -94,8 +98,10 @@ class ComparisonPage(PageBase):
         self.canvas.set_value_lookup(self._histogram_value)
         layout.addWidget(self.canvas)
         self.tabs.addTab(hist,"Distribuições")
-        self.curve_canvas=MplCanvas()
-        self.tabs.addTab(self.curve_canvas,"Curvas temporais")
+        self.curve_canvas = MplCanvas()
+        curves = Surface(role="PlotFrame")
+        curves.add(self.curve_canvas, 1)
+        self.tabs.addTab(curves, "Curvas temporais")
         bloch=QWidget()
         content=QVBoxLayout(bloch)
         self.frame_label=QLabel("Carregue os estados para visualizar as duas execuções.")
@@ -301,7 +307,7 @@ class ComparisonPage(PageBase):
         from core.figures import histogram_figure
         from gui.widgets.plot_canvas import style_figure
         histogram_figure((a, b), side_by_side=self.hist_layout.currentIndex() == 1,
-                         fig=self.canvas.fig, colors=(PALETTE.primary, PALETTE.q2), label_size=10)
+                         fig=self.canvas.fig, colors=(PALETTE.q1, PALETTE.q2), label_size=10)
         style_figure(self.canvas.fig)
         self.canvas.draw()
         if previous and previous.get("mode","controlled") == self.comparison_mode.currentData() and tuple(e.id for e in previous["experiments"])==(a.id,b.id):
@@ -357,7 +363,7 @@ class ComparisonPage(PageBase):
         from core.figures import temporal_figure
         from gui.widgets.plot_canvas import style_figure
         temporal_figure(data['experiments'], reference='exact' if data.get('mode') == 'trotter' else 'circuit',
-                        fig=self.curve_canvas.fig, curves=data['curves'], colors=(PALETTE.primary, PALETTE.q2), label_size=10)
+                        fig=self.curve_canvas.fig, curves=data['curves'], colors=(PALETTE.q1, PALETTE.q2), label_size=10)
         style_figure(self.curve_canvas.fig)
         self.curve_canvas.draw_idle()
         self._frame(0)

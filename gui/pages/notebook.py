@@ -129,7 +129,7 @@ class NotebookPage(PageBase):
         self.report_plot.setVisible(show_plot)
         if show_plot:
             draw_histograms(self.report_plot.fig, [s.result.counts for s in sources], frequency=True,
-                labels=[experiment_title(s, self.preview_annotations) for s in sources], colors=(PALETTE.primary, PALETTE.q2))
+                labels=[experiment_title(s, self.preview_annotations) for s in sources], colors=(PALETTE.q1, PALETTE.q2))
             style_figure(self.report_plot.fig); self.report_plot.draw_idle()
 
     def payload(self): return {key: field.toPlainText() for key, field in self.fields.items()}

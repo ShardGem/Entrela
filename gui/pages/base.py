@@ -109,5 +109,7 @@ class PageBase(QWidget):
         self._header.layout().setDirection(
             QHBoxLayout.TopToBottom if narrow else QHBoxLayout.LeftToRight
         )
-        self._header.layout().setContentsMargins(20, 0 if getattr(self, '_embedded_heading', False) else 16, 20, 6 if getattr(self, '_embedded_heading', False) else 12)
+        embedded = getattr(self, "_embedded_heading", False)
+        self._header.layout().setContentsMargins(LAYOUT.page_margin, 0 if embedded else 16,
+                                                 LAYOUT.page_margin, 8 if embedded else 12)
         self._body.setContentsMargins(LAYOUT.page_margin, 8, LAYOUT.page_margin, 24)

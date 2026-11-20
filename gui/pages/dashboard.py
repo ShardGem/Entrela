@@ -1,12 +1,61 @@
 """Project landing and overview, backed only by persisted work and executions."""
-from PySide6.QtCore import Signal, Qt, QTimer, QEvent
-from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QSplitter, QMenu
+from PySide6.QtCore import QEvent, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QFontMetrics
+from PySide6.QtWidgets import (
+    QLabel, QListWidget, QListWidgetItem, QMenu, QSplitter,
+    QStyle, QStyledItemDelegate, QStyleOptionViewItem, QVBoxLayout, QWidget,
+)
 from gui.pages.base import PageBase
 from gui.widgets.card import MetricCard
-from gui.design_system import Surface
+from gui.design_system import LAYOUT, Surface
+from gui.theme import PALETTE
 from gui.widgets.button import PrimaryButton, SecondaryButton
+from gui.widgets.flow_layout import FlowLayout
 from data.workspace import experiment_title
 from core.types import system_label
+
+
+class _RecordRow(QStyledItemDelegate):
+    """Título e contexto secundário no mesmo item selecionável."""
+
+    def sizeHint(self, option, index):
+        lines = 2 if "\n" in str(index.data()) else 1
+        return QSize(0, lines * option.fontMetrics.height() + 16)
+
+    def paint(self, painter, option, index):
+        row = QStyleOptionViewItem(option)
+        self.initStyleOption(row, index)
+        title, _, detail = str(index.data(Qt.DisplayRole) or "").partition("\n")
+        selected = bool(row.state & QStyle.State_Selected)
+        hovered = bool(row.state & QStyle.State_MouseOver)
+        title_font = QFont(row.font)
+        title_font.setWeight(QFont.DemiBold)
+        detail_font = QFont(row.font)
+        detail_font.setPixelSize(max(11, row.fontMetrics.height() - 5))
+        title_height = QFontMetrics(title_font).height()
+        detail_height = QFontMetrics(detail_font).height() if detail else 0
+        text_rect = row.rect.adjusted(10, 0, -10, 0)
+        top = text_rect.y() + (text_rect.height() - title_height - detail_height) // 2
+
+        painter.save()
+        painter.setClipRect(row.rect, Qt.IntersectClip)
+        if selected or hovered:
+            painter.fillRect(row.rect, QColor(PALETTE.primary_faint if selected else PALETTE.bg))
+        painter.setPen(QColor(PALETTE.primary if row.state & QStyle.State_HasFocus else PALETTE.border))
+        painter.drawLine(row.rect.bottomLeft(), row.rect.bottomRight())
+        if row.state & QStyle.State_HasFocus:
+            painter.drawRect(row.rect.adjusted(0, 0, -1, -1))
+        for text, font, y, height, color in (
+            (title, title_font, top, title_height, PALETTE.primary if selected else PALETTE.text),
+            (detail, detail_font, top + title_height, detail_height, PALETTE.text_muted),
+        ):
+            if text:
+                painter.setFont(font)
+                painter.setPen(QColor(color))
+                visible = QFontMetrics(font).elidedText(text, Qt.ElideRight, text_rect.width())
+                painter.drawText(QRect(text_rect.x(), y, text_rect.width(), height),
+                                 Qt.AlignLeft | Qt.AlignVCenter, visible)
+        painter.restore()
 
 
 class DashboardPage(PageBase):
@@ -36,10 +85,7 @@ class DashboardPage(PageBase):
         # Compatibility values are retained but no empty KPI strip occupies the landing.
         for attr, title in [('card_sims', 'Execuções'), ('card_last', 'Modelo'), ('card_fid', 'Fidelidade'), ('card_purity', 'Pureza')]:
             card = MetricCard(title, parent=self); card.hide(); setattr(self, attr, card)
-        actions = QHBoxLayout()
-        self.intro = QLabel('Escolha uma investigação ou comece por um exemplo. Cada resultado preserva sua configuração de origem.')
-        self.intro.setWordWrap(True); self.intro.setObjectName('SectionSubtitle')
-        self.body().addWidget(self.intro)
+        actions = FlowLayout(spacing=8)
         self.create_project = PrimaryButton('Criar projeto', icon='plus')
         self.create_project.clicked.connect(self.project_create_requested.emit)
         self.new_experiment = SecondaryButton('Novo experimento', icon='plus')
@@ -55,63 +101,76 @@ class DashboardPage(PageBase):
         self.show_works.hide()
         for button in (self.all_projects, self.create_project, self.new_experiment, self.show_works):
             actions.addWidget(button)
-        actions.addStretch()
         self.body().addLayout(actions)
         self.dashboard_splitter = QSplitter(Qt.Horizontal)
         self.dashboard_splitter.setChildrenCollapsible(False)
-        self.dashboard_splitter.setHandleWidth(3)
-        self.project_surface = Surface('Investigações', role='WorkbenchInspector')
+        self.dashboard_splitter.setHandleWidth(LAYOUT.handle_width)
+        self.project_surface = Surface('Investigações', role='ProjectCard')
         self.project_list = QListWidget()
+        self.project_list.setObjectName("WorkspaceList")
         self.project_list.setAccessibleName('Projetos recentes')
-        self.project_list.setMinimumHeight(180)
         self.project_list.setWordWrap(True)
         self.project_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.project_list.itemActivated.connect(lambda item: self.project_selected.emit(item.data(Qt.UserRole)))
         self.project_list.itemClicked.connect(lambda item: self.project_selected.emit(item.data(Qt.UserRole)))
         self.project_surface.add(self.project_list)
-        self.dashboard_splitter.addWidget(self.project_surface)
-        self.overview = Surface('Experimento em andamento', role='FlatSection')
-        self.resume_title = QLabel('Comece com uma pergunta científica')
-        self.resume_title.setObjectName('PanelTitle'); self.resume_title.setWordWrap(True)
-        self.overview.add(self.resume_title)
+        self.projects_column = QWidget()
+        projects_layout = QVBoxLayout(self.projects_column)
+        projects_layout.setContentsMargins(0, 0, 0, 0)
+        projects_layout.addWidget(self.project_surface, 0, Qt.AlignTop)
+        projects_layout.addStretch()
+        self.dashboard_splitter.addWidget(self.projects_column)
+        self.overview = Surface(role='FlatSection')
+        self.overview.body().setContentsMargins(8, 0, 0, 0)
+        self.overview.body().setSpacing(18)
+        self.resume_card = Surface(role='ProjectResume')
+        self.resume_role = QLabel('Experimento em andamento')
+        self.resume_role.setObjectName('Eyebrow')
+        self.resume_card.add(self.resume_role)
+        self.resume_title = QLabel()
+        self.resume_title.setObjectName('ResumeTitle')
+        self.resume_title.setTextFormat(Qt.PlainText)
+        self.resume_title.setWordWrap(True)
+        self.resume_card.add(self.resume_title)
         self.resume_description = QLabel('Abra um modelo editável, execute uma simulação e registre suas observações. Os dados são calculados localmente.')
         self.resume_description.setWordWrap(True); self.resume_description.setObjectName('FieldHint')
-        self.overview.add(self.resume_description)
+        self.resume_card.add(self.resume_description)
         self.resume = PrimaryButton('Abrir na bancada', icon='arrow-right')
         self.resume.clicked.connect(self._resume)
-        self.overview.body().addWidget(self.resume, 0, Qt.AlignLeft)
+        self.resume_card.body().addWidget(self.resume, 0, Qt.AlignLeft)
+        self.overview.add(self.resume_card)
         self.question = QLabel(); self.question.setWordWrap(True); self.question.setObjectName('SectionSubtitle')
         self.question.setTextFormat(Qt.PlainText)
-        self.overview.body().insertWidget(1, self.question)
+        self.resume_card.body().insertWidget(2, self.question)
         self.works_label = QLabel('Experimentos'); self.works_label.setObjectName('PanelTitle'); self.overview.add(self.works_label)
         self.works = QListWidget()
+        self.works.setObjectName("WorkspaceList")
         self.works.setMinimumHeight(150)
         self.works.setAccessibleName('Experimentos do projeto')
         self.works.itemActivated.connect(lambda item: self.work_selected.emit(item.data(Qt.UserRole)))
         self.works.itemClicked.connect(lambda item: self.work_selected.emit(item.data(Qt.UserRole)))
         self.overview.add(self.works)
-        self.recent = Surface('Execuções recentes', role='FlatSection')
-        self.recent.body().setContentsMargins(0, 10, 0, 0)
+        self.recent = Surface('Execuções recentes', role='ProjectCard')
         self.recent_list = QListWidget()
+        self.recent_list.setObjectName("WorkspaceList")
         self.recent_list.setAccessibleName('Execuções recentes com sua modalidade e data')
         self.recent_list.setMinimumHeight(150)
         self.recent_list.itemActivated.connect(lambda item: self.experiment_selected.emit(item.data(Qt.UserRole)))
         self.recent_list.itemClicked.connect(lambda item: self.experiment_selected.emit(item.data(Qt.UserRole)))
         self.recent.add(self.recent_list)
         self.overview.add(self.recent)
-        links = QHBoxLayout()
+        links = FlowLayout()
         self.notebook = SecondaryButton('Abrir caderno', icon='book')
         self.notebook.clicked.connect(self.notebook_requested.emit)
         self.ideal = SecondaryButton('Comparar com a referência ideal', icon='comparison')
         self.ideal.clicked.connect(self.ideal_requested.emit)
         links.addWidget(self.notebook)
         links.addWidget(self.ideal)
-        links.addStretch(1)
         self.overview.body().addLayout(links)
         self.overview.body().addStretch()
         self.dashboard_splitter.addWidget(self.overview)
         self.dashboard_splitter.setStretchFactor(1, 1)
-        self.dashboard_splitter.setSizes([360, 900])
+        self.dashboard_splitter.setSizes([300, 840])
         self.body().addWidget(self.dashboard_splitter, 1)
         self.first_use = Surface('Seu primeiro experimento')
         for text, signal in [('Escolher um exemplo da biblioteca', self.examples_requested), ('Iniciar tutorial de Bell', self.tutorial_requested), ('Consultar histórico completo', self.open_history)]:
@@ -125,6 +184,9 @@ class DashboardPage(PageBase):
         self.concepts.setWordWrap(True); self.concepts.hide()
         self.first_use.add(self.concepts)
         self.concept_toggle.toggled.connect(self.concepts.setVisible)
+        for view in (self.project_list, self.works, self.recent_list):
+            view.setItemDelegate(_RecordRow(view))
+            view.setMouseTracking(True)
         self._render()
 
     def set_mode(self, mode):
@@ -133,12 +195,9 @@ class DashboardPage(PageBase):
 
     def _size_lists(self):
         scale = max(1, self.font().pixelSize()/15)
-        for view, limit in ((self.works, 5 if self.mode == 'experiments' else 2), (self.recent_list, 3)):
-            row = max(round(48*scale), view.sizeHintForRow(0))
-            height = max(round(70*scale), min(max(1, view.count()), limit)*row + 16)
-            view.setMinimumHeight(0)
-            view.setMaximumHeight(height)
-            view.setFixedHeight(height)
+        for view, limit in ((self.project_list, 7), (self.works, 5), (self.recent_list, 4)):
+            rows = sum(view.sizeHintForRow(i) for i in range(min(view.count(), limit)))
+            view.setFixedHeight(max(round(44 * scale), rows + 4))
             view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             view.setTextElideMode(Qt.ElideRight)
 
@@ -174,8 +233,7 @@ class DashboardPage(PageBase):
         if ideal_pair:
             self.ideal.setToolTip('A: ' + ideal_pair[2] + '\nB: ' + ideal_pair[3] + '\nReferência: mesmo circuito sem ruído; não é evolução exata.')
         self.all_projects.setVisible(project is not None)
-        self.project_surface.setVisible(project is None)
-        self.intro.setVisible(project is None)
+        self.projects_column.setVisible(project is None)
         self.create_project.setVisible(project is None)
         self.notebook.setEnabled(bool(project))
         self._render()
@@ -202,9 +260,8 @@ class DashboardPage(PageBase):
         self.show_works.setText('Ver resumo' if show_works else 'Ver experimentos')
         self.works_label.setVisible(show_works); self.works.setVisible(show_works)
         self.resume_title.setText(self._works[0]['title'] if self._works else 'Comece uma investigação')
-        self.resume_title.setVisible(not show_works)
-        self.resume_description.setVisible(not show_works)
-        self.resume.setVisible(not show_works)
+        self.resume_role.setVisible(bool(self._works))
+        self.resume_card.setVisible(not show_works)
         if self._works:
             work = self._works[0]
             self.resume_description.setText(('Circuito livre' if work['kind'] == 'circuit' else 'Evolução por Hamiltoniano') + ' · ' + ('Última execução disponível; o rascunho permanece editável.' if work.get('executions') else 'Rascunho em edição · ainda sem execução.'))

@@ -644,7 +644,7 @@ class AnalysisPage(PageBase):
         from core.figures import analysis_figure
         from gui.widgets.plot_canvas import style_figure
         analysis_figure(self.data, self.series_combo.currentData(), self.canvas.fig,
-                        colors=(PALETTE.primary, PALETTE.q2, PALETTE.q3, PALETTE.q4, PALETTE.q5, PALETTE.q6), label_size=10)
+                        colors=(PALETTE.q1, PALETTE.q2, PALETTE.q3, PALETTE.q4, PALETTE.q5, PALETTE.q6), label_size=10)
         style_figure(self.canvas.fig)
         self.canvas.draw_idle()
 

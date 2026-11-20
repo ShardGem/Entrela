@@ -27,6 +27,7 @@ class CollapsibleSection(QFrame):
         self.summary.setObjectName("SectionSubtitle")
         self.summary.setWordWrap(True)
         layout.addWidget(self.summary)
+        self.summary.hide()
         self.content = QWidget()
         self.content.setObjectName("SectionContent")
         self.content_layout = QVBoxLayout(self.content)

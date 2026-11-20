@@ -40,6 +40,10 @@ def test_profiles_have_readable_text_and_primary_actions(window, theme):
             for surface in (PALETTE.bg, PALETTE.bg_elevated, PALETTE.surface, PALETTE.surface_hover):
                 assert _contrast(text, surface) >= 4.5, (theme, high_contrast, text, surface)
         assert _contrast(PALETTE.primary_on, PALETTE.primary) >= 4.5
+        assert _contrast(PALETTE.chrome_muted, PALETTE.chrome) >= 4.5
+        assert _contrast(PALETTE.chrome_text, PALETTE.chrome_selected) >= 4.5
+        for series in (PALETTE.q1, PALETTE.q2, PALETTE.q3, PALETTE.q4, PALETTE.q5, PALETTE.q6):
+            assert _contrast(series, PALETTE.bg_elevated) >= 3
     assert resolve_theme(theme) == theme
 
 
@@ -64,7 +68,8 @@ def test_profiles_restore_legacy_choices_and_keep_scientific_data(window, qt_app
         assert all((state.data == saved).all() for state, saved in zip(experiment.result.states, states))
     page.accent.setCurrentIndex(page.accent.findData('violet'))
     page.theme.setCurrentIndex(page.theme.findData('navy'))
-    assert PALETTE.primary == '#c1a4ff'
+    assert PALETTE.primary == '#7340b6'
+    assert PALETTE.primary != PALETTE.q1
     settings_path = tmp_path / 'restore.ini'
     settings = QSettings(str(settings_path), QSettings.IniFormat)
     settings.setValue('appearance/theme', 'navy')

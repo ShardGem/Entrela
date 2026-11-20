@@ -370,7 +370,7 @@ class HistoryPage(PageBase):
         self.summary.setHtml(text)
         from core.figures import histogram_figure
         from gui.widgets.plot_canvas import style_figure
-        histogram_figure([experiment], fig=self.chart.fig, colors=(PALETTE.primary,), label_size=10)
+        histogram_figure([experiment], fig=self.chart.fig, colors=(PALETTE.q1,), label_size=10)
         style_figure(self.chart.fig)
         self.chart.draw_idle()
         if result.metadata.get("operations") or result.circuit_text or files is not None:

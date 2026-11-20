@@ -29,6 +29,7 @@ from PySide6.QtGui import (
 import math
 from pathlib import Path
 from gui.branding import application_icon
+from gui.palettes import NAVY
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -130,8 +131,8 @@ class QuantumBackground(QWidget):
         # =========================================================
         gradient = QLinearGradient(0, 0, rect.width(), rect.height())
 
-        gradient.setColorAt(0, QColor("#04060a"))
-        gradient.setColorAt(1, QColor("#0a1120"))
+        gradient.setColorAt(0, QColor(NAVY["chrome"]))
+        gradient.setColorAt(1, QColor(NAVY["chrome_hover"]))
 
         painter.fillRect(rect, gradient)
 
@@ -160,6 +161,7 @@ class QuantumBackground(QWidget):
 
         painter.setPen(Qt.NoPen)
 
+        light = QColor(NAVY["chrome_accent"])
         particle_count = 90
 
         for i in range(particle_count):
@@ -177,7 +179,8 @@ class QuantumBackground(QWidget):
 
             size = max(1.5, 4 - (i * 0.03))
 
-            painter.setBrush(QColor(88, 214, 255, alpha))
+            light.setAlpha(alpha)
+            painter.setBrush(light)
 
             painter.drawEllipse(QPointF(x, y), size, size)
 
@@ -191,7 +194,8 @@ class QuantumBackground(QWidget):
         for i in range(8):
             alpha = 18 - i * 2
 
-            painter.setBrush(QColor(88, 214, 255, alpha))
+            light.setAlpha(alpha)
+            painter.setBrush(light)
 
             painter.drawEllipse(
                 QPointF(center_x, center_y), glow_radius - i * 18, glow_radius - i * 18
@@ -230,12 +234,9 @@ class SplashScreen(QSplashScreen):
 
         self.container.setGeometry(0, 0, 1100, 650)
 
-        self.container.setStyleSheet("""
-            QWidget {
-                background-color: #090d14;
-                border-radius: 28px;
-            }
-        """)
+        self.container.setStyleSheet(
+            f"background-color: {NAVY['chrome']}; border-radius: 28px;"
+        )
 
         # =========================================================
         # Background
@@ -320,16 +321,10 @@ class SplashScreen(QSplashScreen):
 
         self.loading.setAlignment(Qt.AlignCenter)
 
-        self.loading.setStyleSheet("""
-            QLabel {
-                color: #58d6ff;
-                font-size: 12px;
-                font-family: Inter;
-                letter-spacing: 2px;
-                background: transparent;
-                margin-bottom: 10px;
-            }
-        """)
+        self.loading.setStyleSheet(
+            f"color: {NAVY['chrome_muted']}; font-size: 13px;"
+            "background: transparent; margin-bottom: 10px;"
+        )
 
         layout.addWidget(self.loading)
 

@@ -10,7 +10,12 @@ from gui.theme import PALETTE
 
 def style_axes(ax):
     ax.set_facecolor(PALETTE.bg_elevated)
-    ax.tick_params(colors=PALETTE.text_muted)
+    ax.tick_params(colors=PALETTE.text_muted, length=3, width=.7)
+    ax.set_axisbelow(True)
+    for gridline in (*ax.get_xgridlines(), *ax.get_ygridlines()):
+        gridline.set_color(PALETTE.border)
+        gridline.set_alpha(.82)
+        gridline.set_linewidth(.65)
     for spine in ax.spines.values():
         spine.set_color(PALETTE.border)
     ax.spines["top"].set_visible(False)
@@ -18,6 +23,9 @@ def style_axes(ax):
     ax.xaxis.label.set_color(PALETTE.text_muted)
     ax.yaxis.label.set_color(PALETTE.text_muted)
     ax.title.set_color(PALETTE.text)
+    ax.title.set_weight("medium")
+    ax.title.set_ha("left")
+    ax.title.set_x(0.)
     return ax
 
 
@@ -47,6 +55,7 @@ class MplCanvas(StableFigureCanvas):
         )
         super().__init__(self.fig, parent, preferred=(500, 320))
         self._navigation = None
+        self._explore_button = None
         self._value_lookup = None
         self.mpl_connect("motion_notify_event", self._show_values)
         self.mpl_connect("figure_leave_event", lambda _: QToolTip.hideText())
@@ -72,10 +81,12 @@ class MplCanvas(StableFigureCanvas):
             self._navigation = NavigationToolbar2QT(self, self, coordinates=False)
             self._navigation.hide()
         button = QToolButton(parent)
+        button.setObjectName("QuietTool")
         button.setText("Explorar gráfico")
         button.setAccessibleName("Explorar gráfico")
         button.setToolTip("Ampliar, mover ou restaurar a escala do gráfico. Passe o mouse sobre os dados para ler valores.")
-        button.setIcon(get_icon("search", color=PALETTE.text_muted))
+        self._explore_button = button
+        self.refresh_theme()
         button.setIconSize(QSize(20, 20))
         button.setToolButtonStyle(Qt.ToolButtonIconOnly)
         button.setPopupMode(QToolButton.InstantPopup)
@@ -92,6 +103,10 @@ class MplCanvas(StableFigureCanvas):
         menu.aboutToShow.connect(lambda: zoom.setChecked(self._navigation.mode.name == "ZOOM"))
         button.setMenu(menu)
         return button
+
+    def refresh_theme(self):
+        if self._explore_button is not None:
+            self._explore_button.setIcon(get_icon("search", color=PALETTE.text_muted))
 
     def set_value_lookup(self, lookup):
         self._value_lookup = lookup

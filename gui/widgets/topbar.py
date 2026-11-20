@@ -3,14 +3,16 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
+from gui.design_system import LAYOUT
+
 
 class Topbar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("PageHeader")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 17, 28, 15)
-        layout.setSpacing(3)
+        layout.setContentsMargins(LAYOUT.page_margin, 19, LAYOUT.page_margin, 15)
+        layout.setSpacing(5)
 
         self.context = QLabel()
         self.context.setObjectName("TopbarBreadcrumb")

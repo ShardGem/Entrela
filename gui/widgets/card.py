@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.icons import get_pixmap
-from gui.theme import PALETTE
+from gui.theme import FONT_MONO, PALETTE
 
 
 class Card(QFrame):
@@ -70,14 +70,14 @@ class MetricCard(QFrame):
                 f"color: {accent};"
                 "font-size: 26px;"
                 "font-weight: 600;"
-                "font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;"
+                f"font-family: {FONT_MONO};"
                 "letter-spacing: -0.5px;"
             )
 
         value_row.addWidget(self._value)
 
         self._unit = QLabel(unit)
-        self._unit.setStyleSheet(f"color: {PALETTE.text_dim}; font-size: 12px;")
+        self._unit.setObjectName("MetricUnit")
         value_row.addWidget(self._unit, alignment=Qt.AlignBottom)
         value_row.addStretch()
 
@@ -141,20 +141,22 @@ class EmptyState(QWidget):
         layout.setSpacing(16)
         layout.setContentsMargins(40, 40, 40, 40)
 
-        icon_lbl = QLabel()
-        icon_lbl.setFixedSize(40, 40)
-        icon_lbl.setPixmap(get_pixmap(icon, color=PALETTE.text_dim, size=40))
-        icon_lbl.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_lbl, alignment=Qt.AlignCenter)
+        self._icon_name = icon
+        self._icon = QLabel()
+        self._icon.setFixedSize(40, 40)
+        self._icon.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._icon, alignment=Qt.AlignCenter)
+        self.refresh_theme()
 
         t = QLabel(title)
-        t.setStyleSheet(f"color: {PALETTE.text}; font-size: 15px; font-weight: 600;")
+        t.setObjectName("WorkspaceSectionTitle")
+        t.setWordWrap(True)
         t.setAlignment(Qt.AlignCenter)
         layout.addWidget(t)
 
         if description:
             d = QLabel(description)
-            d.setStyleSheet(f"color: {PALETTE.text_muted}; font-size: 13px;")
+            d.setObjectName("FieldHint")
             d.setAlignment(Qt.AlignCenter)
             d.setWordWrap(True)
             d.setMaximumWidth(360)
@@ -165,3 +167,6 @@ class EmptyState(QWidget):
             btn.setObjectName("PrimaryButton")
             layout.addWidget(btn, alignment=Qt.AlignCenter)
             self.action_button = btn
+
+    def refresh_theme(self):
+        self._icon.setPixmap(get_pixmap(self._icon_name, color=PALETTE.primary, size=32))

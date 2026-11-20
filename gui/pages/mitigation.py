@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton
+from gui.widgets.card import MetricCard
 from gui.widgets.collapsible import CollapsibleSection
 from gui.widgets.content_tabs import ContentTabs
 from gui.design_system import Surface
@@ -98,8 +99,14 @@ class MitigationPage(PageBase):
         self.table.setAccessibleName("Medições e incerteza de amostragem por fator")
         self.canvas = MplCanvas(height=3)
         self.canvas.setMinimumHeight(250)
-        self.views.addTab(self.canvas, 'Extrapolação')
+        plot = Surface(role="PlotFrame")
+        plot.add(self.canvas, 1)
+        self.views.addTab(plot, 'Extrapolação')
         self.views.addTab(self.table, 'Medições por fator')
+        self.extrapolated = MetricCard("⟨Z⟩ extrapolado")
+        self.extrapolated.setObjectName("RunMetric")
+        self.extrapolated.layout().setContentsMargins(0, 6, 0, 9)
+        inspector.add(self.extrapolated)
         self.summary = QLabel()
         self.summary.setWordWrap(True)
         self.summary.setObjectName("FieldHint")
@@ -113,10 +120,12 @@ class MitigationPage(PageBase):
             "ZNE estima um observável e não garante melhora. Não produz automaticamente um estado mitigado. "
             "Valores extrapolados não são truncados a [-1,1]. Fidelidade e pureza permanecem as da simulação original. "
             "Wilson é um intervalo aproximado por fator, sem cobertura simultânea e sem propagação "
-            "ao alvo de ruído zero. Nenhuma das incertezas mostradas cobre viés do modelo ou do ajuste."
+            "ao alvo de ruído zero. O erro padrão propagado é uma estimativa, sem cobertura de intervalo de confiança. "
+            "As incertezas de amostragem deixam de fora o viés do modelo e do ajuste."
         )
         note.setWordWrap(True)
         method = CollapsibleSection("Como interpretar")
+        method.setProperty("inline", True)
         method.content_layout.addWidget(note)
         inspector.add(method)
         inspector.body().addStretch(1)
@@ -131,6 +140,8 @@ class MitigationPage(PageBase):
         self.table.setRowCount(0)
         self.summary.clear()
         self.sampling_warning.clear()
+        self.sampling_warning.hide()
+        self.extrapolated.hide()
         self.views.setCurrentIndex(0)
         self.views.setTabEnabled(1, False)
         ax = self.canvas.reset_axes()
@@ -174,6 +185,7 @@ class MitigationPage(PageBase):
                     "Erro padrão igual a zero não comprova ausência de incerteza."
                 ]
             self.sampling_warning.setText(" ".join(warnings))
+            self.sampling_warning.setVisible(bool(warnings))
             for index, (f, y, e) in enumerate(zip(m["scale_factors"], m["measured"], m["stderr"])):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
@@ -183,11 +195,10 @@ class MitigationPage(PageBase):
                     item = QTableWidgetItem(text)
                     item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(row, col, item)
-            self.summary.setText(
-                f"Z extrapolado do qubit {m['qubit']}: {m['extrapolated']:.6f}. "
-                f"Erro padrão plug-in propagado: {m['extrapolated_stderr']:.6f}. "
-                "Métricas de estado pertencem à execução de origem preservada."
-            )
+            self.extrapolated.set_value(f"{m['extrapolated']:.6f}", f"q{m['qubit']}")
+            self.extrapolated.show()
+            summary = [f"Erro padrão propagado (plug-in): {m['extrapolated_stderr']:.6f}"]
+
             xs = np.array(m["scale_factors"])
             ys = np.array(m["measured"])
             ax.errorbar(
@@ -196,7 +207,7 @@ class MitigationPage(PageBase):
                 yerr=(np.maximum(0., np.array([ys - np.array(intervals)[:, 0], np.array(intervals)[:, 1] - ys]))
                       if len(intervals) == len(ys) else m["stderr"]),
                 fmt="o",
-                color=PALETTE.primary,
+                color=PALETTE.q1,
                 label="Wilson 95% por fator" if len(intervals) == len(ys) else "Erro padrão plug-in",
             )
             coeff = m.get(
@@ -219,12 +230,12 @@ class MitigationPage(PageBase):
                     linestyle="--",
                     label="Referência: mesmo circuito sem ruído",
                 )
-                self.summary.setText(
-                    self.summary.text()
-                    + f" Erro absoluto: antes {m['baseline_absolute_error']:.5g}; após {m['extrapolated_absolute_error']:.5g}. "
-                    + f"Graus de liberdade residuais: {m['degrees_of_freedom']}. "
-                    + "O erro padrão propagado é estimado; não é um intervalo de confiança do alvo de ruído zero."
-                )
+                summary.extend([
+                    f"Erro absoluto antes: {m['baseline_absolute_error']:.5g}",
+                    f"Erro absoluto após: {m['extrapolated_absolute_error']:.5g}",
+                    f"Graus de liberdade residuais: {m['degrees_of_freedom']}",
+                ])
+            self.summary.setText("\n".join(summary))
             ax.set_xlabel("Fator de ruído efetivo (0 = ruído zero)")
             ax.set_ylabel("⟨Z⟩")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text, fontsize=8)

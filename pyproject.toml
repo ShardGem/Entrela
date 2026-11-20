@@ -27,4 +27,4 @@ include = ["core*", "data*", "gui*"]
 entrela = "gui.application:main"
 
 [tool.setuptools.package-data]
-gui = ["assets/*.png", "assets/icons/*", "assets/fonts/*.ttf", "assets/fonts/OFL.txt"]
+gui = ["assets/*.png", "assets/icons/*", "assets/fonts/*.ttf", "assets/fonts/OFL*.txt"]

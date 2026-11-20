@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QMenu, QTabBar, QVBoxLayout, QWidget
 
 from gui.widgets.button import SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
+from gui.design_system import LAYOUT
 from gui.widgets.content_tabs import ContentTabs
 
 
@@ -51,7 +52,7 @@ class ExperimentWorkspace(QWidget):
 
         self.toolbar = QWidget()
         tools = FlowLayout(self.toolbar)
-        tools.setContentsMargins(20, 2, 20, 6)
+        tools.setContentsMargins(LAYOUT.page_margin, 4, LAYOUT.page_margin, LAYOUT.control_gap)
         self.stages = QTabBar()
         self.stages.setObjectName('WorkspaceStages')
         self.stages.setDrawBase(False)

@@ -2,9 +2,9 @@
 
 import math
 from fractions import Fraction
-from PySide6.QtCore import Qt, QRectF, QSize, Signal
+from PySide6.QtCore import Qt, QPointF, QRectF, QSize, Signal
 from PySide6.QtGui import QColor, QPen, QBrush, QPainter, QFont
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QSizePolicy
+from PySide6.QtWidgets import QFrame, QGraphicsView, QGraphicsScene, QGraphicsItem, QSizePolicy
 from gui.theme import PALETTE
 from core.circuit_document import GATE_HELP
 
@@ -71,7 +71,7 @@ class GateItem(QGraphicsItem):
         op = self.operation
         name = op["name"]
         qs = op["qubits"]
-        color = PALETTE.q2 if op.get("stage") == "preparation" else PALETTE.primary
+        color = PALETTE.q2 if op.get("stage") == "preparation" else PALETTE.q1
         if name == "measure":
             color = PALETTE.success
         pen = QPen(QColor(color), 2.5 if self.isSelected() else 1.4)
@@ -161,6 +161,7 @@ class CircuitCanvas(QGraphicsView):
         self.total_operations = 0
         self.scene_model = QGraphicsScene(self)
         self.setScene(self.scene_model)
+        self.setFrameShape(QFrame.NoFrame)
         self.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
@@ -187,8 +188,8 @@ class CircuitCanvas(QGraphicsView):
         return QSize(260, 240)
 
     def refresh_theme(self):
-        self.setBackgroundBrush(QBrush(QColor(PALETTE.bg)))
-        self.scene_model.setBackgroundBrush(QBrush(QColor(PALETTE.bg)))
+        self.setBackgroundBrush(QBrush(QColor(PALETTE.bg_elevated)))
+        self.scene_model.setBackgroundBrush(QBrush(QColor(PALETTE.bg_elevated)))
         selection = self.scene_model.selectedItems()
         indexes = [item.data(0) for item in selection]
         if self.operations:
@@ -196,6 +197,26 @@ class CircuitCanvas(QGraphicsView):
                 self.operations, self.num_qubits, self.offset, self.total_operations
             )
             self.select_operations(indexes)
+
+    def drawBackground(self, painter, rect):
+        super().drawBackground(painter, rect)
+        if self.editable:
+            step = 24
+            left = math.ceil(rect.left() / step) * step
+            top = math.ceil(rect.top() / step) * step
+            color = QColor(PALETTE.border_strong)
+            color.setAlphaF(.28)
+            pen = QPen(color)
+            pen.setWidthF(1.5)
+            pen.setCosmetic(True)
+            painter.save()
+            painter.setPen(pen)
+            painter.drawPoints([
+                QPointF(x, y)
+                for x in range(left, math.ceil(rect.right()), step)
+                for y in range(top, math.ceil(rect.bottom()), step)
+            ])
+            painter.restore()
 
     def _selection(self):
         items = self.scene_model.selectedItems()

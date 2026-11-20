@@ -5,11 +5,11 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QPlainTextEdit,
     QHeaderView,
-    QToolButton, QMenu, QHBoxLayout, QVBoxLayout, QWidget, QScrollArea,
+    QToolButton, QMenu, QHBoxLayout, QWidget, QScrollArea,
 )
 from gui.pages.base import PageBase
 from gui.widgets.card import MetricCard, MetricGrid, EmptyState
-from gui.widgets.button import SecondaryButton
+from gui.widgets.button import GhostButton, SecondaryButton
 from gui.design_system import Surface
 from gui.tabs.results_tab import ResultsTab
 from gui.widgets.state_inspector import StateInspector
@@ -98,15 +98,12 @@ class ResultsPage(PageBase):
         self.inspector_scroll.setWidgetResizable(True)
         self.inspector_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.inspector_scroll.setWidget(self.inspector)
-        inspector_column = QVBoxLayout()
-        inspector_column.setSpacing(6)
-        self.inspector_toggle = SecondaryButton('Ocultar detalhes')
+        self.inspector_toggle = GhostButton('Ocultar detalhes', icon='info')
         self.inspector_toggle.setCheckable(True)
         self.inspector_toggle.setChecked(True)
         self.inspector_toggle.toggled.connect(self._set_inspector_open)
-        inspector_column.addWidget(self.inspector_toggle, 0, Qt.AlignRight | Qt.AlignTop)
-        inspector_column.addWidget(self.inspector_scroll, 1)
-        column_layout.addLayout(inspector_column)
+        self.add_action(self.inspector_toggle)
+        column_layout.addWidget(self.inspector_scroll)
         self.body().addWidget(self.result_layout, 1)
         for name, text, signal in [
             ("btn_rerun", "Reexecutar", self.rerun_requested),
@@ -149,6 +146,7 @@ class ResultsPage(PageBase):
         self.empty.setVisible(not available)
         self.result_layout.setVisible(available)
         self.reproduction_status.hide()
+        self.inspector_toggle.setEnabled(available)
         self.export_button.setEnabled(available)
         self.btn_edit.setEnabled(available)
 

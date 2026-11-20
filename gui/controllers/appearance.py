@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication, QWidget, QAbstractButton, QTextBrows
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.colors import to_hex
 from gui.theme import PALETTE, build_qss
-from gui.palettes import DARK, LIGHT, NAVY, THEMES
+from gui.palettes import THEMES
 from gui.icons import get_icon
 from gui.widgets.data_table import table_row_height
 
@@ -58,18 +58,23 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", dens
     theme = resolve_theme(theme)
     before = asdict(PALETTE)
     after = dict(THEMES[theme])
+    light_workbench = theme != "dark"
     if accent in ACCENTS:
-        primary, hover, pressed, muted = ACCENTS[accent][theme == "light"]
+        primary, hover, pressed, muted = ACCENTS[accent][light_workbench]
         after.update(primary=primary, primary_hover=hover, primary_pressed=pressed,
                      primary_muted=muted, primary_faint=muted)
         after.update(action_bg=primary, action_hover=hover, action_pressed=pressed,
                      action_on=after['primary_on'])
     if high_contrast:
-        after.update(text="#ffffff" if theme != "light" else "#000000",
-                     text_muted="#d7e0ed" if theme != "light" else "#263b53",
-                     text_dim="#c1d0e1" if theme != "light" else "#334d69",
-                     border="#8295ad" if theme != "light" else "#657a92",
-                     border_strong="#b6c6da" if theme != "light" else "#3d536e")
+        after.update(text="#ffffff" if not light_workbench else "#000000",
+                     text_muted="#d7e0ed" if not light_workbench else "#263b53",
+                     text_dim="#c1d0e1" if not light_workbench else "#334d69",
+                     border="#8295ad" if not light_workbench else "#657a92",
+                     border_strong="#b6c6da" if not light_workbench else "#3d536e")
+        if theme == "light":
+            after.update(chrome_text="#000000", chrome_muted="#263b53", chrome_border="#657a92")
+        else:
+            after.update(chrome_text="#ffffff", chrome_muted="#d7e0ed", chrome_border="#8295ad")
     app = QApplication.instance()
     if app:
         app.setProperty("entrelaReduceMotion", bool(reduce_motion))
@@ -136,13 +141,6 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", dens
             widget.setHtml(rendered)
             widget.verticalScrollBar().setValue(vertical)
             widget.horizontalScrollBar().setValue(horizontal)
-        if isinstance(widget, QAbstractButton) and hasattr(widget, "icon_name"):
-            widget.setIcon(
-                get_icon(
-                    widget.icon_name,
-                    color=PALETTE.primary if widget.isChecked() else PALETTE.text_muted,
-                )
-            )
         if isinstance(widget, QAbstractButton) and getattr(widget, "_icon_name", None):
             widget.setIcon(get_icon(widget._icon_name, color=widget._icon_color()))
         if hasattr(widget, "refresh_theme"):

@@ -42,6 +42,9 @@ class GhostButton(_BaseButton):
         super().__init__(text, icon, parent)
         self.setObjectName("GhostButton")
 
+    def _icon_color(self) -> str:
+        return PALETTE.primary
+
 
 class DangerButton(_BaseButton):
     def __init__(self, text="", icon=None, parent=None):
