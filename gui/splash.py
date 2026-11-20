@@ -29,7 +29,7 @@ from PySide6.QtGui import (
 import math
 from pathlib import Path
 from gui.branding import application_icon
-from gui.palettes import NAVY
+from gui.palettes import DARK
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -131,8 +131,8 @@ class QuantumBackground(QWidget):
         # =========================================================
         gradient = QLinearGradient(0, 0, rect.width(), rect.height())
 
-        gradient.setColorAt(0, QColor(NAVY["chrome"]))
-        gradient.setColorAt(1, QColor(NAVY["chrome_hover"]))
+        gradient.setColorAt(0, QColor(DARK["chrome"]))
+        gradient.setColorAt(1, QColor(DARK["chrome_hover"]))
 
         painter.fillRect(rect, gradient)
 
@@ -161,7 +161,7 @@ class QuantumBackground(QWidget):
 
         painter.setPen(Qt.NoPen)
 
-        light = QColor(NAVY["chrome_accent"])
+        light = QColor(DARK["chrome_accent"])
         particle_count = 90
 
         for i in range(particle_count):
@@ -235,7 +235,7 @@ class SplashScreen(QSplashScreen):
         self.container.setGeometry(0, 0, 1100, 650)
 
         self.container.setStyleSheet(
-            f"background-color: {NAVY['chrome']}; border-radius: 28px;"
+            f"background-color: {DARK['chrome']}; border-radius: 28px;"
         )
 
         # =========================================================
@@ -322,7 +322,7 @@ class SplashScreen(QSplashScreen):
         self.loading.setAlignment(Qt.AlignCenter)
 
         self.loading.setStyleSheet(
-            f"color: {NAVY['chrome_muted']}; font-size: 13px;"
+            f"color: {DARK['chrome_muted']}; font-size: 13px;"
             "background: transparent; margin-bottom: 10px;"
         )
 

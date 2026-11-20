@@ -11,7 +11,7 @@ class Topbar(QFrame):
         super().__init__(parent)
         self.setObjectName("PageHeader")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(LAYOUT.page_margin, 19, LAYOUT.page_margin, 15)
+        layout.setContentsMargins(LAYOUT.page_margin, 16, LAYOUT.page_margin, 12)
         layout.setSpacing(5)
 
         self.context = QLabel()

@@ -29,6 +29,7 @@ from gui.branding import application_icon
 from gui.manual import WELCOME_HTML
 from gui.widgets.sidebar import Sidebar
 from gui.design_system import LAYOUT
+from gui.navigation import NAV_ITEMS
 from gui.controllers.navigation import NavigationController
 from gui.controllers.layout import LayoutController
 from gui.widgets.dialogs import ConfigurationsDialog
@@ -210,6 +211,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         self.topbar = Topbar()
         self.sidebar = Sidebar()
+        self.sidebar.restore_sections(self.settings.value("layout/sidebar_sections"))
         layout.addWidget(self.sidebar)
         right = QFrame()
         right.setObjectName("Workbench")
@@ -303,6 +305,8 @@ class MainWindow(QMainWindow):
         self.sidebar.compact_requested.connect(self._toggle_sidebar)
         self.sidebar.navigate.connect(self._open_destination)
         self.sidebar.search_requested.connect(self._open_commands)
+        self.sidebar.new_requested.connect(self._new_experiment)
+        self.sidebar.sections_changed.connect(lambda groups: self.settings.setValue("layout/sidebar_sections", groups))
         self.sidebar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
         self.page_history.configure_requested.connect(lambda: self._show_page("simulation"))
         self.page_workspace.page_selected.connect(self._show_page)
@@ -409,9 +413,14 @@ class MainWindow(QMainWindow):
             ("mode:guided", "Usar modo Guiado", "ajuda etapas"),
             ("mode:advanced", "Usar modo Avançado", "parâmetros"),
         ]
+        commands[:0] = [
+            ("page:" + key, label, "navegar " + " ".join(PAGE_META.get(key, (label, ""))))
+            for key, label in NAV_ITEMS
+        ]
         commands += [
-            ("page:" + key, "Abrir " + title, "navegar "+title+" "+description)
+            ("page:" + key, title, description)
             for key, (title, description) in PAGE_META.items()
+            if key not in dict(NAV_ITEMS)
         ]
         if hasattr(self, 'projects'):
             try:

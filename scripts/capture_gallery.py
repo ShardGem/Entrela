@@ -256,6 +256,9 @@ def main():
         window.projects.open_project(None)
         gallery.show('dashboard')
         gallery.capture('01-inicio/01-visao-geral.png', 'Projetos e retomada do trabalho', 'dashboard')
+        window._open_commands()
+        gallery.capture('01-inicio/04-busca.png', 'Busca e comandos do laboratório', 'dashboard', window.command_palette)
+        window.command_palette.close()
         window.projects.open_project('Ruído em Ising')
         gallery.capture('01-inicio/03-projeto.png', 'Projeto · experimentos e execuções recentes', 'dashboard')
         splash = SplashScreen()
@@ -330,7 +333,7 @@ def main():
             if route in workspace._detail_actions:
                 workspace._detail_actions[route].trigger()
             else:
-                workspace.observation_tabs.setCurrentIndex(4 if route == 'results:data' else 3)
+                workspace.observation_tabs.setCurrentIndex(3 if route == 'results:data' else 2)
             gallery.capture(f'04-resultados/resultados-{key}.png', title, 'results')
         gallery.show('bloch')
         bloch = window.page_bloch

@@ -172,13 +172,15 @@ def test_observation_switch_keeps_selected_snapshot(window):
     window.projects.show_execution(record.id)
     window.page_bloch.slider.setValue(2)
     workspace = window.page_workspace
-    workspace.observation_tabs.setCurrentIndex(2)
+    window.sidebar.buttons['bloch'].click()
     assert window.is_page_active('bloch')
+    assert workspace.observation_tabs.isHidden()
+    window.sidebar.buttons['results'].click()
     workspace.observation_tabs.setCurrentIndex(1)
     assert window.is_page_active('results')
     assert window.page_results.results_tab.chart_views.currentIndex() == 1
     assert window.page_bloch.slider.value() == 2
-    workspace.observation_tabs.setCurrentIndex(3)
+    workspace.observation_tabs.setCurrentIndex(2)
     assert window.page_results.tabs.currentWidget() is window.page_results.state_inspector
     assert window.page_bloch.slider.value() == 2
 

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from PySide6.QtCore import Qt, QSignalBlocker, Signal
-from PySide6.QtWidgets import QMenu, QTabBar, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt, QSignalBlocker, Signal
+from PySide6.QtWidgets import QBoxLayout, QMenu, QTabBar, QVBoxLayout, QWidget
 
-from gui.widgets.button import SecondaryButton
+from gui.widgets.button import GhostButton, SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
 from gui.design_system import LAYOUT
 from gui.widgets.content_tabs import ContentTabs
@@ -51,15 +51,19 @@ class ExperimentWorkspace(QWidget):
         root.setSpacing(0)
 
         self.toolbar = QWidget()
-        tools = FlowLayout(self.toolbar)
-        tools.setContentsMargins(LAYOUT.page_margin, 4, LAYOUT.page_margin, LAYOUT.control_gap)
+        self.toolbar_layout = QBoxLayout(QBoxLayout.LeftToRight, self.toolbar)
+        self.toolbar_layout.setContentsMargins(LAYOUT.page_margin, 4, LAYOUT.page_margin, LAYOUT.control_gap)
+        self.visible_views = FlowLayout()
+        self.view_actions = FlowLayout()
+        self.toolbar_layout.addLayout(self.visible_views, 1)
+        self.toolbar_layout.addLayout(self.view_actions)
         self.stages = QTabBar()
         self.stages.setObjectName('WorkspaceStages')
         self.stages.setDrawBase(False)
         self.stages.addTab('Preparar')
         self.stages.addTab('Resultados')
         self.stages.setAccessibleName('Preparação ou consulta da execução')
-        tools.addWidget(self.stages)
+        self.visible_views.addWidget(self.stages)
         self.stages.hide()
         self.templates_button = SecondaryButton("Configurações salvas")
         self.templates_button.setAccessibleName("Abrir configurações salvas")
@@ -70,7 +74,8 @@ class ExperimentWorkspace(QWidget):
         self.templates_menu.setToolTipsVisible(True)
         self.templates_button.setMenu(self.templates_menu)
 
-        self.recent_button = SecondaryButton("Execuções…")
+        self.recent_button = SecondaryButton("Execuções")
+        self.recent_button.setObjectName("ViewAction")
         self.recent_button.setAccessibleName("Abrir execuções recentes")
         self.recent_button.setToolTip("Abra resultados de uma execução salva sem procurar outra tela.")
         self.recent_menu = QMenu(self.recent_button)
@@ -103,12 +108,19 @@ class ExperimentWorkspace(QWidget):
         self.observation_tabs.setExpanding(False)
         self.observation_tabs.setUsesScrollButtons(True)
         self.observation_tabs.setAccessibleName('Visualizações da execução')
-        for text in ('Medições', 'Evolução', 'Bloch', 'Estado global', 'Dados'):
+        for text in ('Medições', 'Evolução', 'Estado global', 'Dados'):
             self.observation_tabs.addTab(text)
-        tools.addWidget(self.observation_tabs)
-        details = SecondaryButton('Mais visualizações')
-        menu = QMenu(details)
-        menu.addAction('Medições e evolução lado a lado', self._paired_charts)
+        self.visible_views.addWidget(self.observation_tabs)
+        self.back_to_results = GhostButton("Voltar aos gráficos", icon="arrow-left")
+        self.back_to_results.clicked.connect(lambda: self._observation_selected(0))
+        self.visible_views.addWidget(self.back_to_results)
+        self.more_views = SecondaryButton("Mais", icon="ellipsis")
+        self.more_views.setObjectName("ViewAction")
+        self.more_views.setAccessibleName("Mais visualizações da execução")
+        self.more_views.setToolTip("Circuito executado, interpretação, metadados e gráficos lado a lado")
+        menu = QMenu(self.more_views)
+        self.paired_action = menu.addAction("Medições e evolução lado a lado", self._paired_charts)
+        self.paired_action.setCheckable(True)
         menu.addSeparator()
         self._detail_actions = {}
         for route, title in self.RESULTS:
@@ -116,9 +128,9 @@ class ExperimentWorkspace(QWidget):
                 action = menu.addAction(title, lambda checked=False, key=route: self._apply_route(key, True))
                 action.setCheckable(True)
                 self._detail_actions[route] = action
-        details.setMenu(menu)
-        tools.addWidget(details)
-        tools.addWidget(self.recent_button)
+        self.more_views.setMenu(menu)
+        self.view_actions.addWidget(self.more_views)
+        self.view_actions.addWidget(self.recent_button)
         root.insertWidget(0, self.toolbar)
         self.observation_tabs.tabBarClicked.connect(self._observation_clicked)
         self.observation_tabs.currentChanged.connect(self._observation_selected)
@@ -181,7 +193,7 @@ class ExperimentWorkspace(QWidget):
             self._pages['results'].results_tab.chart_views.setCurrentIndex(index)
             self._apply_route('results:graphs', True)
         else:
-            self._apply_route({2:'bloch', 3:'results:state', 4:'results:data'}[index], True)
+            self._apply_route({2: 'results:state', 3: 'results:data'}[index], True)
 
     def _paired_charts(self):
         self._pages['results'].results_tab.chart_views.setCurrentIndex(2)
@@ -191,7 +203,7 @@ class ExperimentWorkspace(QWidget):
         """Reutiliza uma ação existente na faixa comum, somente no seu contexto."""
         if key not in self._keys:
             raise ValueError("Página fora do laboratório: " + key)
-        self.toolbar.layout().addWidget(widget)
+        self.view_actions.addWidget(widget)
         self._context_actions.append((widget, key))
         self._update_context_actions()
 
@@ -204,16 +216,37 @@ class ExperimentWorkspace(QWidget):
             action.setChecked(self._route == route)
         chart_views = getattr(self._pages['results'], 'results_tab', None)
         chart_index = chart_views.chart_views.currentIndex() if chart_views else 0
-        route_index = {
-            'bloch': 2, 'results:state': 3, 'results:data': 4,
-            'results:graphs': chart_index if chart_index < 2 else 0,
-        }.get(self._route, -1)
-        with QSignalBlocker(self.observation_tabs):
-            current = self.observation_tabs.currentIndex()
-            if route_index >= 0:
-                self.observation_tabs.setCurrentIndex(route_index)
-            elif current >= 0:
-                self.observation_tabs.setCurrentIndex(0)
+        paired = self._route == 'results:graphs' and chart_index == 2
+        tab_index = {
+            'results:state': 2, 'results:data': 3,
+            'results:graphs': chart_index,
+        }.get(self._route)
+        reviewing = self.current_page_key == 'results' or self._route == 'circuit:inspect'
+        self.more_views.setVisible(reviewing)
+        self.paired_action.setChecked(paired)
+        self.back_to_results.setVisible(reviewing and (tab_index is None or paired))
+        self.observation_tabs.setVisible(reviewing and tab_index is not None and not paired)
+        if not self.observation_tabs.isHidden():
+            with QSignalBlocker(self.observation_tabs):
+                self.observation_tabs.setCurrentIndex(tab_index)
+        self._arrange_toolbar()
+
+    def _arrange_toolbar(self):
+        margins = self.toolbar_layout.contentsMargins()
+        required = self.visible_views.sizeHint().width() + self.view_actions.sizeHint().width()
+        required += margins.left() + margins.right() + self.toolbar_layout.spacing()
+        direction = QBoxLayout.LeftToRight if required <= self.width() else QBoxLayout.TopToBottom
+        if self.toolbar_layout.direction() != direction:
+            self.toolbar_layout.setDirection(direction)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._arrange_toolbar()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.StyleChange, QEvent.FontChange) and hasattr(self, "view_actions"):
+            self._arrange_toolbar()
 
     def _selected(self, index: int):
         if 0 <= index < len(self._keys):

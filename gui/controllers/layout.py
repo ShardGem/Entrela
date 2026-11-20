@@ -95,6 +95,8 @@ class LayoutController(QObject):
             self.window.settings.remove('layout/choice/' + key)
         self.window.settings.remove('layout/routes')
         self.window.settings.remove('layout/laboratory')
+        self.window.settings.remove('layout/sidebar_sections')
+        self.window.sidebar.restore_sections([key for key, *_ in self.window.sidebar.GROUPS])
         self.window.page_workspace._last_preparation = 'simulation'
         self.window.page_workspace._last_result = 'results:graphs'
         self.window.navigation.last_for_root.update(dashboard='dashboard', simulation='simulation', analysis='analysis', history='history', docs='examples', settings='settings')

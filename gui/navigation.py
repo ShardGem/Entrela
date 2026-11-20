@@ -14,6 +14,7 @@ ROOT_FOR_PAGE.update(circuit='simulation', results='simulation', bloch='simulati
 # Destinos visíveis: as áreas de trabalho são contêineres, não substitutos
 # dos acessos às funcionalidades. A ordem também define o percurso por teclado.
 NAV_ITEMS = [
+    ('dashboard', 'Projetos'),
     ('simulation', 'Simulação'),
     ('circuit', 'Circuitos'),
     ('results', 'Resultados'),
@@ -21,7 +22,6 @@ NAV_ITEMS = [
     ('comparison', 'Comparar execuções'),
     ('analysis', 'Estudos e varreduras'),
     ('mitigation', 'Mitigação ZNE'),
-    ('dashboard', 'Projetos'),
     ('history', 'Histórico'),
     ('notebook', 'Caderno'),
     ('catalog', 'Biblioteca'),
@@ -30,10 +30,16 @@ NAV_ITEMS = [
 ]
 NAV_LABELS = dict(NAV_ITEMS)
 NAV_GROUPS = [
-    ('lab', 'Laboratório', 'group-lab', ('simulation', 'circuit', 'results', 'bloch')),
-    ('research', 'Investigação', 'group-research', ('comparison', 'analysis', 'mitigation')),
-    ('records', 'Acervo', 'group-organize', ('dashboard', 'history', 'notebook', 'catalog')),
+    ('lab', 'Preparar', ('simulation', 'circuit')),
+    ('observe', 'Explorar', ('results', 'bloch')),
+    ('research', 'Investigar', ('comparison', 'analysis', 'mitigation')),
+    ('records', 'Acervo', ('history', 'notebook', 'catalog')),
 ]
+NAV_ICONS = {
+    'dashboard': 'project-folder', 'simulation': 'group-lab',
+    'circuit': 'gate-wires', 'mitigation': 'extrapolate',
+    'notebook': 'annotations', 'catalog': 'book-stack',
+}
 
 ROOT_FOR_PAGE.update(catalog="catalog", notebook="notebook")
 PAGE_LABELS.update(catalog="Biblioteca", notebook="Caderno", dashboard="Projetos", history="Histórico de execuções", analysis="Estudos e varreduras", docs="Aprender")

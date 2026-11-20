@@ -217,6 +217,36 @@ def test_command_palette_search_and_action(window):
     palette._activate()
     assert window.help_dock.isVisible()
     assert window._current_page == current_page
+def test_command_palette_ranks_matches_and_accepts_arrows_from_search(qt_app):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from gui.widgets.command_palette import CommandPalette
+
+    palette = CommandPalette()
+    destinations = [
+        ("page:history", "Histórico", "execuções"),
+        ("page:simulation", "Simulação", "evolução por Hamiltoniano"),
+        ("tool:sim", "Configurar simulação", "parâmetros"),
+    ]
+    chosen = []
+    palette.command_requested.connect(chosen.append)
+    palette.open_commands(destinations)
+    qt_app.processEvents()
+    palette.search.setText("simulacao")
+    assert palette.list.currentItem().data(Qt.UserRole) == "page:simulation"
+    QTest.keyClick(palette.search, Qt.Key_Down)
+    assert palette.search.hasFocus()
+    assert palette.list.currentItem().data(Qt.UserRole) == "tool:sim"
+    QTest.keyClick(palette.search, Qt.Key_Up)
+    QTest.keyClick(palette.search, Qt.Key_Return)
+    assert chosen == ["page:simulation"]
+    palette.open_commands(destinations)
+    assert palette.list.currentItem().data(Qt.UserRole) == "page:simulation"
+    QTest.keyClick(palette.search, Qt.Key_Escape)
+    assert not palette.isVisible()
+    assert chosen == ["page:simulation"]
+
+
 def test_history_search_filters_records(window):
     exp=run_experiment(replace(create_example_config("bell"),shots=64))
     window.repository.save(exp)

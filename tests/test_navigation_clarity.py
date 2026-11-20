@@ -10,6 +10,8 @@ def test_groups_start_open_and_navigation_preserves_independent_choices(window, 
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
     sidebar.group_buttons['records'].click()
     wait_until(lambda: sidebar.group_bodies['records'].isHidden())
+    expanded = window.settings.value('layout/sidebar_sections')
+    assert 'records' not in expanded and 'observe' in expanded
     assert all(not sidebar.group_bodies[key].isHidden() for key in ('lab', 'research'))
     window._show_page('comparison')
     assert sidebar.group_bodies['records'].isHidden()

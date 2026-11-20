@@ -9,6 +9,12 @@ from PySide6.QtSvg import QSvgRenderer
 
 
 _BODIES = {
+    "project-folder": '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM7 12h10m-10 4h6"/>',
+    "gate-wires": '<path d="M3 7h4m6 0h8M3 17h9m6 0h3"/><rect x="7" y="4" width="6" height="6" rx="1.2"/><rect x="12" y="14" width="6" height="6" rx="1.2"/>',
+    "extrapolate": '<path d="M4 4v16h16M6 14l4-3 4-3 6-2"/><path d="M10 11v6m4-9v9m6-11v11" stroke-dasharray="1.2 2.6"/>',
+    "book-stack": '<rect x="4" y="4" width="5" height="16" rx="1"/><path d="M12 5v15m3-14 5-1 3 14-5 1z"/>',
+    "ellipsis": '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/>',
+    "arrow-left": '<path d="M20 12H4m6-6-6 6 6 6"/>',
     "annotations": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',
     "configurations": '<path d="M3 6h7m4 0h7M3 12h3m4 0h11M3 18h11m4 0h3"/><circle cx="12" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="18" r="2"/>',
     "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',

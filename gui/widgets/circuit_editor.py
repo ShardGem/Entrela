@@ -138,7 +138,7 @@ class CircuitEditor(QWidget):
         self.creation_help.set_summary("")
         self.creation_help.layout().removeWidget(self.creation_help.header)
         self.creation_help.header.setParent(self)
-        self.creation_help.header.setText("Como criar")
+        self.creation_help.header.hide()
         self.creation_help.header.setToolTip("Como criar um circuito: passo a passo, controle e alvo, ângulos e leitura dos resultados.")
         help_text = QLabel(QUICK_START)
         help_text.setWordWrap(True)
@@ -208,9 +208,9 @@ class CircuitEditor(QWidget):
             button.setAccessibleName(title)
             toolbar.addWidget(button)
         self.file_menu = QToolButton()
-        self.file_menu.setText("Arquivo")
+        self.file_menu.setText("Ações do circuito")
         self.file_menu.setPopupMode(QToolButton.InstantPopup)
-        self.file_menu.setAccessibleName("Operações de arquivo e visualização do circuito")
+        self.file_menu.setAccessibleName("Ações do circuito")
         file_menu = QMenu(self.file_menu)
         self.file_menu.setMenu(file_menu)
         self.zoom = QSpinBox()
@@ -240,11 +240,9 @@ class CircuitEditor(QWidget):
             action = file_menu.addAction(text, button.click)
             action.setToolTip(button.toolTip())
         toolbar.addWidget(self.file_menu)
-        self.edit_menu_button = QToolButton()
-        self.edit_menu_button.setText("Editar")
-        self.edit_menu_button.setPopupMode(QToolButton.InstantPopup)
-        self.edit_menu = QMenu(self.edit_menu_button)
-        self.edit_menu_button.setMenu(self.edit_menu)
+        file_menu.addSeparator()
+        self.edit_menu = QMenu("Editar seleção", file_menu)
+        file_menu.addMenu(self.edit_menu)
         for text, callback in [
             ("Copiar seleção", self._copy_selected), ("Recortar seleção", self._cut_selected),
             ("Colar portas", self._paste_gates), ("Selecionar todas", self._select_all),
@@ -253,13 +251,20 @@ class CircuitEditor(QWidget):
             ("Mover depois", lambda: self._reorder(self.selected, self.selected + 1)),
         ]:
             self.edit_menu.addAction(text, callback)
-        toolbar.addWidget(self.edit_menu_button)
         toolbar.addWidget(self.zoom)
         self.advanced_section.layout().removeWidget(self.advanced_section.header)
         self.advanced_section.header.setParent(self)
         self.advanced_section.header.setText("Avançado")
         self.advanced_section.header.setToolTip("Fase global do circuito, em radianos. Não altera probabilidades de medição isoladamente.")
-        toolbar.addWidget(self.advanced_section.header)
+        self.advanced_section.header.hide()
+        for title, section in (
+            ("Parâmetros avançados", self.advanced_section),
+            ("Como criar um circuito", self.creation_help),
+        ):
+            action = file_menu.addAction(title)
+            action.setCheckable(True)
+            action.triggered.connect(section.set_expanded)
+            section.expanded_changed.connect(action.setChecked)
         self.advanced_section.hide()
         self.advanced_section.expanded_changed.connect(self.advanced_section.setVisible)
         library_row = FlowLayout()
@@ -379,7 +384,6 @@ class CircuitEditor(QWidget):
         palette_heading = QLabel('Portas')
         palette_heading.setObjectName('PanelTitle')
         palette_layout.insertWidget(0, palette_heading)
-        toolbar.addWidget(self.creation_help.header)
         palette_panel.setMinimumWidth(180)
         palette_panel.setMaximumWidth(270)
         self.scene_splitter.addWidget(palette_panel)

@@ -27,9 +27,10 @@ LIGHT = {
 }
 NAVY = {
     **LIGHT,
-    "chrome": "#171D32", "chrome_border": "#36405D", "chrome_text": "#F1F3FF",
-    "chrome_muted": "#AEBAD8", "chrome_hover": "#242D47", "chrome_selected": "#343F66",
-    "chrome_accent": "#B7C5FF",
+    "bg": "#F8F9FD", "border": "#DCE2EF",
+    "chrome": "#E8EDF7", "chrome_border": "#CCD7EA", "chrome_text": "#24324A",
+    "chrome_muted": "#4C5A73", "chrome_hover": "#DFE7F5", "chrome_selected": "#D3DFF8",
+    "chrome_accent": "#2F459F",
 }
 
 THEMES = {"dark": DARK, "light": LIGHT, "navy": NAVY}
@@ -42,6 +43,6 @@ THEME_CHOICES = (
 THEME_DESCRIPTIONS = {
     "dark": "Grafite combina fundo escuro, superfícies neutras e azul claro para ações.",
     "light": "Claro usa superfícies claras em toda a janela, com índigo para foco e ações.",
-    "navy": "Azul Entrela combina navegação em azul-tinta, área de trabalho clara e ações em índigo.",
+    "navy": "Azul Entrela usa tons de azul ardósia na navegação e índigo para ações e seleções.",
     "auto": "Automático acompanha a aparência do sistema operacional.",
 }

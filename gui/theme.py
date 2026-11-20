@@ -80,7 +80,7 @@ PALETTE = Palette()
 SPACING = Spacing()
 RADIUS = Radius()
 
-FONT_FAMILY = "Instrument Sans"
+FONT_FAMILY = "Inter"
 FONT_MONO = '"IBM Plex Mono", "Cascadia Mono", Consolas, monospace'
 
 
@@ -108,7 +108,7 @@ QWidget {{ color: {p.text}; background: transparent; }}
 QMainWindow, QWidget#RootWidget {{ background: {p.chrome}; }}
 QDialog, QDockWidget {{ background: {p.bg}; }}
 QFrame#Workbench {{
-    background: {p.bg}; border: 1px solid {p.chrome_border}; border-radius: 16px;
+    background: {p.bg}; border: 1px solid {p.chrome_border}; border-radius: 12px;
 }}
 QStatusBar {{ background: {p.chrome}; color: {p.chrome_muted}; font-size: 11px; }}
 QStatusBar QLabel {{ color: {p.chrome_muted}; font-size: 11px; }}
@@ -118,10 +118,11 @@ QToolTip {{
 }}
 
 /* Identidade e hierarquia tipográfica */
-QLabel#TopbarTitle, QLabel#HeroTitle {{ font-size: 31px; font-weight: 700; }}
-QLabel#TopbarBreadcrumb {{ color: {p.text_dim}; font-size: 11px; font-weight: 600; }}
+QLabel#TopbarTitle {{ font-size: 24px; font-weight: 600; }}
+QLabel#HeroTitle {{ font-size: 28px; font-weight: 600; }}
+QLabel#TopbarBreadcrumb {{ color: {p.text_muted}; font-size: 11px; font-weight: 500; }}
 QLabel#PageTitle, QLabel#ResumeTitle {{ font-size: 23px; font-weight: 600; }}
-QLabel#WorkspaceSectionTitle {{ font-size: 20px; font-weight: 600; }}
+QLabel#WorkspaceSectionTitle {{ font-size: 17px; font-weight: 600; }}
 QLabel#SectionTitle, QLabel#PanelTitle {{ font-size: 14px; font-weight: 600; }}
 QLabel#ExecutionIdentity, QLabel#SummaryValue {{ font-weight: 600; }}
 QLabel#PageSubtitle, QLabel#SectionSubtitle, QLabel#LeadText {{ color: {p.text_muted}; }}
@@ -139,21 +140,23 @@ QLabel#MetricUnit {{ color: {p.text_dim}; font-size: 11px; }}
 
 /* Navegação */
 QFrame#Sidebar {{ background: {p.chrome}; }}
-QLabel#SidebarLogo {{ color: {p.chrome_text}; font-size: 20px; font-weight: 700; }}
-QLabel#SidebarMark {{ background: {p.chrome_hover}; border: 1px solid {p.chrome_border}; border-radius: 9px; }}
+QLabel#SidebarLogo {{ color: {p.chrome_text}; font-size: 17px; font-weight: 600; }}
+QFrame#SidebarDivider {{ background: {p.chrome_border}; border: none; }}
+QLabel#NavShortcut {{
+    color: {p.chrome_muted}; font-size: 10px; padding: 2px 5px;
+    border: 1px solid {p.chrome_border}; border-radius: 4px;
+}}
 QPushButton#NavButton, QPushButton#NavGroup, QPushButton#SearchButton, QToolButton#SidebarToggle {{
     color: {p.chrome_muted}; background: transparent; border: 1px solid transparent; border-radius: 8px;
     text-align: left;
 }}
-QPushButton#NavButton {{ padding: 5px 10px; font-weight: 500; }}
-QPushButton#NavButton[compact="true"] {{ padding: 5px 7px; }}
-QPushButton#NavGroup {{ padding: 4px 8px; font-size: 10px; font-weight: 600; }}
-QPushButton#NavGroup[activeGroup="true"] {{ color: {p.chrome_text}; }}
-QPushButton#SearchButton {{ background: {p.chrome_hover}; border-color: {p.chrome_border}; padding: 6px 10px; }}
+QPushButton#NavButton {{ padding: 4px 9px; font-weight: 500; }}
+QPushButton#NavGroup {{ padding: 4px 25px 4px 9px; font-size: 11px; font-weight: 600; }}
+QPushButton#SearchButton {{ background: transparent; border-color: {p.chrome_border}; padding: 5px 9px; }}
 QPushButton#NavButton:hover, QPushButton#NavGroup:hover, QToolButton#SidebarToggle:hover {{
     background: {p.chrome_hover}; color: {p.chrome_text};
 }}
-QPushButton#NavButton:checked {{ background: {p.chrome_selected}; color: {p.chrome_text}; font-weight: 600; }}
+QPushButton#NavButton:checked {{ background: {p.chrome_selected}; color: {p.chrome_accent}; font-weight: 600; }}
 QPushButton#SearchButton:hover {{ background: {p.chrome_selected}; color: {p.chrome_text}; }}
 QPushButton#NavButton:focus, QPushButton#NavGroup:focus, QPushButton#SearchButton:focus,
 QToolButton#SidebarToggle:focus {{ border-color: {p.chrome_accent}; }}
@@ -227,6 +230,16 @@ QMenu::item {{ padding: 7px 24px 7px 12px; border-radius: 5px; }}
 QMenu::item:selected {{ background: {p.primary_faint}; color: {p.primary}; }}
 QMenu::item:disabled {{ color: {p.text_dim}; }}
 QMenu::separator {{ height: 1px; margin: 4px 6px; background: {p.border}; }}
+QDialog#CommandPalette {{ background: {p.bg_elevated}; }}
+QLineEdit#CommandQuery {{ background: {p.bg}; font-size: 14px; padding: 10px 12px; }}
+QListWidget#CommandResults {{ border: none; background: {p.bg_elevated}; }}
+QLabel#CommandKey {{
+    color: {p.text_muted}; font-size: 10px; padding: 2px 4px;
+    border: 1px solid {p.border}; border-radius: 4px;
+}}
+QPushButton#ViewAction {{ background: transparent; border-color: transparent; color: {p.text_muted}; }}
+QPushButton#ViewAction:hover {{ background: {p.surface_hover}; color: {p.text}; }}
+QPushButton#ViewAction:focus {{ border-color: {p.primary}; }}
 
 /* Campos e controles */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{

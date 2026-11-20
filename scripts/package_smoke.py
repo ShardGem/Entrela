@@ -33,12 +33,12 @@ splash=SplashScreen()
 assert not splash.logo.pixmap.isNull()
 assert not splash.text.pixmap().isNull()
 window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
-assert 'Instrument Sans' == QFontInfo(window.topbar.title.font()).family()
+assert 'Inter' == QFontInfo(window.topbar.title.font()).family()
 font_folder=Path(gui.__file__).parent/'assets/fonts'
-for weight in ('Regular', 'Medium', 'SemiBold', 'Bold'):
-    assert (font_folder/f'InstrumentSans-{weight}.ttf').is_file()
+for weight in ('Regular', 'Medium', 'SemiBold'):
+    assert (font_folder/f'Inter-{weight}.ttf').is_file()
 assert (font_folder/'IBMPlexMono-Regular.ttf').is_file()
-assert (font_folder/'OFL-InstrumentSans.txt').is_file()
+assert (font_folder/'OFL-Inter.txt').is_file()
 assert (font_folder/'OFL-IBMPlexMono.txt').is_file()
 assert 'SIL OPEN FONT LICENSE' in (font_folder/'OFL.txt').read_text()
 window.show();app.processEvents()

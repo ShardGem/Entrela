@@ -71,7 +71,7 @@ def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", dens
                      text_dim="#c1d0e1" if not light_workbench else "#334d69",
                      border="#8295ad" if not light_workbench else "#657a92",
                      border_strong="#b6c6da" if not light_workbench else "#3d536e")
-        if theme == "light":
+        if light_workbench:
             after.update(chrome_text="#000000", chrome_muted="#263b53", chrome_border="#657a92")
         else:
             after.update(chrome_text="#ffffff", chrome_muted="#d7e0ed", chrome_border="#8295ad")

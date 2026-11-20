@@ -1,277 +1,286 @@
-"""Navegação com grupos independentes e nomes visíveis nas duas larguras."""
-from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation, QEasingCurve, QEvent, QTimer
-from PySide6.QtWidgets import QApplication,QFrame,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QToolButton,QLabel,QScrollArea
-from gui.icons import get_icon
-from gui.theme import PALETTE
+"""Destinos do laboratório, com seções independentes e acesso por teclado."""
+
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QKeySequence, QPainter
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QToolButton, QVBoxLayout, QWidget
+
 from gui.branding import application_icon
-from gui.navigation import NAV_ITEMS, NAV_GROUPS
+from gui.icons import get_icon, get_pixmap
+from gui.navigation import NAV_GROUPS, NAV_ICONS, NAV_ITEMS, NAV_LABELS
+from gui.theme import PALETTE
 
 
 class NavButton(QPushButton):
-    def __init__(self,icon_name,label,parent=None):
-        super().__init__(parent)
-        self.icon_name=icon_name
-        self.label=label
-        self.setObjectName('NavButton')
+    def __init__(self, icon_name, label, parent=None):
+        super().__init__(label, parent)
+        self.icon_name = icon_name
+        self.label = label
+        self.setObjectName("NavButton")
         self.setCheckable(True)
-        self.setAutoExclusive(False)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(38)
+        self.setMinimumHeight(34)
         self.setAccessibleName(label)
-        self.setToolTip(label)
-        self.setText('  '+label)
-        self._refresh_icon()
+        self.setIconSize(QSize(16, 16))
+        self.toggled.connect(self.refresh_theme)
+        self.refresh_theme()
 
-    def _refresh_icon(self):
-        self.setIcon(get_icon(self.icon_name, PALETTE.chrome_accent if self.isChecked() else PALETTE.chrome_muted))
-        self.setIconSize(QSize(18,18))
+    def refresh_theme(self):
+        color = PALETTE.chrome_accent if self.isChecked() else PALETTE.chrome_muted
+        self.setIcon(get_icon(self.icon_name, color))
 
-    def setChecked(self,checked):
-        super().setChecked(checked)
-        self._refresh_icon()
+
+class _SectionToggle(QPushButton):
+    def __init__(self, title):
+        super().__init__(title)
+        self.setObjectName("NavGroup")
+        self.setCheckable(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMinimumHeight(25)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        glyph = "chevron-down" if self.isChecked() else "next"
+        pixmap = get_pixmap(glyph, PALETTE.chrome_muted, 13)
+        painter = QPainter(self)
+        painter.drawPixmap(self.width() - 23, (self.height() - 13) // 2, pixmap)
 
 
 class Sidebar(QFrame):
-    navigate=Signal(str)
-    compact_requested=Signal(bool)
-    search_requested=Signal()
-    help_requested=Signal()
+    navigate = Signal(str)
+    compact_requested = Signal(bool)
+    search_requested = Signal()
+    help_requested = Signal()
+    new_requested = Signal()
+    sections_changed = Signal(list)
+
     ITEMS = NAV_ITEMS
     GROUPS = NAV_GROUPS
     DESCRIPTIONS = {
-        'dashboard': 'Retome uma execução recente ou comece um novo experimento.',
-        'simulation': 'Defina estado inicial, Hamiltoniano, evolução, ruído e medições para executar uma simulação.',
-        'circuit': 'Monte e edite portas, use modelos e salve revisões do circuito antes de executar.',
-        'results': 'Consulte gráficos, dados, métricas e reprodutibilidade da execução selecionada.',
-        'bloch': 'Inspecione esferas de Bloch, probabilidades e estado global nos snapshots ou no estado final calculado.',
-        'analysis': 'Faça estudos e varreduras de ruído, parâmetros e precisão de Trotter a partir de uma execução.',
-        'mitigation': 'Configure ZNE para extrapolar um observável e avaliar seu erro e sua incerteza.',
-        'comparison': 'Compare métricas, gráficos e estados de duas execuções compatíveis.',
-        'history': 'Pesquise, inspecione e reabra execuções salvas, ou selecione duas para comparar.',
+        'dashboard': 'Retome o experimento em andamento ou abra uma investigação.',
+        'simulation': 'Configure o sistema e execute uma evolução por Hamiltoniano.',
+        'circuit': 'Monte e teste circuitos de portas.',
+        'results': 'Consulte medições, evolução e estado global da execução.',
+        'bloch': 'Inspecione os estados locais e navegue entre snapshots.',
+        'analysis': 'Investigue a precisão, o ruído e a sensibilidade a parâmetros.',
+        'mitigation': 'Extrapole a estimativa de um observável por ZNE.',
+        'comparison': 'Compare duas execuções compatíveis.',
+        'history': 'Pesquise e reabra execuções salvas.',
         'notebook': 'Registre anotações, reúna evidências e exporte relatórios.',
-        'catalog': 'Explore exemplos, configurações salvas e circuitos reutilizáveis.',
-        'docs': 'Consulte conceitos, exemplos explicados, manual e referências científicas.',
-        'settings': 'Ajuste aparência, acessibilidade, exportação e backup do espaço de trabalho.',
+        'catalog': 'Explore exemplos, modelos e circuitos reutilizáveis.',
+        'docs': 'Consulte conceitos e instruções do laboratório.',
+        'settings': 'Ajuste aparência, acessibilidade, exportação e backup.',
     }
 
-    def __init__(self,parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("Sidebar")
+        self.buttons = {}
+        self.group_buttons = {}
+        self.group_bodies = {}
+        self._compact = False
+        self._active = "dashboard"
+        self._expanded_groups = {key for key, _, _ in self.GROUPS}
         self._width_timer = QTimer(self)
         self._width_timer.setSingleShot(True)
-        self._width_timer.setInterval(0)
         self._width_timer.timeout.connect(self._fit_width)
-        self.setObjectName('Sidebar')
-        self.buttons={}
-        self.group_buttons={}
-        self.group_bodies={}
-        self._animations={}
-        self._compact=False
-        self._active='dashboard'
-        self._expanded_groups={key for key,_,_,_ in self.GROUPS}
         self._build()
-        self.set_compact(False)
-        self.set_active('dashboard')
+        self.refresh_theme()
+        self.set_active("dashboard")
 
     def _build(self):
-        outer=QVBoxLayout(self)
-        outer.setContentsMargins(11, 5, 10, 1)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(12, 7, 11, 4)
         outer.setSpacing(4)
         self.brand_box = QWidget()
-        brand=QHBoxLayout(self.brand_box)
-        logo=QLabel()
-        self.logo=logo
-        logo.setObjectName("SidebarMark")
-        logo.setPixmap(application_icon().pixmap(23, 23))
-        logo.setAlignment(Qt.AlignCenter)
-        logo.setFixedSize(34, 34)
-        brand.addWidget(logo)
-        self.logo_title=QLabel('Entrela')
-        self.logo_title.setObjectName('SidebarLogo')
-        brand.addWidget(self.logo_title,1)
-        outer.addWidget(self.brand_box)
-        brand.setContentsMargins(3, 5, 0, 12)
-        self.toggle=QToolButton()
-        self.toggle.setObjectName('SidebarToggle')
-        self.toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        brand = QHBoxLayout(self.brand_box)
+        brand.setContentsMargins(3, 2, 0, 8)
+        brand.setSpacing(8)
+        self.logo = QLabel()
+        self.logo.setFixedSize(27, 27)
+        self.logo.setAlignment(Qt.AlignCenter)
+        brand.addWidget(self.logo)
+        self.logo_title = QLabel("Entrela")
+        self.logo_title.setObjectName("SidebarLogo")
+        brand.addWidget(self.logo_title, 1)
+        self.toggle = QToolButton()
+        self.toggle.setObjectName("SidebarToggle")
         self.toggle.setCursor(Qt.PointingHandCursor)
-        self.toggle.setMinimumSize(28, 34)
-        self.toggle.setIconSize(QSize(17,17))
-        self.toggle.clicked.connect(lambda:self.compact_requested.emit(not self._compact))
+        self.toggle.setMinimumSize(28, 31)
+        self.toggle.setIconSize(QSize(16, 16))
+        self.toggle.clicked.connect(lambda: self.compact_requested.emit(not self._compact))
         brand.addWidget(self.toggle)
-        self.search = NavButton('search', 'Buscar')
+        outer.addWidget(self.brand_box)
+
+        self.search = NavButton("search", "Buscar")
         self.search.setObjectName("SearchButton")
         self.search.setCheckable(False)
-        self.search.setToolTip('Buscar funções, experimentos e conceitos (Ctrl+K)')
+        self.search.setToolTip("Buscar telas, ações e experimentos (Ctrl+K)")
         self.search.clicked.connect(self.search_requested.emit)
+        search_layout = QHBoxLayout(self.search)
+        search_layout.setContentsMargins(0, 0, 8, 0)
+        search_layout.addStretch()
+        self.search_key = QLabel(QKeySequence("Ctrl+K").toString(QKeySequence.NativeText))
+        self.search_key.setObjectName("NavShortcut")
+        self.search_key.setAttribute(Qt.WA_TransparentForMouseEvents)
+        search_layout.addWidget(self.search_key, 0, Qt.AlignVCenter)
         outer.addWidget(self.search)
-        self.scroll=QScrollArea()
+        outer.addSpacing(5)
+
+        projects_row = QHBoxLayout()
+        projects_row.setSpacing(3)
+        self.buttons["dashboard"] = self._make_button("dashboard")
+        projects_row.addWidget(self.buttons["dashboard"], 1)
+        self.new_button = QToolButton()
+        self.new_button.setObjectName("SidebarToggle")
+        self.new_button.setIconSize(QSize(16, 16))
+        self.new_button.setMinimumSize(29, 31)
+        self.new_button.setToolTip("Novo experimento (Ctrl+N)")
+        self.new_button.setAccessibleName("Novo experimento")
+        self.new_button.clicked.connect(self.new_requested.emit)
+        projects_row.addWidget(self.new_button)
+        outer.addLayout(projects_row)
+
+        self.scroll = QScrollArea()
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        content=QWidget()
-        layout=QVBoxLayout(content)
-        layout.setContentsMargins(0,0,0,0)
-        layout.setSpacing(4)
-        for key,title,icon,items in self.GROUPS:
-            header=QPushButton()
-            header.setObjectName('NavGroup')
-            header.setMinimumHeight(26)
-            header.setIconSize(QSize(22,22))
-            header.setCursor(Qt.PointingHandCursor)
-            header.setAccessibleName(title+' — expandir ou recolher grupo')
-            header.clicked.connect(lambda checked=False,key=key:self._expand(key))
-            layout.addWidget(header)
-            self.group_buttons[key]=header
-            body=QWidget()
-            children=QVBoxLayout(body)
-            children.setContentsMargins(0, 0, 0, 0)
-            children.setSpacing(2)
+        content = QWidget()
+        groups = QVBoxLayout(content)
+        groups.setContentsMargins(0, 0, 0, 0)
+        groups.setSpacing(4)
+        for key, title, items in self.GROUPS:
+            header = _SectionToggle(title)
+            header.clicked.connect(lambda checked, section=key: self._toggle_section(section, checked))
+            self.group_buttons[key] = header
+            groups.addWidget(header)
+
+            body = QWidget()
+            children = QVBoxLayout(body)
+            children.setContentsMargins(0, 0, 0, 3)
+            children.setSpacing(1)
             for page in items:
-                button = self._make_button(page, title)
+                button = self._make_button(page)
                 children.addWidget(button)
-                self.buttons[page]=button
-            self.group_bodies[key]=body
-            animation=QPropertyAnimation(body,b'maximumHeight',self)
-            animation.setDuration(180)
-            animation.setEasingCurve(QEasingCurve.InOutCubic)
-            animation.finished.connect(lambda key=key:self._finish_animation(key))
-            self._animations[key]=animation
-            layout.addWidget(body)
-        layout.addStretch()
+                self.buttons[page] = button
+            self.group_bodies[key] = body
+            groups.addWidget(body)
+        groups.addStretch()
         self.scroll.setWidget(content)
-        outer.addWidget(self.scroll,1)
-        self.buttons['docs'] = self._make_button('docs')
-        outer.addWidget(self.buttons['docs'])
-        self.help_button = NavButton('help', 'Ajuda contextual')
+        outer.addWidget(self.scroll, 1)
+
+        rule = QFrame()
+        rule.setObjectName("SidebarDivider")
+        rule.setFixedHeight(1)
+        outer.addWidget(rule)
+        self.buttons["docs"] = self._make_button("docs")
+        outer.addWidget(self.buttons["docs"])
+        self.help_button = NavButton("help", "Ajuda contextual")
         self.help_button.setCheckable(False)
-        self.help_button.setToolTip('Ajuda da área em uso (F1)')
+        self.help_button.setToolTip("Ajuda da área em uso (F1)")
         self.help_button.clicked.connect(self.help_requested.emit)
         outer.addWidget(self.help_button)
-        self.buttons['settings'] = self._make_button('settings')
-        outer.addWidget(self.buttons['settings'])
+        self.buttons["settings"] = self._make_button("settings")
+        outer.addWidget(self.buttons["settings"])
 
-    def _make_button(self, key, group=None):
-        label = dict(self.ITEMS)[key]
-        icon = {'notebook': 'annotations', 'catalog': 'examples'}.get(key, key)
-        button = NavButton(icon, label)
-        context = f'{group} · {label}' if group else label
-        button.setToolTip(context + '\n' + self.DESCRIPTIONS[key])
+    def _make_button(self, key):
+        label = NAV_LABELS[key]
+        button = NavButton(NAV_ICONS.get(key, key), label)
+        button.setToolTip(label + "\n" + self.DESCRIPTIONS[key])
         button.setAccessibleDescription(self.DESCRIPTIONS[key])
-        button.clicked.connect(lambda checked=False, key=key: self._on_click(key))
+        button.clicked.connect(lambda checked=False: self._on_click(key))
         return button
 
-    def _expand(self,key):
-        if key in self._expanded_groups:
-            self._expanded_groups.remove(key)
-        else:
+    def _toggle_section(self, key, opened):
+        if opened:
             self._expanded_groups.add(key)
-        self._refresh_groups(animate=True)
+        else:
+            self._expanded_groups.discard(key)
+        self._refresh_sections()
+        self.sections_changed.emit(sorted(self._expanded_groups))
 
-    def _finish_animation(self,key):
-        body=self.group_bodies[key]
-        expanded=key in self._expanded_groups
-        body.setVisible(expanded)
-        body.setMaximumHeight(16777215 if expanded else 0)
+    def restore_sections(self, expanded):
+        if isinstance(expanded, str):
+            expanded = [expanded]
+        if isinstance(expanded, list):
+            self._expanded_groups = {key for key, _, _ in self.GROUPS if key in expanded}
+            self._refresh_sections()
 
-    def _refresh_groups(self,animate=False):
-        app=QApplication.instance()
-        motion=self.isVisible() and not bool(app.property('entrelaReduceMotion') if app else False)
-        for key,title,icon,items in self.GROUPS:
-            expanded=key in self._expanded_groups
-            body=self.group_bodies[key]
-            animation=self._animations[key]
-            current=body.height() if body.isVisible() else 0
-            changed=bool(body.property('expanded'))!=expanded
-            animation.stop()
-            body.setProperty('expanded',expanded)
-            if animate and changed and motion:
-                body.setVisible(True)
-                body.setMaximumHeight(current)
-                animation.setStartValue(current)
-                animation.setEndValue(body.sizeHint().height() if expanded else 0)
-                animation.start()
-            else:
-                self._finish_animation(key)
-            button=self.group_buttons[key]
-            button.setText(title)
-            button.setCheckable(True)
-            button.setChecked(expanded)
-            button.setToolTip(title+(' — recolher grupo' if expanded else ' — expandir grupo')+'\n'+' · '.join(dict(self.ITEMS)[page] for page in items))
-            button.setAccessibleName(title+(' — grupo expandido' if expanded else ' — grupo recolhido'))
-            button.setProperty('activeGroup',self._active in items)
-            button.setProperty('compact',self._compact)
-            button.setProperty('expanded',expanded)
-            button.style().unpolish(button)
-            button.style().polish(button)
-            button.setIcon(get_icon('chevron-down' if expanded else 'next', PALETTE.chrome_accent if self._active in items else PALETTE.chrome_muted))
-            button.setIconSize(QSize(16,16))
+    def _refresh_sections(self):
+        for key, title, items in self.GROUPS:
+            opened = key in self._expanded_groups
+            header = self.group_buttons[key]
+            header.setChecked(opened)
+            header.setAccessibleName(f"{title} · {'expandido' if opened else 'recolhido'}")
+            header.setToolTip(('Recolher ' if opened else 'Expandir ') + title)
+            self.group_bodies[key].setVisible(opened)
 
-    def _on_click(self,key):
+    def _on_click(self, key):
         self.navigate.emit(key)
         self.buttons[key].setChecked(key == self._active)
 
-    def set_active(self,key):
-        self._active=key
-        for page,button in self.buttons.items():
-            button.setChecked(page==key)
-        group=next((name for name,_,_,items in self.GROUPS if key in items),None)
-        if group:
-            self._expanded_groups.add(group)
-        self._refresh_groups()
-        if key in self.buttons:
-            if self.scroll.isAncestorOf(self.buttons[key]):
-                self.scroll.ensureWidgetVisible(self.buttons[key])
+    def set_active(self, key):
+        self._active = key
+        for page, button in self.buttons.items():
+            button.setChecked(page == key)
+        for group, _, items in self.GROUPS:
+            if key in items:
+                self._expanded_groups.add(group)
+                break
+        self._refresh_sections()
+        if key in self.buttons and self.scroll.isAncestorOf(self.buttons[key]):
+            self.scroll.ensureWidgetVisible(self.buttons[key])
 
-    def set_compact(self,compact):
-        self._compact=bool(compact)
-        self.toggle.setIcon(get_icon('expand' if compact else 'collapse',PALETTE.chrome_muted))
-        self.toggle.setToolTip('Expandir navegação' if compact else 'Recolher navegação')
-        self.toggle.setAccessibleName(self.toggle.toolTip())
-        for button in (*self.buttons.values(), self.search, self.help_button):
-            button.setText(button.label)
-            button.setProperty('compact',bool(compact))
-            button.style().unpolish(button)
-            button.style().polish(button)
-        self._refresh_groups()
+    def set_compact(self, compact):
+        self._compact = bool(compact)
+        self._refresh_controls()
+
+    def _refresh_controls(self):
+        self.toggle.setIcon(get_icon("expand" if self._compact else "collapse", PALETTE.chrome_muted))
+        label = "Expandir navegação" if self._compact else "Recolher navegação"
+        self.toggle.setToolTip(label)
+        self.toggle.setAccessibleName(label)
+        self.new_button.setIcon(get_icon("plus", PALETTE.chrome_muted))
+        self.search_key.setVisible(not self._compact)
+        self.new_button.setVisible(not self._compact)
         self._fit_width()
 
     def _fit_width(self):
+        buttons = (*self.buttons.values(), self.help_button)
+        margins = self.layout().contentsMargins()
+        horizontal = margins.left() + margins.right()
+        scrollbar = self.scroll.verticalScrollBar().sizeHint().width()
         if self._compact:
-            word_width = max(button.fontMetrics().horizontalAdvance(word)
-                             for button in self.buttons.values() for word in button.label.split())
-            heading_width = max(button.sizeHint().width() for button in self.group_buttons.values())
-            margins = self.layout().contentsMargins()
-            gutters = 46 + margins.left() + margins.right() + self.scroll.verticalScrollBar().sizeHint().width()
-            width = max(155, word_width + gutters, heading_width + 20)
-            self.setFixedWidth(width)
-            for button in self.buttons.values():
-                lines = ['']
+            word_width = max(
+                button.fontMetrics().horizontalAdvance(word)
+                for button in buttons for word in button.label.split()
+            )
+            headers = max(button.sizeHint().width() for button in self.group_buttons.values())
+            width = max(157, word_width + 42 + horizontal + scrollbar, headers + horizontal + scrollbar)
+            available = width - horizontal - scrollbar - 42
+            for button in buttons:
+                lines = [""]
                 for word in button.label.split():
-                    candidate = (lines[-1]+' '+word).strip()
-                    if lines[-1] and button.fontMetrics().horizontalAdvance(candidate) > width - gutters:
+                    candidate = (lines[-1] + " " + word).strip()
+                    if lines[-1] and button.fontMetrics().horizontalAdvance(candidate) > available:
                         lines.append(word)
                     else:
                         lines[-1] = candidate
-                button.setText('\n'.join(lines))
-                button.setMinimumHeight(max(38, len(lines)*button.fontMetrics().height()+12))
+                button.setText("\n".join(lines))
+                button.setMinimumHeight(max(34, len(lines) * button.fontMetrics().height() + 10))
         else:
-            for button in self.buttons.values():
+            for button in buttons:
                 button.setText(button.label)
-                button.setMinimumHeight(38)
-            text_width = max(button.sizeHint().width() for button in self.buttons.values())
-            margins = self.layout().contentsMargins()
-            self.setFixedWidth(max(218, text_width + margins.left() + margins.right() + 12))
+                button.setMinimumHeight(34)
+            width = max(221, max(button.sizeHint().width() for button in buttons) + horizontal + scrollbar)
+        self.setFixedWidth(width)
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and getattr(self, 'group_buttons', None):
-            self._width_timer.start()
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, "search"):
+            self._width_timer.start(0)
 
     def refresh_theme(self):
-        if hasattr(self,'toggle'):
-            self.logo.setPixmap(application_icon().pixmap(23, 23))
-            self.set_compact(self._compact)
-            for button in self.buttons.values():
-                button._refresh_icon()
-            self.search._refresh_icon()
-            self.help_button._refresh_icon()
+        self.logo.setPixmap(application_icon().pixmap(22, 22))
+        self._refresh_controls()
+        for header in self.group_buttons.values():
+            header.update()
