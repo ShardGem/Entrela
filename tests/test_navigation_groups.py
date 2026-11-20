@@ -48,3 +48,18 @@ def test_readability_migrates_previous_default_once(qt_app, tmp_path):
     second = MainWindow(ExperimentRepository(tmp_path/'runs'), settings)
     assert second.page_settings.font_size.value() == 13
     second.close()
+
+
+
+def test_saved_sections_keep_their_state_on_startup(qt_app, tmp_path):
+    settings = QSettings(str(tmp_path / "sections.ini"), QSettings.IniFormat)
+    settings.setValue("layout/sidebar_sections", ["observe", "records"])
+    window = MainWindow(ExperimentRepository(tmp_path / "runs"), settings)
+    try:
+        assert window.is_page_active("simulation")
+        assert window.sidebar.group_bodies["lab"].isHidden()
+        assert window.sidebar.group_buttons["lab"].property("activeSection")
+        assert not window.sidebar.group_bodies["observe"].isHidden()
+    finally:
+        window.close()
+        window.deleteLater()

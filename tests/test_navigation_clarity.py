@@ -1,5 +1,6 @@
 """A navegação mantém destinos legíveis e grupos independentes."""
-from PySide6.QtTest import QSignalSpy
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QSignalSpy, QTest
 
 from gui.controllers.appearance import apply_appearance
 from tests.qt_helpers import wait_until
@@ -8,6 +9,7 @@ from tests.qt_helpers import wait_until
 def test_groups_start_open_and_navigation_preserves_independent_choices(window, qt_app):
     sidebar = window.sidebar
     assert all(not body.isHidden() for body in sidebar.group_bodies.values())
+    assert all(not header.icon().isNull() for header in sidebar.group_buttons.values())
     sidebar.group_buttons['records'].click()
     wait_until(lambda: sidebar.group_bodies['records'].isHidden())
     expanded = window.settings.value('layout/sidebar_sections')
@@ -55,3 +57,25 @@ def test_navigation_stays_readable_after_theme_font_and_width_changes(window, qt
                 assert button.height() >= len(button.text().splitlines())*button.fontMetrics().height()
     finally:
         apply_appearance(window)
+
+
+
+def test_group_focus_remains_clear_after_folding_the_active_section(window, qt_app):
+    sidebar = window.sidebar
+    window._show_page("simulation")
+    prepare = sidebar.group_buttons["lab"]
+    explore = sidebar.group_buttons["observe"]
+    sidebar._focus_row(prepare)
+    QTest.keyClick(prepare, Qt.Key_Left)
+    assert sidebar.group_bodies["lab"].isHidden()
+    assert prepare.property("activeSection")
+    assert prepare.accessibleDescription() == "Área atual: Simulação"
+    assert window.is_page_active("simulation")
+
+    QTest.keyClick(prepare, Qt.Key_Down)
+    assert qt_app.focusWidget() is explore
+    QTest.keyClick(explore, Qt.Key_Right)
+    assert qt_app.focusWidget() is sidebar.buttons["results"]
+    QTest.keyClick(sidebar.buttons["results"], Qt.Key_Left)
+    assert qt_app.focusWidget() is explore
+    assert window.is_page_active("simulation")

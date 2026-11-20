@@ -197,6 +197,7 @@ class MainWindow(QMainWindow):
         self.page_settings.layout_reset_requested.connect(self.layout_controller.reset)
         active = self.projects.active
         self._show_page("circuit" if active and active["kind"] == "circuit" else "simulation")
+        self.sidebar.restore_sections(self.settings.value("layout/sidebar_sections"))
         if self._storage_error:
             self.statusBar().showMessage(
                 "Armazenamento indisponível: " + self._storage_error
@@ -211,7 +212,6 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         self.topbar = Topbar()
         self.sidebar = Sidebar()
-        self.sidebar.restore_sections(self.settings.value("layout/sidebar_sections"))
         layout.addWidget(self.sidebar)
         right = QFrame()
         right.setObjectName("Workbench")

@@ -30,13 +30,13 @@ NAV_ITEMS = [
 ]
 NAV_LABELS = dict(NAV_ITEMS)
 NAV_GROUPS = [
-    ('lab', 'Preparar', ('simulation', 'circuit')),
-    ('observe', 'Explorar', ('results', 'bloch')),
-    ('research', 'Investigar', ('comparison', 'analysis', 'mitigation')),
-    ('records', 'Acervo', ('history', 'notebook', 'catalog')),
+    ('lab', 'Preparar', 'group-lab', ('simulation', 'circuit')),
+    ('observe', 'Explorar', 'group-start', ('results', 'bloch')),
+    ('research', 'Investigar', 'group-research', ('comparison', 'analysis', 'mitigation')),
+    ('records', 'Acervo', 'group-archive', ('history', 'notebook', 'catalog')),
 ]
 NAV_ICONS = {
-    'dashboard': 'project-folder', 'simulation': 'group-lab',
+    'dashboard': 'project-folder', 'simulation': 'simulation-pulse',
     'circuit': 'gate-wires', 'mitigation': 'extrapolate',
     'notebook': 'annotations', 'catalog': 'book-stack',
 }

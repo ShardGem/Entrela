@@ -25,24 +25,40 @@ class NavButton(QPushButton):
         self.refresh_theme()
 
     def refresh_theme(self):
-        color = PALETTE.chrome_accent if self.isChecked() else PALETTE.chrome_muted
-        self.setIcon(get_icon(self.icon_name, color))
+        self.setIcon(get_icon(self.icon_name, self._icon_color()))
+
+    def _icon_color(self):
+        return PALETTE.chrome_accent if self.isChecked() else PALETTE.chrome_muted
 
 
-class _SectionToggle(QPushButton):
-    def __init__(self, title):
-        super().__init__(title)
+class _SectionToggle(NavButton):
+    def __init__(self, icon_name, title):
+        self._active_section = False
+        super().__init__(icon_name, title)
         self.setObjectName("NavGroup")
-        self.setCheckable(True)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(25)
+        self.setMinimumHeight(33)
+
+    def set_active_section(self, active):
+        if self._active_section != active:
+            self._active_section = active
+            self.setProperty("activeSection", active)
+            self.style().unpolish(self)
+            self.style().polish(self)
+            self.refresh_theme()
+
+    def _icon_color(self):
+        return PALETTE.chrome_accent if self._active_section else PALETTE.chrome_muted
+
+    def refresh_theme(self):
+        super().refresh_theme()
+        glyph = "chevron-down" if self.isChecked() else "chevron-right"
+        self._chevron = get_pixmap(glyph, self._icon_color(), 14)
+        self.update()
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        glyph = "chevron-down" if self.isChecked() else "next"
-        pixmap = get_pixmap(glyph, PALETTE.chrome_muted, 13)
         painter = QPainter(self)
-        painter.drawPixmap(self.width() - 23, (self.height() - 13) // 2, pixmap)
+        painter.drawPixmap(self.width() - 24, (self.height() - 14) // 2, self._chevron)
 
 
 class Sidebar(QFrame):
@@ -55,6 +71,7 @@ class Sidebar(QFrame):
 
     ITEMS = NAV_ITEMS
     GROUPS = NAV_GROUPS
+    CHILD_INDENT = 14
     DESCRIPTIONS = {
         'dashboard': 'Retome o experimento em andamento ou abra uma investigação.',
         'simulation': 'Configure o sistema e execute uma evolução por Hamiltoniano.',
@@ -79,21 +96,23 @@ class Sidebar(QFrame):
         self.group_bodies = {}
         self._compact = False
         self._active = "dashboard"
-        self._expanded_groups = {key for key, _, _ in self.GROUPS}
+        self._expanded_groups = {key for key, *_ in self.GROUPS}
         self._width_timer = QTimer(self)
         self._width_timer.setSingleShot(True)
         self._width_timer.timeout.connect(self._fit_width)
         self._build()
+        for button in self._rows():
+            button.installEventFilter(self)
         self.refresh_theme()
         self.set_active("dashboard")
 
     def _build(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 7, 11, 4)
-        outer.setSpacing(4)
+        outer.setSpacing(3)
         self.brand_box = QWidget()
         brand = QHBoxLayout(self.brand_box)
-        brand.setContentsMargins(3, 2, 0, 8)
+        brand.setContentsMargins(3, 2, 0, 7)
         brand.setSpacing(8)
         self.logo = QLabel()
         self.logo.setFixedSize(27, 27)
@@ -126,19 +145,15 @@ class Sidebar(QFrame):
         outer.addWidget(self.search)
         outer.addSpacing(5)
 
-        projects_row = QHBoxLayout()
-        projects_row.setSpacing(3)
-        self.buttons["dashboard"] = self._make_button("dashboard")
-        projects_row.addWidget(self.buttons["dashboard"], 1)
-        self.new_button = QToolButton()
-        self.new_button.setObjectName("SidebarToggle")
-        self.new_button.setIconSize(QSize(16, 16))
-        self.new_button.setMinimumSize(29, 31)
-        self.new_button.setToolTip("Novo experimento (Ctrl+N)")
-        self.new_button.setAccessibleName("Novo experimento")
+        self.new_button = NavButton("plus", "Novo experimento")
+        self.new_button.setObjectName("SidebarCreate")
+        self.new_button.setCheckable(False)
+        self.new_button.setToolTip("Novo experimento por Hamiltoniano (Ctrl+N)")
         self.new_button.clicked.connect(self.new_requested.emit)
-        projects_row.addWidget(self.new_button)
-        outer.addLayout(projects_row)
+        outer.addWidget(self.new_button)
+
+        self.buttons["dashboard"] = self._make_button("dashboard")
+        outer.addWidget(self.buttons["dashboard"])
 
         self.scroll = QScrollArea()
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -147,16 +162,16 @@ class Sidebar(QFrame):
         content = QWidget()
         groups = QVBoxLayout(content)
         groups.setContentsMargins(0, 0, 0, 0)
-        groups.setSpacing(4)
-        for key, title, items in self.GROUPS:
-            header = _SectionToggle(title)
+        groups.setSpacing(3)
+        for key, title, icon, items in self.GROUPS:
+            header = _SectionToggle(icon, title)
             header.clicked.connect(lambda checked, section=key: self._toggle_section(section, checked))
             self.group_buttons[key] = header
             groups.addWidget(header)
 
             body = QWidget()
             children = QVBoxLayout(body)
-            children.setContentsMargins(0, 0, 0, 3)
+            children.setContentsMargins(self.CHILD_INDENT, 0, 0, 3)
             children.setSpacing(1)
             for page in items:
                 button = self._make_button(page)
@@ -202,16 +217,21 @@ class Sidebar(QFrame):
         if isinstance(expanded, str):
             expanded = [expanded]
         if isinstance(expanded, list):
-            self._expanded_groups = {key for key, _, _ in self.GROUPS if key in expanded}
+            self._expanded_groups = {key for key, *_ in self.GROUPS if key in expanded}
             self._refresh_sections()
 
     def _refresh_sections(self):
-        for key, title, items in self.GROUPS:
+        for key, title, _, items in self.GROUPS:
             opened = key in self._expanded_groups
+            active = self._active in items
             header = self.group_buttons[key]
             header.setChecked(opened)
+            header.set_active_section(active)
             header.setAccessibleName(f"{title} · {'expandido' if opened else 'recolhido'}")
-            header.setToolTip(('Recolher ' if opened else 'Expandir ') + title)
+            current = "Área atual: " + NAV_LABELS[self._active] if active else ""
+            header.setAccessibleDescription(current)
+            instruction = ("Recolher " if opened else "Expandir ") + title
+            header.setToolTip(instruction + ("\n" + current if active else ""))
             self.group_bodies[key].setVisible(opened)
 
     def _on_click(self, key):
@@ -222,7 +242,7 @@ class Sidebar(QFrame):
         self._active = key
         for page, button in self.buttons.items():
             button.setChecked(page == key)
-        for group, _, items in self.GROUPS:
+        for group, _, _, items in self.GROUPS:
             if key in items:
                 self._expanded_groups.add(group)
                 break
@@ -239,25 +259,75 @@ class Sidebar(QFrame):
         label = "Expandir navegação" if self._compact else "Recolher navegação"
         self.toggle.setToolTip(label)
         self.toggle.setAccessibleName(label)
-        self.new_button.setIcon(get_icon("plus", PALETTE.chrome_muted))
         self.search_key.setVisible(not self._compact)
-        self.new_button.setVisible(not self._compact)
         self._fit_width()
 
+    def _rows(self):
+        yield self.search
+        yield self.new_button
+        yield self.buttons["dashboard"]
+        for key, _, _, items in self.GROUPS:
+            yield self.group_buttons[key]
+            for page in items:
+                yield self.buttons[page]
+        yield self.buttons["docs"]
+        yield self.help_button
+        yield self.buttons["settings"]
+
+    def eventFilter(self, watched, event):
+        if event.type() != QEvent.KeyPress or event.modifiers() != Qt.NoModifier:
+            return super().eventFilter(watched, event)
+
+        key = event.key()
+        if key in (Qt.Key_Up, Qt.Key_Down, Qt.Key_Home, Qt.Key_End):
+            rows = [row for row in self._rows() if row.isVisibleTo(self) and row.isEnabled()]
+            if watched in rows:
+                position = rows.index(watched)
+                index = {
+                    Qt.Key_Up: max(0, position - 1),
+                    Qt.Key_Down: min(len(rows) - 1, position + 1),
+                    Qt.Key_Home: 0, Qt.Key_End: len(rows) - 1,
+                }[key]
+                self._focus_row(rows[index])
+                return True
+
+        if key in (Qt.Key_Left, Qt.Key_Right):
+            for group, _, _, items in self.GROUPS:
+                header = self.group_buttons[group]
+                if watched is header:
+                    opened = group in self._expanded_groups
+                    if key == Qt.Key_Right and opened:
+                        self._focus_row(self.buttons[items[0]])
+                    elif opened != (key == Qt.Key_Right):
+                        self._toggle_section(group, not opened)
+                    return True
+                if key == Qt.Key_Left and watched in (self.buttons[item] for item in items):
+                    self._focus_row(header)
+                    return True
+        return super().eventFilter(watched, event)
+
+    def _focus_row(self, row):
+        row.setFocus(Qt.ShortcutFocusReason)
+        if self.scroll.isAncestorOf(row):
+            self.scroll.ensureWidgetVisible(row, 0, 4)
+
     def _fit_width(self):
-        buttons = (*self.buttons.values(), self.help_button)
         margins = self.layout().contentsMargins()
         horizontal = margins.left() + margins.right()
         scrollbar = self.scroll.verticalScrollBar().sizeHint().width()
+        rows = [(self.new_button, 0), (self.help_button, 0)]
+        rows += [(button, self.CHILD_INDENT + scrollbar if self.scroll.isAncestorOf(button) else 0)
+                 for button in self.buttons.values()]
+        headers = max(button.sizeHint().width() for button in self.group_buttons.values()) + scrollbar
+
         if self._compact:
-            word_width = max(
-                button.fontMetrics().horizontalAdvance(word)
-                for button in buttons for word in button.label.split()
+            longest = max(
+                extra + button.fontMetrics().horizontalAdvance(word)
+                for button, extra in rows for word in button.label.split()
             )
-            headers = max(button.sizeHint().width() for button in self.group_buttons.values())
-            width = max(157, word_width + 42 + horizontal + scrollbar, headers + horizontal + scrollbar)
-            available = width - horizontal - scrollbar - 42
-            for button in buttons:
+            width = max(166, longest + horizontal + 42, headers + horizontal)
+            for button, extra in rows:
+                available = width - horizontal - extra - 42
                 lines = [""]
                 for word in button.label.split():
                     candidate = (lines[-1] + " " + word).strip()
@@ -268,10 +338,11 @@ class Sidebar(QFrame):
                 button.setText("\n".join(lines))
                 button.setMinimumHeight(max(34, len(lines) * button.fontMetrics().height() + 10))
         else:
-            for button in buttons:
+            for button, _ in rows:
                 button.setText(button.label)
                 button.setMinimumHeight(34)
-            width = max(221, max(button.sizeHint().width() for button in buttons) + horizontal + scrollbar)
+            required = max(button.sizeHint().width() + extra for button, extra in rows)
+            width = max(225, max(required, headers) + horizontal + 2)
         self.setFixedWidth(width)
 
     def changeEvent(self, event):
@@ -283,4 +354,4 @@ class Sidebar(QFrame):
         self.logo.setPixmap(application_icon().pixmap(22, 22))
         self._refresh_controls()
         for header in self.group_buttons.values():
-            header.update()
+            header.refresh_theme()
