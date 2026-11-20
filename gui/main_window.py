@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
         self.sidebar.compact_requested.connect(self._toggle_sidebar)
         self.sidebar.navigate.connect(self._open_destination)
         self.sidebar.search_requested.connect(self._open_commands)
-        self.sidebar.new_requested.connect(self._new_experiment)
+        self.sidebar.new_button.setMenu(self.page_dashboard.new_experiment.menu())
         self.sidebar.sections_changed.connect(lambda groups: self.settings.setValue("layout/sidebar_sections", groups))
         self.sidebar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
         self.page_history.configure_requested.connect(lambda: self._show_page("simulation"))
@@ -393,7 +393,7 @@ class MainWindow(QMainWindow):
         self.command_palette.command_requested.connect(self._command)
         self.shortcuts = []
         for key, callback in [
-            ("Ctrl+N", self._new_experiment),
+            ("Ctrl+N", self.sidebar.new_button.showMenu),
             ("Ctrl+O", self._import_experiment),
             ("Ctrl+Return", self._run_active_context),
             ("Ctrl+K", self._open_commands),
@@ -406,7 +406,7 @@ class MainWindow(QMainWindow):
 
     def _open_commands(self):
         commands = [
-            ("new", "Criar experimento", "novo"),
+            ("new", "Novo experimento", "criar Hamiltoniano circuito"),
             ("import", "Importar experimento ou estudo", "abrir arquivo JSON ZIP reprodução"),
             ("tutorial", "Aprender: tutorial de Bell", "primeiro experimento"),
             ("saved-configurations", "Abrir configurações salvas", "parâmetros reutilizáveis Hamiltoniano modelos"),
@@ -454,7 +454,7 @@ class MainWindow(QMainWindow):
 
     def _command(self, identifier):
         if identifier == "new":
-            self._new_experiment()
+            self.sidebar.new_button.showMenu()
         elif identifier == "import":
             self._import_experiment()
         elif identifier == "tutorial":

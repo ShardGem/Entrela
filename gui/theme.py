@@ -146,8 +146,7 @@ QLabel#NavShortcut {{
     color: {p.chrome_muted}; font-size: 10px; padding: 2px 5px;
     border: 1px solid {p.chrome_border}; border-radius: 4px;
 }}
-QPushButton#NavButton, QPushButton#NavGroup, QPushButton#SearchButton,
-QPushButton#SidebarCreate, QToolButton#SidebarToggle {{
+QPushButton#NavButton, QPushButton#NavGroup, QPushButton#SearchButton, QToolButton#SidebarToggle {{
     color: {p.chrome_muted}; background: transparent; border: 1px solid transparent; border-radius: 8px;
     text-align: left;
 }}
@@ -155,8 +154,6 @@ QPushButton#NavButton {{ padding: 4px 9px; font-weight: 500; }}
 QPushButton#NavGroup {{ padding: 5px 26px 5px 9px; color: {p.chrome_text}; font-weight: 600; }}
 QPushButton#NavGroup[activeSection="true"] {{ color: {p.chrome_accent}; }}
 QPushButton#NavGroup[activeSection="true"]:!checked {{ background: {p.chrome_hover}; }}
-QPushButton#SidebarCreate {{ padding: 4px 9px; color: {p.chrome_text}; font-weight: 600; }}
-QPushButton#SidebarCreate:hover {{ background: {p.chrome_hover}; }}
 QPushButton#SearchButton {{ background: transparent; border-color: {p.chrome_border}; padding: 5px 9px; }}
 QPushButton#NavButton:hover, QPushButton#NavGroup:hover, QToolButton#SidebarToggle:hover {{
     background: {p.chrome_hover}; color: {p.chrome_text};
@@ -164,7 +161,7 @@ QPushButton#NavButton:hover, QPushButton#NavGroup:hover, QToolButton#SidebarTogg
 QPushButton#NavButton:checked {{ background: {p.chrome_selected}; color: {p.chrome_accent}; font-weight: 600; }}
 QPushButton#SearchButton:hover {{ background: {p.chrome_selected}; color: {p.chrome_text}; }}
 QPushButton#NavButton:focus, QPushButton#NavGroup:focus, QPushButton#SearchButton:focus,
-QPushButton#SidebarCreate:focus, QToolButton#SidebarToggle:focus {{ border-color: {p.chrome_accent}; }}
+QToolButton#SidebarToggle:focus {{ border-color: {p.chrome_accent}; }}
 
 /* Superfícies, barras e seções */
 QFrame#StudioPanel, QWidget#InspectorPanel, QFrame#EvidencePanel, QFrame#WorkbenchInspector,
@@ -211,6 +208,7 @@ QPushButton#PrimaryButton:hover {{ background: {p.action_hover}; border-color: {
 QPushButton#PrimaryButton:pressed {{ background: {p.action_pressed}; border-color: {p.action_pressed}; }}
 QPushButton#PrimaryButton:focus {{ border: 2px solid {p.text}; }}
 QPushButton#PrimaryButton:disabled {{ background: {p.surface}; color: {p.text_dim}; border-color: {p.border}; }}
+QFrame#Sidebar QPushButton#PrimaryButton {{ text-align: left; padding: 7px 6px; }}
 QPushButton#GhostButton, QToolButton#QuietTool {{
     background: transparent; border-color: transparent; color: {p.primary}; padding: {max(4, pad - 1)}px 8px;
 }}

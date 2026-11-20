@@ -244,8 +244,6 @@ class DashboardPage(PageBase):
     def _resume(self):
         if self._works:
             self.work_selected.emit(self._works[0]['id'])
-        else:
-            self.new_simulation.emit()
 
     def _render(self):
         if not hasattr(self, 'recent_list'): return
@@ -256,6 +254,7 @@ class DashboardPage(PageBase):
             item = QListWidgetItem(f"{work['title']}\n{kind} · {status}")
             item.setData(Qt.UserRole, work['id']); item.setToolTip(item.text()); self.works.addItem(item)
         show_works = bool(self._works) and self.mode == 'experiments'
+        self.new_experiment.setVisible(bool(self._works))
         self.show_works.setVisible(bool(self._works))
         self.show_works.setText('Ver resumo' if show_works else 'Ver experimentos')
         self.works_label.setVisible(show_works); self.works.setVisible(show_works)
@@ -265,7 +264,8 @@ class DashboardPage(PageBase):
         if self._works:
             work = self._works[0]
             self.resume_description.setText(('Circuito livre' if work['kind'] == 'circuit' else 'Evolução por Hamiltoniano') + ' · ' + ('Última execução disponível; o rascunho permanece editável.' if work.get('executions') else 'Rascunho em edição · ainda sem execução.'))
-        self.resume.setText('Abrir na bancada' if self._works else 'Criar experimento')
+        self.resume.setText('Abrir na bancada' if self._works else 'Novo experimento')
+        self.resume.setMenu(None if self._works else self.new_experiment.menu())
         self.recent_list.clear()
         records = [e for e in self._recent_experiments if self.project_name is None or self.annotations.get(e.id, {}).get('project', '') == self.project_name]
         for exp in records[:8]:

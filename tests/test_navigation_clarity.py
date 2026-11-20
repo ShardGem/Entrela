@@ -1,5 +1,5 @@
 """A navegação mantém destinos legíveis e grupos independentes."""
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtTest import QSignalSpy, QTest
 
 from gui.controllers.appearance import apply_appearance
@@ -50,6 +50,8 @@ def test_navigation_stays_readable_after_theme_font_and_width_changes(window, qt
             for _ in range(4):
                 qt_app.processEvents()
             sidebar = window.sidebar
+            assert sidebar.new_button.width() >= sidebar.new_button.sizeHint().width()
+            assert sidebar.new_button.height() >= sidebar.new_button.sizeHint().height()
             assert sidebar.scroll.horizontalScrollBar().maximum() == 0
             for button in sidebar.buttons.values():
                 available = button.width()-button.iconSize().width()-26
@@ -58,6 +60,43 @@ def test_navigation_stays_readable_after_theme_font_and_width_changes(window, qt
     finally:
         apply_appearance(window)
 
+
+def test_new_experiment_offers_both_types_before_switching_drafts(window, qt_app):
+    sidebar = window.sidebar
+    button = sidebar.new_button
+    menu = button.menu()
+    assert button.geometry().bottom() < sidebar.search.geometry().top()
+    assert menu is window.page_dashboard.new_experiment.menu()
+    assert [action.text() for action in menu.actions()] == [
+        "Evolução por Hamiltoniano", "Circuito livre de portas",
+    ]
+    assert window.projects.create_work("hamiltonian", "Rascunho em edição")
+    original = window.projects.active_id
+
+    opened = QSignalSpy(menu.aboutToShow)
+
+    def cancel():
+        QTimer.singleShot(0, lambda: QTest.keyClick(menu, Qt.Key_Escape))
+
+    menu.aboutToShow.connect(cancel)
+    QTest.mouseClick(button, Qt.LeftButton)
+    qt_app.processEvents()
+    menu.aboutToShow.disconnect(cancel)
+    assert opened.count() == 1
+    assert window.projects.active_id == original
+
+    def choose_circuit():
+        menu.setActiveAction(menu.actions()[1])
+        QTest.keyClick(menu, Qt.Key_Return)
+
+    menu.aboutToShow.connect(lambda: QTimer.singleShot(0, choose_circuit))
+    window.activateWindow()
+    qt_app.processEvents()
+    QTest.keyClick(window, Qt.Key_N, Qt.ControlModifier)
+    wait_until(lambda: window.is_page_active("circuit"))
+    assert opened.count() == 2
+    assert window.projects.active["kind"] == "circuit"
+    assert any(work["id"] == original for work in window.projects.store.works())
 
 
 def test_group_focus_remains_clear_after_folding_the_active_section(window, qt_app):

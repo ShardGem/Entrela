@@ -8,6 +8,7 @@ from gui.branding import application_icon
 from gui.icons import get_icon, get_pixmap
 from gui.navigation import NAV_GROUPS, NAV_ICONS, NAV_ITEMS, NAV_LABELS
 from gui.theme import PALETTE
+from gui.widgets.button import PrimaryButton
 
 
 class NavButton(QPushButton):
@@ -66,7 +67,6 @@ class Sidebar(QFrame):
     compact_requested = Signal(bool)
     search_requested = Signal()
     help_requested = Signal()
-    new_requested = Signal()
     sections_changed = Signal(list)
 
     ITEMS = NAV_ITEMS
@@ -130,6 +130,15 @@ class Sidebar(QFrame):
         brand.addWidget(self.toggle)
         outer.addWidget(self.brand_box)
 
+        self.new_button = PrimaryButton("Novo experimento", icon="plus")
+        self.new_button.setMinimumHeight(40)
+        self.new_button.setIconSize(QSize(16, 16))
+        self.new_button.setAccessibleName(self.new_button.text())
+        self.new_button.setAccessibleDescription("Escolha o tipo de experimento. Atalho Ctrl+N.")
+        self.new_button.setToolTip("Escolher entre evolução por Hamiltoniano e circuito de portas (Ctrl+N)")
+        outer.addWidget(self.new_button)
+        outer.addSpacing(4)
+
         self.search = NavButton("search", "Buscar")
         self.search.setObjectName("SearchButton")
         self.search.setCheckable(False)
@@ -144,13 +153,6 @@ class Sidebar(QFrame):
         search_layout.addWidget(self.search_key, 0, Qt.AlignVCenter)
         outer.addWidget(self.search)
         outer.addSpacing(5)
-
-        self.new_button = NavButton("plus", "Novo experimento")
-        self.new_button.setObjectName("SidebarCreate")
-        self.new_button.setCheckable(False)
-        self.new_button.setToolTip("Novo experimento por Hamiltoniano (Ctrl+N)")
-        self.new_button.clicked.connect(self.new_requested.emit)
-        outer.addWidget(self.new_button)
 
         self.buttons["dashboard"] = self._make_button("dashboard")
         outer.addWidget(self.buttons["dashboard"])
@@ -263,8 +265,8 @@ class Sidebar(QFrame):
         self._fit_width()
 
     def _rows(self):
-        yield self.search
         yield self.new_button
+        yield self.search
         yield self.buttons["dashboard"]
         for key, _, _, items in self.GROUPS:
             yield self.group_buttons[key]
@@ -315,10 +317,12 @@ class Sidebar(QFrame):
         margins = self.layout().contentsMargins()
         horizontal = margins.left() + margins.right()
         scrollbar = self.scroll.verticalScrollBar().sizeHint().width()
-        rows = [(self.new_button, 0), (self.help_button, 0)]
+        rows = [(self.help_button, 0)]
         rows += [(button, self.CHILD_INDENT + scrollbar if self.scroll.isAncestorOf(button) else 0)
                  for button in self.buttons.values()]
         headers = max(button.sizeHint().width() for button in self.group_buttons.values()) + scrollbar
+        self.new_button.setText(self.new_button.accessibleName())
+        create_width = self.new_button.sizeHint().width()
 
         if self._compact:
             longest = max(
@@ -326,6 +330,9 @@ class Sidebar(QFrame):
                 for button, extra in rows for word in button.label.split()
             )
             width = max(166, longest + horizontal + 42, headers + horizontal)
+            if width < create_width + horizontal:
+                self.new_button.setText(self.new_button.text().replace(" ", "\n", 1))
+                width = max(width, self.new_button.sizeHint().width() + horizontal)
             for button, extra in rows:
                 available = width - horizontal - extra - 42
                 lines = [""]
@@ -342,7 +349,7 @@ class Sidebar(QFrame):
                 button.setText(button.label)
                 button.setMinimumHeight(34)
             required = max(button.sizeHint().width() + extra for button, extra in rows)
-            width = max(225, max(required, headers) + horizontal + 2)
+            width = max(225, max(required, headers, create_width) + horizontal + 2)
         self.setFixedWidth(width)
 
     def changeEvent(self, event):
