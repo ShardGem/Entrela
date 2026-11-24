@@ -207,10 +207,8 @@ class CircuitEditor(QWidget):
             button.setToolButtonStyle(Qt.ToolButtonIconOnly)
             button.setAccessibleName(title)
             toolbar.addWidget(button)
-        self.file_menu = QToolButton()
-        self.file_menu.setText("Ações do circuito")
-        self.file_menu.setPopupMode(QToolButton.InstantPopup)
-        self.file_menu.setAccessibleName("Ações do circuito")
+        self.file_menu = SecondaryButton("Circuito", icon="open-file")
+        self.file_menu.setAccessibleName("Arquivo e propriedades do circuito")
         file_menu = QMenu(self.file_menu)
         self.file_menu.setMenu(file_menu)
         self.zoom = QSpinBox()
@@ -219,26 +217,13 @@ class CircuitEditor(QWidget):
         self.zoom.setSuffix("%")
         self.zoom.setPrefix("Zoom ")
         self.zoom.valueChanged.connect(lambda value: self.canvas.set_zoom(value))
-        for text, callback in [
-            (
-                "Novo",
-                self._new,
-            ),
-            ("Abrir circuito…", self._import),
-            ("Salvar circuito…", self._export),
-            ("Exportar desenho…", self._export_svg),
-            ("Ajustar visão", lambda: self.canvas.fit_circuit()),
-        ]:
-            button = GhostButton(text)
-            button.clicked.connect(callback)
-            if callback in (self._import, self._export):
-                button.setToolTip("JSON guarda portas e parâmetros. OpenQASM é um formato de código para circuitos quânticos.")
-            elif callback == self._export_svg:
-                button.setToolTip("Exporta o trecho visível como imagem vetorial SVG, que pode ser ampliada sem perder nitidez.")
-            button.hide()
-            button.setParent(self)
-            action = file_menu.addAction(text, button.click)
-            action.setToolTip(button.toolTip())
+        file_menu.setToolTipsVisible(True)
+        file_help = "JSON guarda portas e parâmetros. OpenQASM é um formato de código para circuitos quânticos."
+        file_menu.addAction("Importar circuito…", self._import).setToolTip(file_help)
+        file_menu.addAction("Exportar circuito…", self._export).setToolTip(file_help)
+        file_menu.addAction("Exportar desenho SVG…", self._export_svg).setToolTip("Exporta o trecho visível como imagem vetorial.")
+        file_menu.addSeparator()
+        file_menu.addAction("Limpar circuito atual", self._new).setToolTip("Remove as portas do rascunho atual. Desfazer recupera o circuito anterior.")
         toolbar.addWidget(self.file_menu)
         file_menu.addSeparator()
         self.edit_menu = QMenu("Editar seleção", file_menu)
@@ -251,14 +236,18 @@ class CircuitEditor(QWidget):
             ("Mover depois", lambda: self._reorder(self.selected, self.selected + 1)),
         ]:
             self.edit_menu.addAction(text, callback)
-        toolbar.addWidget(self.zoom)
+        fit = SecondaryButton(icon="fit-view")
+        fit.setAccessibleName("Enquadrar circuito")
+        fit.setToolTip("Enquadrar circuito")
+        fit.clicked.connect(lambda: self.canvas.fit_circuit())
+        toolbar.add_group(self.zoom, fit)
         self.advanced_section.layout().removeWidget(self.advanced_section.header)
         self.advanced_section.header.setParent(self)
         self.advanced_section.header.setText("Avançado")
         self.advanced_section.header.setToolTip("Fase global do circuito, em radianos. Não altera probabilidades de medição isoladamente.")
         self.advanced_section.header.hide()
         for title, section in (
-            ("Parâmetros avançados", self.advanced_section),
+            ("Fase global", self.advanced_section),
             ("Como criar um circuito", self.creation_help),
         ):
             action = file_menu.addAction(title)
@@ -280,9 +269,9 @@ class CircuitEditor(QWidget):
         self.save_revision_button.clicked.connect(self._save_revision)
         self.save_revision_button.setEnabled(False)
         library_row.addWidget(self.save_revision_button)
-        library_toggle = GhostButton("Biblioteca")
-        library_toggle.setCheckable(True)
-        library_row.addWidget(library_toggle)
+        self.revisions_toggle = GhostButton("Revisões", icon="history")
+        self.revisions_toggle.setCheckable(True)
+        library_row.addWidget(self.revisions_toggle)
         self.revision_label = QLabel("Rascunho independente")
         self.revision_label.setWordWrap(True)
         library_row.addWidget(self.revision_label)
@@ -315,7 +304,7 @@ class CircuitEditor(QWidget):
         library_body.addRow("Recuperação local",self.recover_draft)
         root.addWidget(self.library_panel)
         self.library_panel.hide()
-        library_toggle.toggled.connect(self.library_panel.setVisible)
+        self.revisions_toggle.toggled.connect(self.library_panel.setVisible)
         self.summary = QLabel()
         self.summary.setWordWrap(True)
         self.summary.setObjectName("SectionSubtitle")
@@ -537,15 +526,13 @@ class CircuitEditor(QWidget):
         self.scene_splitter.addWidget(self.inspector_tabs)
         self.scene_splitter.setStretchFactor(1, 1)
         self.scene_splitter.setSizes([220, 800, 300])
-        self.inspector_toggle = QToolButton()
-        self.inspector_toggle.setText("Inspetor")
+        self.inspector_toggle = GhostButton("Inspetor", icon="panel-right")
         self.inspector_toggle.setCheckable(True)
         self.inspector_toggle.setChecked(True)
         self.inspector_toggle.setAccessibleName("Mostrar inspetor do circuito")
         self.inspector_toggle.clicked.connect(self._toggle_inspector)
         toolbar.addWidget(self.inspector_toggle)
-        self.evidence_toggle = QToolButton()
-        self.evidence_toggle.setText('Resultado gravado')
+        self.evidence_toggle = GhostButton('Resultado gravado', icon='results')
         self.evidence_toggle.setCheckable(True)
         self.evidence_toggle.setToolTip('Mostrar ou ocultar o resultado gravado abaixo do desenho. Não executa a simulação.')
         self.evidence_toggle.toggled.connect(self.evidence.setVisible)

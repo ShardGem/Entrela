@@ -62,6 +62,9 @@ def test_results_keep_full_plots_visible_after_other_tabs(window, qt_app):
     window._show_page('results')
     page = window.page_results
     page.results_tab.chart_views.setCurrentIndex(2)
+    assert experiment.id in page.provenance_values['Registro'].text()
+    assert not page.metadata_details.is_expanded
+    assert experiment.id in page.metadata_json.toPlainText()
     for tab in (page.metadata, page.state_inspector, page.interpretation, page.results_tab):
         page.tabs.setCurrentWidget(tab)
         settle(qt_app)

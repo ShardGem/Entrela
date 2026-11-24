@@ -1,3 +1,6 @@
+from dataclasses import asdict
+import json
+
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QLabel,
@@ -5,20 +8,22 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QPlainTextEdit,
     QHeaderView,
-    QToolButton, QMenu, QHBoxLayout, QWidget, QScrollArea,
+    QFrame, QFormLayout, QMenu, QHBoxLayout, QVBoxLayout, QWidget, QScrollArea,
 )
 from gui.pages.base import PageBase
 from gui.widgets.card import MetricCard, MetricGrid, EmptyState
-from gui.widgets.button import GhostButton, SecondaryButton
+from gui.widgets.button import GhostButton, PrimaryButton, SecondaryButton
 from gui.design_system import Surface
 from gui.tabs.results_tab import ResultsTab
 from gui.widgets.state_inspector import StateInspector
 from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.collapsible import CollapsibleSection
+from gui.widgets.flow_layout import FlowLayout
 from core.export import result_interpretation
 from core.reproduction import scientific_context
+from core.types import system_label
 from gui.widgets.data_table import configure_table
-import json
-from gui.formatting import quantity
+from gui.formatting import quantity, timestamp
 
 
 class ResultsPage(PageBase):
@@ -67,6 +72,8 @@ class ResultsPage(PageBase):
         self.results_tab = ResultsTab()
         self.interpretation = QLabel("A interpretação aparecerá após uma execução.")
         self.interpretation.setWordWrap(True)
+        self.interpretation.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.interpretation.setObjectName("ResultInterpretation")
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
             ["Estado", "Contagens", "Frequência", "Probabilidade do estado"]
@@ -74,8 +81,31 @@ class ResultsPage(PageBase):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         configure_table(self.table)
-        self.metadata = QPlainTextEdit()
-        self.metadata.setReadOnly(True)
+        self.metadata = QWidget()
+        metadata_layout = QVBoxLayout(self.metadata)
+        metadata_layout.setContentsMargins(0, 0, 0, 0)
+        metadata_layout.setSpacing(12)
+        provenance = Surface("Parâmetros registrados")
+        form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        form.setVerticalSpacing(10)
+        self.provenance_values = {}
+        for field in ("Sistema", "Protocolo", "Ruído", "Medições", "Versões", "Registro"):
+            value = QLabel()
+            value.setTextFormat(Qt.PlainText)
+            value.setWordWrap(True)
+            value.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            self.provenance_values[field] = value
+            form.addRow(field, value)
+        provenance.body().addLayout(form)
+        metadata_layout.addWidget(provenance)
+        self.metadata_details = CollapsibleSection("JSON do registro")
+        self.metadata_json = QPlainTextEdit()
+        self.metadata_json.setReadOnly(True)
+        self.metadata_json.setAccessibleName("JSON do registro")
+        self.metadata_details.content_layout.addWidget(self.metadata_json)
+        metadata_layout.addWidget(self.metadata_details)
+        metadata_layout.addStretch()
         self.tabs.addTab(self.results_tab, "Gráficos")
         self.tabs.addTab(self.interpretation, "Entender resultado")
         self.tabs.addTab(self.table, "Dados")
@@ -98,44 +128,48 @@ class ResultsPage(PageBase):
         self.inspector_scroll.setWidgetResizable(True)
         self.inspector_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.inspector_scroll.setWidget(self.inspector)
-        self.inspector_toggle = GhostButton('Ocultar detalhes', icon='info')
+        self.inspector_toggle = GhostButton('Detalhes', icon='panel-right')
+        self.inspector_toggle.setToolTip('Mostrar ou ocultar as métricas e a referência da execução')
         self.inspector_toggle.setCheckable(True)
         self.inspector_toggle.setChecked(True)
         self.inspector_toggle.toggled.connect(self._set_inspector_open)
         self.add_action(self.inspector_toggle)
         column_layout.addWidget(self.inspector_scroll)
         self.body().addWidget(self.result_layout, 1)
-        for name, text, signal in [
-            ("btn_rerun", "Reexecutar", self.rerun_requested),
-            ("btn_report", "Relatório", self.report_requested),
-            ("btn_save", "Salvar execução", self.save_requested),
-            ("btn_export", "CSV", self.export_requested),
-            ("btn_export_full", "JSON / pacote", self.export_experiment_requested),
-            ("btn_figures", "Figuras PNG", self.export_figures_requested),
+        self.execution_actions = QFrame()
+        self.execution_actions.setObjectName('ExecutionActions')
+        actions = FlowLayout(self.execution_actions)
+        actions.setContentsMargins(8, 6, 8, 6)
+        for name, text, icon, signal in [
+            ("btn_rerun", "Reexecutar", 'rerun', self.rerun_requested),
+            ("btn_report", "Relatório", None, self.report_requested),
+            ("btn_save", "Salvar execução", 'save', self.save_requested),
+            ("btn_export", "CSV", None, self.export_requested),
+            ("btn_export_full", "JSON / pacote", None, self.export_experiment_requested),
+            ("btn_figures", "Figuras PNG", None, self.export_figures_requested),
         ]:
-            button = SecondaryButton(text, parent=self)
+            button_type = PrimaryButton if name == 'btn_save' else SecondaryButton
+            button = button_type(text, icon=icon, parent=self)
             button.clicked.connect(signal.emit)
             button.setEnabled(False)
             setattr(self, name, button)
             if name in ('btn_rerun', 'btn_save'):
-                self.inspector.add(button)
+                actions.addWidget(button)
             else:
                 button.hide()
-        self.btn_edit = SecondaryButton('Editar configuração', icon='settings')
+        self.btn_edit = SecondaryButton('Criar rascunho', icon='copy')
         self.btn_edit.setToolTip('Criar uma cópia editável da configuração desta execução. Não executa o rascunho atual.')
         self.btn_edit.clicked.connect(self.edit_config_requested.emit)
-        self.inspector.add(self.btn_edit)
-        self.btn_rerun.setText('Reexecutar')
+        actions.addWidget(self.btn_edit)
         self.export_menu = QMenu(self)
-        self.export_button = QToolButton()
-        self.export_button.setText('Exportar')
+        self.export_button = SecondaryButton('Exportar', icon='export')
         self.export_button.setAccessibleName('Exportar a execução selecionada')
-        self.export_button.setPopupMode(QToolButton.InstantPopup)
         self.export_button.setMenu(self.export_menu)
         for text, button in [('Relatório científico PDF…', self.btn_report), ('Dados das medições CSV…', self.btn_export),
                              ('Execução completa JSON / pacote ZIP…', self.btn_export_full), ('Figuras da execução PNG…', self.btn_figures)]:
             self.export_menu.addAction(text, button.click)
-        self.inspector.add(self.export_button)
+        actions.addWidget(self.export_button)
+        self.body().addWidget(self.execution_actions)
         self.inspector.body().addStretch()
         self.tabs.currentChanged.connect(self._arrange_result_view)
         self._available = False
@@ -145,6 +179,7 @@ class ResultsPage(PageBase):
         self._available = available
         self.empty.setVisible(not available)
         self.result_layout.setVisible(available)
+        self.execution_actions.setVisible(available)
         self.reproduction_status.hide()
         self.inspector_toggle.setEnabled(available)
         self.export_button.setEnabled(available)
@@ -152,7 +187,6 @@ class ResultsPage(PageBase):
 
     def _set_inspector_open(self, opened):
         self.inspector_scroll.setVisible(opened)
-        self.inspector_toggle.setText('Ocultar detalhes' if opened else 'Mostrar detalhes')
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -199,11 +233,31 @@ class ResultsPage(PageBase):
         self.reproduction_status.setText(status_text)
         self.reproduction_status.setVisible(bool(check))
         self.details.setText(
-            f"{'Circuito livre' if c.circuit is not None else c.system.hamiltonian} · {c.system.num_qubits} qubits\n"
+            f"{system_label(c)} · {c.system.num_qubits} qubits\n"
             f"{c.shots} shots · profundidade {r.circuit_depth}\n"
             f"Duração: {experiment.duration_s:.3f} s\n"
             f"Semente efetiva: {r.metadata.get('effective_seed', 'não registrada')}"
         )
+
+    def _update_provenance(self, experiment):
+        config, result = experiment.config, experiment.result
+        protocol = config.protocol
+        if config.circuit is not None:
+            method = f"Circuito de portas · {len(config.circuit.gates)} portas no documento"
+        else:
+            method = f"T={protocol.total_time:g} · {protocol.trotter_steps} passos · Suzuki de ordem {protocol.trotter_order}"
+        raw_versions = result.metadata.get("versions")
+        versions = raw_versions if isinstance(raw_versions, dict) else {}
+        values = {
+            "Sistema": f"{system_label(config)} · {config.system.num_qubits} qubits",
+            "Protocolo": method,
+            "Ruído": config.noise.kind if config.noise.enabled else "Desativado",
+            "Medições": f"{config.shots} shots · semente efetiva {result.metadata.get('effective_seed', 'não registrada')}",
+            "Versões": " · ".join(f"{name} {version}" for name, version in versions.items()) or "Não registradas",
+            "Registro": f"{experiment.id} · {timestamp(experiment.created_at)}",
+        }
+        for field, value in values.items():
+            self.provenance_values[field].setText(value)
 
     def show_experiment(self, experiment):
         self._set_available(True)
@@ -219,6 +273,7 @@ class ResultsPage(PageBase):
         self.card_erg._label.setText('Energia da origem ⟨H⟩' if r.mitigation else 'Energia ⟨H⟩')
         self.btn_rerun.setToolTip("Recalcula a análise ZNE com método, fatores, shots e seed registrados; preserva as métricas da fonte." if r.mitigation else "Executa novamente a configuração com a semente efetiva registrada.")
         self._update_details()
+        self._update_provenance(experiment)
         self.update_metrics(r.fidelity, r.purity, r.energy)
         self.results_tab.exibir_histograma(r.counts)
         self.results_tab.exibir_evolucao_temporal(
@@ -244,11 +299,11 @@ class ResultsPage(PageBase):
                 ]
             ):
                 self.table.setItem(index, column, QTableWidgetItem(text))
-        self.metadata.setPlainText(
+        self.metadata_json.setPlainText(
             json.dumps(
                 {
                     "id": experiment.id,
-                    "config": __import__("dataclasses").asdict(c),
+                    "config": asdict(c),
                     "metadata": {
                         k: (
                             f"{len(v)} operações — inspecione na página Circuito ou no JSON completo"

@@ -108,7 +108,11 @@ QWidget {{ color: {p.text}; background: transparent; }}
 QMainWindow, QWidget#RootWidget {{ background: {p.chrome}; }}
 QDialog, QDockWidget {{ background: {p.bg}; }}
 QFrame#Workbench {{
-    background: {p.bg}; border: 1px solid {p.chrome_border}; border-radius: 12px;
+    background: {p.bg}; border: 1px solid {p.chrome_border}; border-radius: 15px;
+}}
+QFrame#PageHeader {{
+    background: {p.bg_elevated}; border-bottom: 1px solid {p.border};
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
 }}
 QStatusBar {{ background: {p.chrome}; color: {p.chrome_muted}; font-size: 11px; }}
 QStatusBar QLabel {{ color: {p.chrome_muted}; font-size: 11px; }}
@@ -118,9 +122,9 @@ QToolTip {{
 }}
 
 /* Identidade e hierarquia tipográfica */
-QLabel#TopbarTitle {{ font-size: 24px; font-weight: 600; }}
+QLabel#TopbarTitle {{ font-size: 25px; font-weight: 600; }}
 QLabel#HeroTitle {{ font-size: 28px; font-weight: 600; }}
-QLabel#TopbarBreadcrumb {{ color: {p.text_muted}; font-size: 11px; font-weight: 500; }}
+QLabel#TopbarBreadcrumb {{ color: {p.text_muted}; font-size: 12px; font-weight: 500; }}
 QLabel#PageTitle, QLabel#ResumeTitle {{ font-size: 23px; font-weight: 600; }}
 QLabel#WorkspaceSectionTitle {{ font-size: 17px; font-weight: 600; }}
 QLabel#SectionTitle, QLabel#PanelTitle {{ font-size: 14px; font-weight: 600; }}
@@ -141,24 +145,27 @@ QLabel#MetricUnit {{ color: {p.text_dim}; font-size: 11px; }}
 /* Navegação */
 QFrame#Sidebar {{ background: {p.chrome}; }}
 QLabel#SidebarLogo {{ color: {p.chrome_text}; font-size: 17px; font-weight: 600; }}
+QLabel#SidebarMark {{ background: {p.chrome_hover}; border: 1px solid {p.chrome_border}; border-radius: 8px; }}
 QFrame#SidebarDivider {{ background: {p.chrome_border}; border: none; }}
 QLabel#NavShortcut {{
-    color: {p.chrome_muted}; font-size: 10px; padding: 2px 5px;
+    color: {p.chrome_muted}; background: {p.chrome}; font-size: 10px; padding: 2px 5px;
     border: 1px solid {p.chrome_border}; border-radius: 4px;
 }}
 QPushButton#NavButton, QPushButton#NavGroup, QPushButton#SearchButton, QToolButton#SidebarToggle {{
-    color: {p.chrome_muted}; background: transparent; border: 1px solid transparent; border-radius: 8px;
+    color: {p.chrome_muted}; background: transparent; border: 1px solid transparent; border-radius: 7px;
     text-align: left;
 }}
 QPushButton#NavButton {{ padding: 4px 9px; font-weight: 500; }}
 QPushButton#NavGroup {{ padding: 5px 26px 5px 9px; color: {p.chrome_text}; font-weight: 600; }}
 QPushButton#NavGroup[activeSection="true"] {{ color: {p.chrome_accent}; }}
 QPushButton#NavGroup[activeSection="true"]:!checked {{ background: {p.chrome_hover}; }}
-QPushButton#SearchButton {{ background: transparent; border-color: {p.chrome_border}; padding: 5px 9px; }}
+QPushButton#SearchButton {{ background: {p.chrome_hover}; border-color: {p.chrome_border}; padding: 5px 9px; }}
 QPushButton#NavButton:hover, QPushButton#NavGroup:hover, QToolButton#SidebarToggle:hover {{
     background: {p.chrome_hover}; color: {p.chrome_text};
 }}
-QPushButton#NavButton:checked {{ background: {p.chrome_selected}; color: {p.chrome_accent}; font-weight: 600; }}
+QPushButton#NavButton:checked {{
+    background: {p.chrome_selected}; color: {p.chrome_accent}; border-color: {p.chrome_border}; font-weight: 600;
+}}
 QPushButton#SearchButton:hover {{ background: {p.chrome_selected}; color: {p.chrome_text}; }}
 QPushButton#NavButton:focus, QPushButton#NavGroup:focus, QPushButton#SearchButton:focus,
 QToolButton#SidebarToggle:focus {{ border-color: {p.chrome_accent}; }}
@@ -168,8 +175,17 @@ QFrame#StudioPanel, QWidget#InspectorPanel, QFrame#EvidencePanel, QFrame#Workben
 QFrame#ProjectCard, QFrame#PlotFrame, QWidget#ParameterWorkspace {{
     background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: {RADIUS.lg}px;
 }}
-QFrame#ProjectResume, QFrame#PreparationPlate {{
+QFrame#ProjectResume {{
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+        stop: 0 {p.primary_faint}, stop: 1 {p.bg_elevated});
+    border: 1px solid {p.border}; border-radius: {RADIUS.lg}px;
+}}
+QFrame#PreparationPlate {{
     background: {p.primary_faint}; border: 1px solid {p.border}; border-radius: {RADIUS.lg}px;
+}}
+QLabel#ResultInterpretation {{
+    background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: {RADIUS.lg}px;
+    padding: 18px;
 }}
 QFrame#Card {{ background: transparent; border: none; }}
 QFrame#IdentityCard, QFrame#SectionCard, QFrame#RunMetric {{
@@ -179,6 +195,9 @@ QFrame#SectionCard[inline="true"] {{ border: none; }}
 QFrame#MetricTile {{ background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: {RADIUS.md}px; }}
 QFrame#ExecutionBar, QFrame#TransportBar, QFrame#CommandBar {{
     background: transparent; border: none; border-top: 1px solid {p.border};
+}}
+QFrame#ExecutionActions {{
+    background: {p.bg_elevated}; border: 1px solid {p.border}; border-radius: {RADIUS.md}px;
 }}
 QLabel#ValidationMessage {{ color: {p.text_muted}; font-size: 12px; }}
 QLabel#ValidationMessage[state="error"] {{ color: {p.danger}; }}
@@ -193,7 +212,7 @@ QToolButton#SectionToggle:hover {{ color: {p.primary}; background: {p.surface_ho
 
 /* Botões e menus */
 QPushButton, QToolButton {{
-    background: {p.bg_elevated}; color: {p.text}; border: 1px solid {p.border}; border-radius: {RADIUS.md}px;
+    background: {p.bg_elevated}; color: {p.text}; border: 1px solid {p.border}; border-radius: 7px;
     padding: {max(4, pad - 1)}px 12px; font-weight: 500;
 }}
 QPushButton:hover, QToolButton:hover {{ background: {p.surface_hover}; }}
@@ -206,13 +225,17 @@ QPushButton#PrimaryButton {{
 }}
 QPushButton#PrimaryButton:hover {{ background: {p.action_hover}; border-color: {p.action_hover}; }}
 QPushButton#PrimaryButton:pressed {{ background: {p.action_pressed}; border-color: {p.action_pressed}; }}
-QPushButton#PrimaryButton:focus {{ border: 2px solid {p.text}; }}
+QPushButton#PrimaryButton:focus {{ border-color: {p.text}; }}
 QPushButton#PrimaryButton:disabled {{ background: {p.surface}; color: {p.text_dim}; border-color: {p.border}; }}
 QFrame#Sidebar QPushButton#PrimaryButton {{ text-align: left; padding: 7px 6px; }}
+QFrame#Sidebar QPushButton#PrimaryButton:focus {{ border-color: {p.chrome_text}; }}
 QPushButton#GhostButton, QToolButton#QuietTool {{
     background: transparent; border-color: transparent; color: {p.primary}; padding: {max(4, pad - 1)}px 8px;
 }}
 QPushButton#GhostButton:hover, QToolButton#QuietTool:hover {{ background: {p.primary_faint}; }}
+QPushButton#GhostButton:checked, QToolButton#QuietTool:checked {{
+    background: {p.primary_faint}; border-color: {p.primary_muted}; color: {p.primary};
+}}
 QPushButton#GhostButton:focus, QToolButton#QuietTool:focus, QPushButton#ConfigStep:focus {{ border-color: {p.primary}; }}
 QPushButton#GhostButton:disabled, QToolButton#QuietTool:disabled {{ color: {p.text_dim}; }}
 QPushButton#DangerButton {{ color: {p.danger}; background: {p.danger_bg}; }}
@@ -291,10 +314,13 @@ QTabWidget::pane {{ border: none; }}
 QTabBar {{ qproperty-drawBase: false; }}
 QTabBar::tab {{
     background: transparent; color: {p.text_muted}; border: 1px solid transparent;
-    border-radius: 8px; padding: 7px 12px; margin-right: 3px;
+    border-bottom: 2px solid transparent; border-top-left-radius: 6px; border-top-right-radius: 6px;
+    padding: 7px 12px; margin-right: 3px;
 }}
 QTabBar::tab:hover {{ background: {p.surface_hover}; }}
-QTabBar::tab:selected {{ background: {p.primary_faint}; color: {p.primary}; font-weight: 600; }}
+QTabBar::tab:selected {{
+    background: {p.primary_faint}; color: {p.primary}; border-bottom-color: {p.primary}; font-weight: 600;
+}}
 QTabBar::tab:focus {{ border-color: {p.primary}; }}
 QTabBar::tab:disabled {{ color: {p.text_dim}; }}
 QListView, QTreeView, QTableView {{

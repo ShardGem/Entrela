@@ -11,8 +11,8 @@ class Topbar(QFrame):
         super().__init__(parent)
         self.setObjectName("PageHeader")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(LAYOUT.page_margin, 16, LAYOUT.page_margin, 12)
-        layout.setSpacing(5)
+        layout.setContentsMargins(LAYOUT.page_margin, 18, LAYOUT.page_margin, 14)
+        layout.setSpacing(4)
 
         self.context = QLabel()
         self.context.setObjectName("TopbarBreadcrumb")

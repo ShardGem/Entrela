@@ -65,16 +65,17 @@ class ExperimentWorkspace(QWidget):
         self.stages.setAccessibleName('Preparação ou consulta da execução')
         self.visible_views.addWidget(self.stages)
         self.stages.hide()
-        self.templates_button = SecondaryButton("Configurações salvas")
-        self.templates_button.setAccessibleName("Abrir configurações salvas")
+        self.templates_button = SecondaryButton("Carregar modelo", icon="layers")
         self.templates_button.setToolTip(
-            "Reutilize parâmetros salvos do formulário de simulação. Carregar não executa a simulação."
+            "Abra um exemplo ou reutilize parâmetros de uma configuração salva."
         )
-        self.templates_menu = QMenu(self.templates_button)
+        self.model_menu = QMenu(self.templates_button)
+        self.templates_menu = QMenu("Configurações salvas", self.model_menu)
+        self.model_menu.addMenu(self.templates_menu)
         self.templates_menu.setToolTipsVisible(True)
-        self.templates_button.setMenu(self.templates_menu)
+        self.templates_button.setMenu(self.model_menu)
 
-        self.recent_button = SecondaryButton("Execuções")
+        self.recent_button = SecondaryButton("Execuções", icon="history")
         self.recent_button.setObjectName("ViewAction")
         self.recent_button.setAccessibleName("Abrir execuções recentes")
         self.recent_button.setToolTip("Abra resultados de uma execução salva sem procurar outra tela.")
@@ -114,12 +115,12 @@ class ExperimentWorkspace(QWidget):
         self.back_to_results = GhostButton("Voltar aos gráficos", icon="arrow-left")
         self.back_to_results.clicked.connect(lambda: self._observation_selected(0))
         self.visible_views.addWidget(self.back_to_results)
-        self.more_views = SecondaryButton("Mais", icon="ellipsis")
+        self.more_views = SecondaryButton("Visualizações", icon="layers")
         self.more_views.setObjectName("ViewAction")
         self.more_views.setAccessibleName("Mais visualizações da execução")
         self.more_views.setToolTip("Circuito executado, interpretação, metadados e gráficos lado a lado")
         menu = QMenu(self.more_views)
-        self.paired_action = menu.addAction("Medições e evolução lado a lado", self._paired_charts)
+        self.paired_action = menu.addAction("Mostrar medições e evolução", self._paired_charts)
         self.paired_action.setCheckable(True)
         menu.addSeparator()
         self._detail_actions = {}

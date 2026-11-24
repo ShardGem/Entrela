@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QBoxLayout, QSplitter, QLabel, QFrame,
-    QProgressBar, QScrollArea, QLineEdit, QToolButton, QMenu,
+    QProgressBar, QScrollArea, QLineEdit, QMenu,
     QGridLayout,
 )
 from gui.pages.base import PageBase
@@ -87,16 +87,14 @@ class SimulationPage(PageBase):
         self._refresh_summary()
 
     def _build(self):
-        self.examples_button = GhostButton("Exemplos", icon="examples")
-        self.examples_button.setToolTip("Carregar uma configuração demonstrativa existente. Nenhuma simulação é executada ao escolher o exemplo.")
-        examples = QMenu(self.examples_button)
+        self.examples_menu = QMenu("Exemplos", self)
+        self.examples_menu.setToolTipsVisible(True)
         from core.examples import get_example
         for identifier in ("first-qubit","bell","ising","depolarizing-bell","thermal-ising"):
             example = get_example(identifier)
-            action = examples.addAction(example.title)
+            action = self.examples_menu.addAction(example.title)
             action.setToolTip(example.description)
             action.triggered.connect(lambda checked=False,key=identifier: self.example_requested.emit(key))
-        self.examples_button.setMenu(examples)
 
         identity = QFrame()
         identity.setObjectName("DocumentHeader")
@@ -117,15 +115,10 @@ class SimulationPage(PageBase):
         self.experiment_name.setPlaceholderText("Simulação sem título")
         self.experiment_name.setAccessibleName("Nome do experimento")
         identity_fields.addWidget(self.experiment_name)
-        self.description_toggle = QToolButton()
-        self.description_toggle.setObjectName("QuietTool")
-        self.description_toggle.setText("Descrição")
+        self.description_toggle = GhostButton("Descrição", icon="annotations")
         self.description_toggle.setCheckable(True)
-        self.description_toggle.setArrowType(Qt.RightArrow)
-        self.description_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.identity_row.addLayout(identity_fields, 1)
         self.setup_actions = FlowLayout(spacing=8)
-        self.setup_actions.addWidget(self.examples_button)
         self.setup_actions.addWidget(self.description_toggle)
         self.identity_row.addLayout(self.setup_actions)
         identity_body.addLayout(self.identity_row)
@@ -140,7 +133,6 @@ class SimulationPage(PageBase):
         identity_body.addWidget(self.description_row)
         self.description_row.hide()
         self.description_toggle.toggled.connect(self.description_row.setVisible)
-        self.description_toggle.toggled.connect(lambda opened: self.description_toggle.setArrowType(Qt.DownArrow if opened else Qt.RightArrow))
 
         self.body().addWidget(identity)
 
@@ -283,7 +275,9 @@ class SimulationPage(PageBase):
         self._scroll.hide()
         self._root.insertWidget(1, self._body_widget, 1)
 
-    def add_setup_action(self, button):
+    def set_model_action(self, button):
+        menu = button.menu()
+        menu.insertMenu(menu.actions()[0], self.examples_menu)
         self.setup_actions.addWidget(button)
 
     def _emit_run(self):
@@ -384,7 +378,6 @@ class SimulationPage(PageBase):
         self.config_panel.setEnabled(not running)
         self.experiment_name.setEnabled(not running)
         self.experiment_description.setEnabled(not running)
-        self.examples_button.setEnabled(not running)
         self.btn_run.setText("Executando…" if running else "Executar simulação")
         self._refresh_summary()
         if running:

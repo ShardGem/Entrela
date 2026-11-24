@@ -9,6 +9,11 @@ from PySide6.QtSvg import QSvgRenderer
 
 
 _BODIES = {
+    "open-file": '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2H7l-4 8V7zM3 19h16l3-8"/>',
+    "fit-view": '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/><rect x="8" y="8" width="8" height="8" rx="1"/>',
+    "panel-right": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16m3-11v6"/>',
+    "copy": '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    "rerun": '<path d="M20 11a8 8 0 1 0-2 6m2-11v5h-5"/><path d="m10 9 5 3-5 3z"/>',
     "simulation-pulse": '<path d="M3 12h4l3-6 4 12 3-6h4"/><path d="M4 5h3m10 14h3"/>',
     "group-archive": '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9m-9 4h4"/>',
     "chevron-right": '<path d="m9 6 6 6-6 6"/>',

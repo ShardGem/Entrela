@@ -112,7 +112,9 @@ def test_example_menu_respects_draft_protection_and_never_runs(window, monkeypat
     panel = page.config_panel
     panel.spin_J.setValue(.321)
     expected = panel.get_config()
-    action = next(action for action in page.examples_button.menu().actions() if 'Bell' in action.text())
+    model_menu = window.page_workspace.templates_button.menu()
+    assert page.examples_menu in [action.menu() for action in model_menu.actions()]
+    action = next(action for action in page.examples_menu.actions() if 'Bell' in action.text())
     action.trigger()
     assert panel.get_config() == create_example_config('bell')
     previous = next(w for w in window.projects.store.works() if w['id'] != window.projects.active_id)
@@ -151,7 +153,7 @@ def test_expanded_sections_and_presentation_survive_restart(window, qt_app):
         other.close()
 
 
-def test_result_actions_stay_with_the_inspector_and_leave_space_for_the_chart(window, qt_app):
+def test_result_actions_stay_available_when_the_inspector_is_closed(window, qt_app):
     page = window.page_results
     record = run_experiment(replace(create_example_config('bell'), shots=16))
     window._current_experiment = record
@@ -165,16 +167,17 @@ def test_result_actions_stay_with_the_inspector_and_leave_space_for_the_chart(wi
                 qt_app.processEvents()
             buttons = [page.btn_rerun, page.btn_save, page.btn_edit, page.export_button]
             for index, button in enumerate(buttons):
-                assert page.inspector.rect().contains(button.geometry())
+                assert page.execution_actions.rect().contains(button.geometry())
                 assert all(not button.geometry().intersects(other.geometry()) for other in buttons[index + 1:])
+            chart_width = page.tabs.width()
+            page.inspector_toggle.click()
+            qt_app.processEvents()
+            assert page.inspector_scroll.isHidden()
+            assert all(button.isVisible() for button in buttons)
+            assert page.tabs.width() > chart_width
+            page.inspector_toggle.click()
             if size == 15:
                 assert page.tabs.width() > page.inspector.width()
-                chart_width = page.tabs.width()
-                page.inspector_toggle.click()
-                qt_app.processEvents()
-                assert page.inspector_scroll.isHidden()
-                assert page.tabs.width() > chart_width
-                page.inspector_toggle.click()
     finally:
         apply_appearance(window)
 

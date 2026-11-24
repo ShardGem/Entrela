@@ -27,10 +27,15 @@ LIGHT = {
 }
 NAVY = {
     **LIGHT,
-    "bg": "#F8F9FD", "border": "#DCE2EF",
-    "chrome": "#E8EDF7", "chrome_border": "#CCD7EA", "chrome_text": "#24324A",
-    "chrome_muted": "#4C5A73", "chrome_hover": "#DFE7F5", "chrome_selected": "#D3DFF8",
-    "chrome_accent": "#2F459F",
+    "bg": "#F6F8FC", "surface": "#EBF0F8", "surface_hover": "#E7EDFA",
+    "surface_active": "#DCE6FA", "border": "#DCE4F0", "border_strong": "#74839D",
+    "primary": "#2D47C2", "primary_hover": "#233BB1", "primary_pressed": "#1C3197",
+    "primary_muted": "#DDE6FF", "primary_faint": "#EEF2FF",
+    "action_bg": "#3653D7", "action_hover": "#2C46C7", "action_pressed": "#2139A9",
+    "text": "#182338", "text_muted": "#40516B", "text_dim": "#52627B",
+    "chrome": "#131A2B", "chrome_border": "#2C3953", "chrome_text": "#F0F4FF",
+    "chrome_muted": "#ABBBD6", "chrome_hover": "#1D2840", "chrome_selected": "#243456",
+    "chrome_accent": "#C6D4FF",
 }
 
 THEMES = {"dark": DARK, "light": LIGHT, "navy": NAVY}
@@ -43,6 +48,6 @@ THEME_CHOICES = (
 THEME_DESCRIPTIONS = {
     "dark": "Grafite combina fundo escuro, superfícies neutras e azul claro para ações.",
     "light": "Claro usa superfícies claras em toda a janela, com índigo para foco e ações.",
-    "navy": "Azul Entrela usa tons de azul ardósia na navegação e índigo para ações e seleções.",
+    "navy": "Azul Entrela combina navegação em azul profundo, uma bancada clara e índigo nas ações.",
     "auto": "Automático acompanha a aparência do sistema operacional.",
 }

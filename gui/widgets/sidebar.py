@@ -108,14 +108,15 @@ class Sidebar(QFrame):
 
     def _build(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 7, 11, 4)
+        outer.setContentsMargins(12, 9, 11, 6)
         outer.setSpacing(3)
         self.brand_box = QWidget()
         brand = QHBoxLayout(self.brand_box)
-        brand.setContentsMargins(3, 2, 0, 7)
+        brand.setContentsMargins(0, 2, 0, 10)
         brand.setSpacing(8)
         self.logo = QLabel()
-        self.logo.setFixedSize(27, 27)
+        self.logo.setObjectName("SidebarMark")
+        self.logo.setFixedSize(32, 32)
         self.logo.setAlignment(Qt.AlignCenter)
         brand.addWidget(self.logo)
         self.logo_title = QLabel("Entrela")
@@ -152,7 +153,9 @@ class Sidebar(QFrame):
         self.search_key.setAttribute(Qt.WA_TransparentForMouseEvents)
         search_layout.addWidget(self.search_key, 0, Qt.AlignVCenter)
         outer.addWidget(self.search)
-        outer.addSpacing(5)
+        outer.addSpacing(6)
+        self._add_divider(outer)
+        outer.addSpacing(3)
 
         self.buttons["dashboard"] = self._make_button("dashboard")
         outer.addWidget(self.buttons["dashboard"])
@@ -172,8 +175,15 @@ class Sidebar(QFrame):
             groups.addWidget(header)
 
             body = QWidget()
-            children = QVBoxLayout(body)
-            children.setContentsMargins(self.CHILD_INDENT, 0, 0, 3)
+            branch = QHBoxLayout(body)
+            branch.setContentsMargins(8, 0, 0, 5)
+            branch.setSpacing(self.CHILD_INDENT - 9)
+            guide = QFrame()
+            guide.setObjectName("SidebarDivider")
+            guide.setFixedWidth(1)
+            branch.addWidget(guide)
+            children = QVBoxLayout()
+            branch.addLayout(children, 1)
             children.setSpacing(1)
             for page in items:
                 button = self._make_button(page)
@@ -185,10 +195,7 @@ class Sidebar(QFrame):
         self.scroll.setWidget(content)
         outer.addWidget(self.scroll, 1)
 
-        rule = QFrame()
-        rule.setObjectName("SidebarDivider")
-        rule.setFixedHeight(1)
-        outer.addWidget(rule)
+        self._add_divider(outer)
         self.buttons["docs"] = self._make_button("docs")
         outer.addWidget(self.buttons["docs"])
         self.help_button = NavButton("help", "Ajuda contextual")
@@ -198,6 +205,13 @@ class Sidebar(QFrame):
         outer.addWidget(self.help_button)
         self.buttons["settings"] = self._make_button("settings")
         outer.addWidget(self.buttons["settings"])
+
+    @staticmethod
+    def _add_divider(layout):
+        rule = QFrame()
+        rule.setObjectName("SidebarDivider")
+        rule.setFixedHeight(1)
+        layout.addWidget(rule)
 
     def _make_button(self, key):
         label = NAV_LABELS[key]

@@ -180,7 +180,7 @@ def main():
     os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     os.environ['QT_SCALE_FACTOR'] = str(args.scale)
     from PySide6.QtCore import Qt, QSettings, QTimer, QCoreApplication, QEvent
-    from PySide6.QtWidgets import QApplication, QMessageBox, QAbstractButton
+    from PySide6.QtWidgets import QApplication, QMessageBox
     from core.types import ExperimentConfig, SystemConfig, SimulationProtocol, NoiseConfig
     from core.circuit_document import CircuitDocument, CircuitGate
     from core.simulation import run_experiment
@@ -304,7 +304,7 @@ def main():
         window.page_circuit.editor._save_revision()
         window.page_circuit.editor._select(0)
         gallery.capture('03-laboratorio/08-editor.png', 'Editor e biblioteca de portas', 'circuit')
-        library_toggle = next(button for button in window.page_circuit.editor.findChildren(QAbstractButton) if button.text() == 'Biblioteca')
+        library_toggle = window.page_circuit.editor.revisions_toggle
         library_toggle.click()
         gallery.capture('03-laboratorio/09-editor-biblioteca.png', 'Biblioteca e revisões do circuito', 'circuit')
         library_toggle.click()

@@ -157,7 +157,6 @@ class BlochPage(PageBase):
         self.maximize_button = GhostButton("Ampliar área 3D")
         self.maximize_button.setCheckable(True)
         self.maximize_button.toggled.connect(self.set_maximized)
-        controls.addWidget(self.maximize_button)
         self.camera_toggle = GhostButton("Inspetor")
         self.camera_toggle.setCheckable(True)
         self.camera_toggle.setChecked(True)
@@ -165,7 +164,6 @@ class BlochPage(PageBase):
         self.camera_toggle.setAccessibleName("Mostrar controles da câmera e visualização")
         self.camera_toggle.clicked.connect(self._camera_chosen)
         self.camera_toggle.toggled.connect(lambda *_: self._visual_mode_changed(self.visual_tabs.currentIndex()))
-        controls.addWidget(self.camera_toggle)
         self.speed_label = QLabel("Velocidade")
         controls.add_group(self.speed_label, self.speed_combo)
         controls.addWidget(self.loop)
@@ -223,6 +221,9 @@ class BlochPage(PageBase):
         view_row = QHBoxLayout()
         view_row.addWidget(self.visual_choice)
         view_row.addWidget(self.selection_label, 1)
+        view_row.addStretch()
+        view_row.addWidget(self.camera_toggle)
+        view_row.addWidget(self.maximize_button)
         layout.addLayout(view_row)
         inspector_layout.addWidget(self.focus_combo)
         inspector_layout.addWidget(self.local_qubit)
@@ -324,11 +325,10 @@ class BlochPage(PageBase):
             self._camera_layout_timer.start()
 
     def _visual_mode_changed(self, index):
-        global_state = self.visual_tabs.widget(index) is self.state_inspector
         self.inspector.setVisible(not self._maximized and self.camera_toggle.isChecked())
         self.camera_toggle.setVisible(not self._maximized)
         compact = self.width() < 1180*max(1,self.font().pixelSize()/15)
-        self.selection_label.setVisible(not global_state and not compact)
+        self.selection_label.setVisible(self.visual_tabs.widget(index) is self.canvas and not compact)
         self.maximize_button.setText('' if compact else ("Restaurar painéis" if self._maximized else "Ampliar visualização"))
 
     def _inspector_changed(self, index):
@@ -360,7 +360,8 @@ class BlochPage(PageBase):
         self.snapshot_label.setText('#' if compact else 'Ir ao snapshot')
         for button, text, icon in [(self.btn_play,'Reproduzir','pause' if self.playing else 'play'),
             (self.btn_stop,'Reiniciar','history'), (self.btn_prev,'Anterior','prev'), (self.btn_next,'Próximo','next'),
-            (self.maximize_button,'Ampliar visualização','expand'), (self.camera_toggle,'Inspetor','settings')]:
+            (self.maximize_button,'Restaurar painéis' if self._maximized else 'Ampliar visualização','fit-view'),
+            (self.camera_toggle,'Inspetor','panel-right')]:
             button.setText('' if compact else text)
             button.setAccessibleName(text)
             button.setToolTip(text)

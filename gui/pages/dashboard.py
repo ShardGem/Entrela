@@ -9,7 +9,7 @@ from gui.pages.base import PageBase
 from gui.widgets.card import MetricCard
 from gui.design_system import LAYOUT, Surface
 from gui.theme import PALETTE
-from gui.widgets.button import PrimaryButton, SecondaryButton
+from gui.widgets.button import GhostButton, PrimaryButton, SecondaryButton
 from gui.widgets.flow_layout import FlowLayout
 from data.workspace import experiment_title
 from core.types import system_label
@@ -86,7 +86,7 @@ class DashboardPage(PageBase):
         for attr, title in [('card_sims', 'Execuções'), ('card_last', 'Modelo'), ('card_fid', 'Fidelidade'), ('card_purity', 'Pureza')]:
             card = MetricCard(title, parent=self); card.hide(); setattr(self, attr, card)
         actions = FlowLayout(spacing=8)
-        self.create_project = PrimaryButton('Criar projeto', icon='plus')
+        self.create_project = SecondaryButton('Criar projeto', icon='project-folder')
         self.create_project.clicked.connect(self.project_create_requested.emit)
         self.new_experiment = SecondaryButton('Novo experimento', icon='plus')
         creation = QMenu(self.new_experiment)
@@ -164,26 +164,33 @@ class DashboardPage(PageBase):
         self.notebook.clicked.connect(self.notebook_requested.emit)
         self.ideal = SecondaryButton('Comparar com a referência ideal', icon='comparison')
         self.ideal.clicked.connect(self.ideal_requested.emit)
+        self.first_use = Surface('Seu primeiro experimento')
+        start_actions = FlowLayout()
+        for text, icon, signal in [('Abrir exemplos', 'book-stack', self.examples_requested),
+                                   ('Iniciar tutorial de Bell', 'play', self.tutorial_requested)]:
+            button = SecondaryButton(text, icon=icon)
+            button.clicked.connect(signal.emit)
+            start_actions.addWidget(button)
+        self.first_use.body().addLayout(start_actions)
+        self.overview.add(self.first_use)
+        self.concept_toggle = GhostButton('Como interpretar os resultados', icon='help')
+        self.concept_toggle.setCheckable(True)
+        self.first_use.body().addWidget(self.concept_toggle, 0, Qt.AlignLeft)
+        self.concepts = QLabel('Contagens são amostras das probabilidades. A esfera de Bloch representa o estado local de cada qubit.\nPureza global e pureza local são medidas distintas. A fidelidade depende da referência indicada.\nZNE extrapola um observável; não reconstrói um estado mitigado.')
+        self.concepts.setWordWrap(True); self.concepts.hide()
+        self.first_use.add(self.concepts)
+        self.concept_toggle.toggled.connect(self.concepts.setVisible)
+        self.recent.body().addWidget(self.ideal, 0, Qt.AlignLeft)
+        history = GhostButton('Ver histórico', icon='history')
+        history.clicked.connect(self.open_history.emit)
+        links.addWidget(history)
         links.addWidget(self.notebook)
-        links.addWidget(self.ideal)
         self.overview.body().addLayout(links)
         self.overview.body().addStretch()
         self.dashboard_splitter.addWidget(self.overview)
         self.dashboard_splitter.setStretchFactor(1, 1)
         self.dashboard_splitter.setSizes([300, 840])
         self.body().addWidget(self.dashboard_splitter, 1)
-        self.first_use = Surface('Seu primeiro experimento')
-        for text, signal in [('Escolher um exemplo da biblioteca', self.examples_requested), ('Iniciar tutorial de Bell', self.tutorial_requested), ('Consultar histórico completo', self.open_history)]:
-            button = SecondaryButton(text)
-            button.clicked.connect(signal.emit); self.first_use.add(button)
-        self.body().addWidget(self.first_use)
-        self.concept_toggle = SecondaryButton('Como interpretar os resultados')
-        self.concept_toggle.setCheckable(True)
-        self.first_use.add(self.concept_toggle)
-        self.concepts = QLabel('Contagens são amostras das probabilidades. A esfera de Bloch representa o estado local de cada qubit.\nPureza global e pureza local são medidas distintas. A fidelidade depende da referência indicada.\nZNE extrapola um observável; não reconstrói um estado mitigado.')
-        self.concepts.setWordWrap(True); self.concepts.hide()
-        self.first_use.add(self.concepts)
-        self.concept_toggle.toggled.connect(self.concepts.setVisible)
         for view in (self.project_list, self.works, self.recent_list):
             view.setItemDelegate(_RecordRow(view))
             view.setMouseTracking(True)
@@ -254,7 +261,7 @@ class DashboardPage(PageBase):
             item = QListWidgetItem(f"{work['title']}\n{kind} · {status}")
             item.setData(Qt.UserRole, work['id']); item.setToolTip(item.text()); self.works.addItem(item)
         show_works = bool(self._works) and self.mode == 'experiments'
-        self.new_experiment.setVisible(bool(self._works))
+        self.new_experiment.setVisible(bool(self._works) and self.project_name is not None)
         self.show_works.setVisible(bool(self._works))
         self.show_works.setText('Ver resumo' if show_works else 'Ver experimentos')
         self.works_label.setVisible(show_works); self.works.setVisible(show_works)
