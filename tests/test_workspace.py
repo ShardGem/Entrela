@@ -194,10 +194,21 @@ def test_comparison_rejects_incompatible_and_normalizes(window):
     page.load([a,b,c])
     page.set_runs(a.id,b.id)
     assert page.metrics_table.rowCount()==3
+    table = page.configuration_table
+    differences = {table.item(row, 0).text(): (table.item(row, 1).text(), table.item(row, 2).text())
+                   for row in range(table.rowCount())}
+    assert differences['Medições (shots)'] == ('64', '128')
+    assert differences['Ruído'] == ('Desativado', 'Despolarizador')
+    assert 'Qubits' not in differences
+    page.only_differences.setChecked(False)
+    assert table.rowCount() > len(differences)
+    assert not page.configuration_details.is_expanded
     bars=page.canvas.fig.axes[0].patches
     assert sum(bar.get_height() for bar in bars)==pytest.approx(2)
     page.set_runs(a.id,c.id)
     assert page.metrics_table.rowCount()==0
+    assert table.rowCount() == 0
+    assert not page.differences.toPlainText()
     assert "Sistemas diferentes" in page.message.text()
 def test_import_creates_independent_record(window,monkeypatch,tmp_path):
     source=run_experiment(replace(create_example_config("bell"),shots=64))
@@ -248,13 +259,24 @@ def test_command_palette_ranks_matches_and_accepts_arrows_from_search(qt_app):
 
 
 def test_history_search_filters_records(window):
+    history = window.page_history
+    assert not history.empty.isHidden()
     exp=run_experiment(replace(create_example_config("bell"),shots=64))
     window.repository.save(exp)
     window._refresh_history()
-    window.page_history.search.setText("not-found")
-    assert window.page_history.table.rowCount()==0
-    window.page_history.search.setText(exp.id)
-    assert window.page_history.table.rowCount()==1
+    history.set_project_filter("Projeto ausente")
+    history.status_filter.setCurrentIndex(history.status_filter.findData("error"))
+    history.search.setText("not-found")
+    assert history.table.rowCount() == 0
+    assert history.empty.isHidden()
+    assert not history.no_matches.isHidden()
+    history.no_matches.action_button.click()
+    assert history.table.rowCount() == 1
+    assert history.project_filter is None
+    assert history.status_filter.currentData() == "all"
+    assert not history.search.text()
+    history.search.setText(exp.id)
+    assert history.table.rowCount() == 1
 
 def test_unopened_tutorial_does_not_erase_saved_progress(window):
     window.settings.setValue("tutorial/bell/step",3)

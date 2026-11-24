@@ -6,7 +6,7 @@ import json
 
 from core.types import system_label
 from data.workspace import experiment_title
-from PySide6.QtCore import Signal, Qt, QTimer
+from PySide6.QtCore import QSignalBlocker, Signal, Qt, QTimer
 from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSplitter, QWidget, QVBoxLayout,
@@ -157,10 +157,14 @@ class HistoryPage(PageBase):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
         self.body().addWidget(splitter, 1)
-        self.empty = EmptyState("history", "Nenhuma execução para exibir", "Revise os filtros ou configure uma simulação para registrar seus resultados.", "Configurar simulação")
+        self.empty = EmptyState("history", "Nenhuma execução registrada", "Configure e execute uma simulação para começar seu histórico.", "Configurar simulação")
         self.empty.action_button.clicked.connect(self.configure_requested.emit)
         self.empty.hide()
         self.body().addWidget(self.empty, 1)
+        self.no_matches = EmptyState("search", "Nenhuma execução corresponde aos filtros", "Limpe os filtros para consultar todas as execuções registradas.", "Limpar filtros")
+        self.no_matches.action_button.clicked.connect(self._clear_filters)
+        self.no_matches.hide()
+        self.body().addWidget(self.no_matches, 1)
         self.selected_identifier = None
         self._detail_experiment = None
         self.detail_panel.hide()
@@ -177,7 +181,9 @@ class HistoryPage(PageBase):
         self.open_result.clicked.connect(lambda: self.experiment_selected.emit(self.selected_identifier) if self.selected_identifier else None)
         self.edit_annotation.clicked.connect(lambda: self.edit_requested.emit(self.selected_identifier) if self.selected_identifier else None)
 
-        pagination = QHBoxLayout()
+        self.pagination = QWidget()
+        pagination = QHBoxLayout(self.pagination)
+        pagination.setContentsMargins(0, 0, 0, 0)
         self.previous = QPushButton("Anterior")
         self.next = QPushButton("Próxima")
         self.page_label = QLabel()
@@ -185,7 +191,7 @@ class HistoryPage(PageBase):
         pagination.addWidget(self.previous)
         pagination.addWidget(self.page_label, 1)
         pagination.addWidget(self.next)
-        self.body().addLayout(pagination)
+        self.body().addWidget(self.pagination)
         self.previous.clicked.connect(lambda: self._paginate(-1))
         self.next.clicked.connect(lambda: self._paginate(1))
         self.offset, self.page_size = 0, 100
@@ -271,14 +277,21 @@ class HistoryPage(PageBase):
             button.clicked.connect(lambda checked=False, identifier=exp.id: self._view(identifier))
             self.table.setCellWidget(row, 9, button)
         self.table.setSortingEnabled(True)
-        self.page_label.setText(
-            f"{len(matches)} registro(s) · página {self.offset // self.page_size + 1}"
-            if matches else "Nenhum experimento encontrado. Execute uma simulação ou ajuste os filtros."
-        )
-        self.empty.setVisible(not bool(matches))
-        self.splitter.setVisible(bool(matches))
+        has_matches = bool(matches)
+        self.page_label.setText(f"{len(matches)} registro(s) · página {self.offset // self.page_size + 1}")
+        self.empty.setVisible(not self.records)
+        self.no_matches.setVisible(bool(self.records) and not has_matches)
+        self.splitter.setVisible(has_matches)
+        self.pagination.setVisible(has_matches)
         self.previous.setEnabled(self.offset > 0)
         self.next.setEnabled(self.offset + self.page_size < len(matches))
+
+    def _clear_filters(self):
+        with QSignalBlocker(self.search), QSignalBlocker(self.status_filter):
+            self.search.clear()
+            self.status_filter.setCurrentIndex(0)
+        self.set_project_filter(None)
+        self.search.setFocus(Qt.OtherFocusReason)
 
     def set_project_filter(self, project):
         """Filter the project field exactly, independently of free-text search."""

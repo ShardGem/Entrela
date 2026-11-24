@@ -54,7 +54,8 @@ def test_sorted_history_buttons_target_actual_record_and_reject_stale_details(qt
     assert experiment.id not in page.summary.toPlainText()
     page.status_filter.setCurrentIndex(3)
     assert page.table.rowCount() == 0
-    assert "Nenhum" in page.page_label.text()
+    assert not page.no_matches.isHidden()
+    assert page.no_matches.action_button.text() == "Limpar filtros"
     page.close()
 
 

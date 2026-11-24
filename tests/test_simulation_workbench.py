@@ -162,21 +162,22 @@ def test_result_actions_stay_available_when_the_inspector_is_closed(window, qt_a
     try:
         for size, width in [(15, 1440), (24, 1024)]:
             apply_appearance(window, 'dark', size)
-            window.resize(width, 900)
+            window.resize(width, 900 if size == 15 else 768)
             for _ in range(4):
                 qt_app.processEvents()
             buttons = [page.btn_rerun, page.btn_save, page.btn_edit, page.export_button]
             for index, button in enumerate(buttons):
                 assert page.execution_actions.rect().contains(button.geometry())
                 assert all(not button.geometry().intersects(other.geometry()) for other in buttons[index + 1:])
-            chart_width = page.tabs.width()
-            page.inspector_toggle.click()
-            qt_app.processEvents()
-            assert page.inspector_scroll.isHidden()
-            assert all(button.isVisible() for button in buttons)
-            assert page.tabs.width() > chart_width
-            page.inspector_toggle.click()
+            for opened in (True, False):
+                page.inspector_toggle.setChecked(opened)
+                qt_app.processEvents()
+                assert page.inspector_scroll.isVisible() == opened
+                assert all(button.isVisible() for button in buttons)
+                assert all(window.rect().contains(button.mapTo(window, button.rect().bottomRight())) for button in buttons)
             if size == 15:
+                page.inspector_toggle.click()
+                qt_app.processEvents()
                 assert page.tabs.width() > page.inspector.width()
     finally:
         apply_appearance(window)

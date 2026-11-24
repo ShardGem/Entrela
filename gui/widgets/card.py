@@ -137,7 +137,7 @@ class EmptyState(QWidget):
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setAlignment(Qt.AlignVCenter)
         layout.setSpacing(16)
         layout.setContentsMargins(40, 40, 40, 40)
 
@@ -159,8 +159,7 @@ class EmptyState(QWidget):
             d.setObjectName("FieldHint")
             d.setAlignment(Qt.AlignCenter)
             d.setWordWrap(True)
-            d.setMaximumWidth(360)
-            layout.addWidget(d, alignment=Qt.AlignCenter)
+            layout.addWidget(d)
 
         if action_text:
             btn = QPushButton(action_text)

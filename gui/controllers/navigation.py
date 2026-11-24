@@ -20,6 +20,7 @@ class NavigationController:
         if key == 'circuit':
             w.page_workspace._apply_route('circuit:edit')
         elif key == 'results':
+            w.page_results.reveal_visualization()
             w.page_results.results_tab.chart_views.setCurrentIndex(0)
             w.page_workspace._apply_route('results:graphs')
         self.show(key)

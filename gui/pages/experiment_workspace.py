@@ -176,6 +176,8 @@ class ExperimentWorkspace(QWidget):
             page.tabs.tabBar().hide()
             page.tabs.setCurrentWidget({'graphs':page.results_tab, 'data':page.table, 'metadata':page.metadata,
                                        'interpretation':page.interpretation, 'state':page.state_inspector}[detail])
+            if emit:
+                page.reveal_visualization()
         blocker = QSignalBlocker(self.tabs)
         self.tabs.setCurrentIndex(self._keys.index(key))
         del blocker

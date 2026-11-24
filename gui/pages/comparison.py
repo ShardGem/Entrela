@@ -1,3 +1,6 @@
+from dataclasses import asdict
+import json
+
 from core.types import system_label
 from data.workspace import experiment_title
 from PySide6.QtCore import Qt, Signal, QSignalBlocker, QTimer
@@ -19,9 +22,36 @@ from gui.widgets.plot_canvas import MplCanvas,style_axes
 from gui.theme import PALETTE
 from gui.widgets.data_table import configure_table
 from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.collapsible import CollapsibleSection
 
 
 from core.comparison import incompatibility
+
+
+def _configuration_parameters(record):
+    config = record.config
+    system, protocol, noise = config.system, config.protocol, config.noise
+    values = {'Sistema': system_label(config), 'Qubits': system.num_qubits}
+    if config.circuit is not None:
+        values['Portas no circuito'] = len(config.circuit.gates)
+        values['Fase global (rad)'] = config.circuit.global_phase
+    else:
+        values.update({'Estado inicial': system.initial_state, 'J': system.J, 'h': system.h,
+                       'Cadeia periódica': 'Sim' if system.periodic else 'Não',
+                       'Tempo total': protocol.total_time, 'Passos de Trotter': protocol.trotter_steps,
+                       'Ordem de Suzuki': protocol.trotter_order})
+    values['Ruído'] = noise.kind if noise.enabled else 'Desativado'
+    if noise.enabled:
+        if noise.kind == 'Despolarizador':
+            values.update({'Despolarização p₁': noise.p1, 'Despolarização p₂': noise.p2})
+        else:
+            values.update({'T₁ (µs)': noise.t1_us, 'T₂ (µs)': noise.t2_us,
+                           'Duração de porta 1q (ns)': noise.gate_time_1q_ns,
+                           'Duração de porta 2q (ns)': noise.gate_time_2q_ns})
+    values.update({'Medições (shots)': config.shots, 'Semente efetiva': record.result.metadata.get('effective_seed'),
+                   'Snapshots registrados': len(record.result.states or ()),
+                   'Profundidade': record.result.circuit_depth})
+    return values
 
 
 class ComparisonPage(PageBase):
@@ -141,9 +171,28 @@ class ComparisonPage(PageBase):
         self.slider.valueChanged.connect(self._frame)
         content.addWidget(self.slider)
         self.tabs.addTab(bloch,"Bloch lado a lado")
+        config_view = Surface('Parâmetros da comparação')
+        self.configuration_notice = QLabel()
+        self.configuration_notice.setWordWrap(True)
+        self.configuration_notice.setObjectName('FieldHint')
+        config_view.add(self.configuration_notice)
+        self.only_differences = QCheckBox('Somente diferenças')
+        self.only_differences.setChecked(True)
+        self.only_differences.toggled.connect(self._update_configuration_table)
+        config_view.add(self.only_differences)
+        self.configuration_table = QTableWidget(0, 3)
+        self.configuration_table.setHorizontalHeaderLabels(['Parâmetro', 'Execução A', 'Execução B'])
+        self.configuration_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.configuration_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        configure_table(self.configuration_table)
+        config_view.add(self.configuration_table, 1)
+        self._parameter_rows = []
+        self.configuration_details = CollapsibleSection('JSON das configurações')
         self.differences=QPlainTextEdit()
         self.differences.setReadOnly(True)
-        self.tabs.addTab(self.differences,"Configurações e referências")
+        self.configuration_details.content_layout.addWidget(self.differences)
+        config_view.add(self.configuration_details)
+        self.tabs.addTab(config_view,"Configurações e referências")
         self.observable_canvas=MplCanvas()
         self.tabs.addTab(self.observable_canvas,"Observáveis ZNE")
         self.tabs.addTab(self.metrics_table, "Métricas numéricas")
@@ -242,7 +291,13 @@ class ComparisonPage(PageBase):
         if error:
             self.summary.clear()
             self._placeholder(self.observable_canvas, "A comparação precisa de duas execuções compatíveis.")
-            self.differences.setPlainText(error)
+            self._parameter_rows = []
+            self.configuration_notice.setText(error)
+            self.only_differences.hide()
+            self.configuration_table.hide()
+            self.configuration_table.setRowCount(0)
+            self.configuration_details.hide()
+            self.differences.clear()
             self.btn_prepare.setEnabled(False)
             self.btn_document.setEnabled(False)
             self.message.setText(error)
@@ -272,11 +327,8 @@ class ComparisonPage(PageBase):
             self.observable_canvas.draw_idle()
         self.btn_prepare.setEnabled(not self._running)
         self.btn_document.setEnabled(False)
-        from dataclasses import asdict
-        import json
-        def mitigation_summary(exp):
-            return {key:value for key,value in (exp.result.mitigation or {}).items() if key in ("method","qubit","shots","seed","scale_factors","extrapolated","extrapolated_stderr","ideal_observable")}
-        self.differences.setPlainText(json.dumps({"A":{"nome":experiment_title(a,self.annotations),"config":asdict(a.config),"mitigation":mitigation_summary(a)},"B":{"nome":experiment_title(b,self.annotations),"config":asdict(b.config),"mitigation":mitigation_summary(b)},"reference":"Fidelidade compara o próprio circuito ideal de cada execução. Registros ZNE preservam estados da fonte. Contagens/folding completos ficam nos arquivos JSON."},ensure_ascii=False,indent=2))
+        self._show_configuration_comparison(a, b)
+
         for row, (label, key) in enumerate(
             [
                 ("Fidelidade", "fidelity"),
@@ -315,6 +367,43 @@ class ComparisonPage(PageBase):
             self.set_full_data(previous)
         elif self.tabs.currentIndex() in (1, 2) and not self._suppress_load:
             self._load_timer.start()
+
+    def _show_configuration_comparison(self, a, b):
+        first, second = _configuration_parameters(a), _configuration_parameters(b)
+        self._parameter_rows = [(label, first.get(label), second.get(label)) for label in first | second]
+        self.only_differences.show()
+        self.configuration_details.show()
+        self._update_configuration_table()
+        mitigation_fields = ('method', 'qubit', 'shots', 'seed', 'scale_factors',
+                             'extrapolated', 'extrapolated_stderr', 'ideal_observable')
+        details = {}
+        for side, record in (('A', a), ('B', b)):
+            mitigation = record.result.mitigation or {}
+            details[side] = {
+                'nome': experiment_title(record, self.annotations),
+                'config': asdict(record.config),
+                'mitigation': {key: mitigation[key] for key in mitigation_fields if key in mitigation},
+            }
+        details['reference'] = ('Fidelidade compara o próprio circuito ideal de cada execução. '
+                                'Registros ZNE preservam estados da fonte. '
+                                'Contagens/folding completos ficam nos arquivos JSON.')
+        self.differences.setPlainText(json.dumps(details, ensure_ascii=False, indent=2))
+
+    def _update_configuration_table(self):
+        changes = [row for row in self._parameter_rows if row[1] != row[2]]
+        rows = changes if self.only_differences.isChecked() else self._parameter_rows
+        self.configuration_notice.setText(
+            f"{len(changes)} parâmetros exibidos diferem entre A e B. "
+            "A fidelidade de cada execução usa seu próprio circuito ideal como referência."
+        )
+        self.configuration_table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            for column, value in enumerate(row):
+                label = '—' if value is None else str(value)
+                item = QTableWidgetItem(label)
+                item.setToolTip(label)
+                self.configuration_table.setItem(index, column, item)
+        self.configuration_table.setVisible(bool(rows))
 
     def _histogram_value(self,event):
         for ax in self.canvas.fig.axes:

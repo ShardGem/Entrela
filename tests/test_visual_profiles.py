@@ -87,8 +87,8 @@ def test_profiles_restore_legacy_choices_and_keep_scientific_data(window, qt_app
         restored.deleteLater()
 
 
-@pytest.mark.parametrize('size,font', [((1440, 960), 15), ((1024, 768), 15), ((1024, 768), 24)])
-def test_inspector_keeps_metrics_in_a_readable_column(window, qt_app, size, font):
+@pytest.mark.parametrize('size,font,compact', [((1440, 960), 15, False), ((1024, 768), 15, True), ((1024, 768), 24, True)])
+def test_inspector_keeps_metrics_readable_and_adapts_to_the_window(window, qt_app, size, font, compact):
     experiment = run_experiment(create_example_config('bell'))
     window._current_experiment = experiment
     window._display_experiment(experiment)
@@ -98,15 +98,33 @@ def test_inspector_keeps_metrics_in_a_readable_column(window, qt_app, size, font
     window.show()
     _settle(qt_app)
     assert (window.width(), window.height()) == size
-    cards = window.page_results.metric_grid.cards
+    page = window.page_results
+    if compact:
+        assert page.tabs.isVisible()
+        assert page.inspector_scroll.isHidden()
+        assert page.tabs.width() == page.result_layout.width()
+        page.inspector_toggle.click()
+        _settle(qt_app)
+        assert page.tabs.isHidden()
+    cards = page.metric_grid.cards
     rects = [card.geometry() for card in cards]
     assert all(card.isVisible() and rect.width() > 0 for card, rect in zip(cards, rects))
     for i, rect in enumerate(rects):
         assert all(not rect.intersects(other) for other in rects[i + 1:])
-        assert rect.right() < window.page_results.metric_grid.width()
-    assert len({rect.y() for rect in rects}) == len(cards)
+        assert rect.right() < page.metric_grid.width()
+    if not compact:
+        assert len({rect.y() for rect in rects}) == len(cards)
     assert all(rect.width() >= 200 for rect in rects)
-    assert window.page_results._scroll.horizontalScrollBar().maximum() == 0
+    assert page._scroll.horizontalScrollBar().maximum() == 0
+    if compact:
+        window.page_workspace.observation_tabs.setCurrentIndex(1)
+        _settle(qt_app)
+        assert page.tabs.isVisible()
+        assert page.inspector_scroll.isHidden()
+        window.page_workspace.observation_tabs.setCurrentIndex(3)
+        page.inspector_toggle.click()
+        _settle(qt_app)
+        assert page.metric_grid.isVisible()
 
 
 def test_window_uses_one_page_heading_and_keeps_explanations(window, qt_app):

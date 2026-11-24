@@ -224,10 +224,11 @@ class CircuitEditor(QWidget):
         file_menu.addAction("Exportar desenho SVG…", self._export_svg).setToolTip("Exporta o trecho visível como imagem vetorial.")
         file_menu.addSeparator()
         file_menu.addAction("Limpar circuito atual", self._new).setToolTip("Remove as portas do rascunho atual. Desfazer recupera o circuito anterior.")
-        toolbar.addWidget(self.file_menu)
         file_menu.addSeparator()
-        self.edit_menu = QMenu("Editar seleção", file_menu)
-        file_menu.addMenu(self.edit_menu)
+        selection_actions = SecondaryButton('Editar seleção', icon='ellipsis')
+        selection_actions.setAccessibleName('Copiar, mover ou remover as portas selecionadas')
+        self.edit_menu = QMenu(selection_actions)
+        selection_actions.setMenu(self.edit_menu)
         for text, callback in [
             ("Copiar seleção", self._copy_selected), ("Recortar seleção", self._cut_selected),
             ("Colar portas", self._paste_gates), ("Selecionar todas", self._select_all),
@@ -236,6 +237,7 @@ class CircuitEditor(QWidget):
             ("Mover depois", lambda: self._reorder(self.selected, self.selected + 1)),
         ]:
             self.edit_menu.addAction(text, callback)
+        toolbar.addWidget(selection_actions)
         fit = SecondaryButton(icon="fit-view")
         fit.setAccessibleName("Enquadrar circuito")
         fit.setToolTip("Enquadrar circuito")
@@ -272,7 +274,9 @@ class CircuitEditor(QWidget):
         self.revisions_toggle = GhostButton("Revisões", icon="history")
         self.revisions_toggle.setCheckable(True)
         library_row.addWidget(self.revisions_toggle)
+        library_row.addWidget(self.file_menu)
         self.revision_label = QLabel("Rascunho independente")
+        self.revision_label.setObjectName("FieldHint")
         self.revision_label.setWordWrap(True)
         library_row.addWidget(self.revision_label)
         root.insertLayout(0, library_row)
@@ -466,12 +470,6 @@ class CircuitEditor(QWidget):
         apply.setToolTip("Atualiza a porta selecionada com os qubits e ângulos dos campos.")
         apply.clicked.connect(self._apply_gate)
         form_body.addWidget(apply)
-        selection_actions = QToolButton()
-        selection_actions.setText('Ações da seleção')
-        selection_actions.setAccessibleName('Copiar, mover ou remover as portas selecionadas')
-        selection_actions.setPopupMode(QToolButton.InstantPopup)
-        selection_actions.setMenu(self.edit_menu)
-        form_body.addWidget(selection_actions)
         note = QLabel("q0 é o primeiro qubit. Use qubits diferentes em portas controladas.\n" + ANGLE_HELP)
         note.setWordWrap(True)
         form_body.addWidget(note)
@@ -530,7 +528,7 @@ class CircuitEditor(QWidget):
         self.inspector_toggle.setCheckable(True)
         self.inspector_toggle.setChecked(True)
         self.inspector_toggle.setAccessibleName("Mostrar inspetor do circuito")
-        self.inspector_toggle.clicked.connect(self._toggle_inspector)
+        self.inspector_toggle.toggled.connect(self.inspector_tabs.setVisible)
         toolbar.addWidget(self.inspector_toggle)
         self.evidence_toggle = GhostButton('Resultado gravado', icon='results')
         self.evidence_toggle.setCheckable(True)
@@ -538,6 +536,7 @@ class CircuitEditor(QWidget):
         self.evidence_toggle.toggled.connect(self.evidence.setVisible)
         self.evidence_toggle.clicked.connect(self._open_evidence)
         toolbar.addWidget(self.evidence_toggle)
+        root.addLayout(toolbar)
         root.addWidget(self.scene_splitter, 1)
         self._compact_scene = False
         self._inspector_wide_visible = True
@@ -549,7 +548,6 @@ class CircuitEditor(QWidget):
         self.scene_compact_tabs.currentChanged.connect(lambda *_: self._palette_layout_timer.start())
         self.scene_compact_tabs.hide()
         root.addWidget(self.scene_compact_tabs, 1)
-        root.addLayout(toolbar)
         root.addWidget(self.advanced_section)
         root.addWidget(self.creation_help)
         execution_options = QWidget()
@@ -813,12 +811,6 @@ class CircuitEditor(QWidget):
             self._palette_layout_timer.start()
             self._arrange_scene()
 
-    def _toggle_inspector(self, visible):
-        if self._compact_scene:
-            self.scene_compact_tabs.setCurrentWidget(self.inspector_tabs)
-        else:
-            self.inspector_tabs.setVisible(visible)
-
     def _open_evidence(self, visible):
         if visible:
             self.operation_views.setCurrentIndex(0)
@@ -836,7 +828,7 @@ class CircuitEditor(QWidget):
             self._inspector_wide_visible = self.inspector_toggle.isChecked()
             self._evidence_wide_visible = self.evidence_toggle.isChecked()
             self.evidence_toggle.setChecked(False)
-            self.inspector_toggle.setCheckable(False)
+            self.inspector_toggle.hide()
             self.scene_splitter.hide()
             self.palette_panel.setMaximumWidth(16777215)
             self.inspector_tabs.setMaximumWidth(16777215)
@@ -855,7 +847,7 @@ class CircuitEditor(QWidget):
             self.inspector_tabs.setMaximumWidth(370)
             self.palette_panel.show()
             self.operation_views.show()
-            self.inspector_toggle.setCheckable(True)
+            self.inspector_toggle.show()
             self.inspector_toggle.setChecked(self._inspector_wide_visible)
             self.inspector_tabs.setVisible(self._inspector_wide_visible)
             self.evidence_toggle.setChecked(self._evidence_wide_visible)

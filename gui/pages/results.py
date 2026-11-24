@@ -1,7 +1,7 @@
 from dataclasses import asdict
 import json
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import QEvent, QSignalBlocker, Signal, Qt
 from PySide6.QtWidgets import (
     QLabel,
     QTableWidget,
@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from gui.pages.base import PageBase
 from gui.widgets.card import MetricCard, MetricGrid, EmptyState
 from gui.widgets.button import GhostButton, PrimaryButton, SecondaryButton
-from gui.design_system import Surface
+from gui.design_system import LAYOUT, Surface
 from gui.tabs.results_tab import ResultsTab
 from gui.widgets.state_inspector import StateInspector
 from gui.widgets.content_tabs import ContentTabs
@@ -132,6 +132,9 @@ class ResultsPage(PageBase):
         self.inspector_toggle.setToolTip('Mostrar ou ocultar as métricas e a referência da execução')
         self.inspector_toggle.setCheckable(True)
         self.inspector_toggle.setChecked(True)
+        self._compact = False
+        self._wide_details_open = True
+        self._compact_details_open = False
         self.inspector_toggle.toggled.connect(self._set_inspector_open)
         self.add_action(self.inspector_toggle)
         column_layout.addWidget(self.inspector_scroll)
@@ -169,7 +172,11 @@ class ResultsPage(PageBase):
                              ('Execução completa JSON / pacote ZIP…', self.btn_export_full), ('Figuras da execução PNG…', self.btn_figures)]:
             self.export_menu.addAction(text, button.click)
         actions.addWidget(self.export_button)
-        self.body().addWidget(self.execution_actions)
+        self.execution_footer = QWidget()
+        footer = QVBoxLayout(self.execution_footer)
+        footer.setContentsMargins(LAYOUT.page_margin, 0, LAYOUT.page_margin, LAYOUT.control_gap)
+        footer.addWidget(self.execution_actions)
+        self._root.addWidget(self.execution_footer)
         self.inspector.body().addStretch()
         self.tabs.currentChanged.connect(self._arrange_result_view)
         self._available = False
@@ -179,22 +186,60 @@ class ResultsPage(PageBase):
         self._available = available
         self.empty.setVisible(not available)
         self.result_layout.setVisible(available)
-        self.execution_actions.setVisible(available)
+        self.execution_footer.setVisible(available)
         self.reproduction_status.hide()
         self.inspector_toggle.setEnabled(available)
         self.export_button.setEnabled(available)
         self.btn_edit.setEnabled(available)
 
     def _set_inspector_open(self, opened):
+        if self._compact:
+            self._compact_details_open = opened
+        else:
+            self._wide_details_open = opened
+        self._update_inspector()
+
+    def _update_inspector(self):
+        opened = self.inspector_toggle.isChecked()
         self.inspector_scroll.setVisible(opened)
+        self.tabs.setVisible(not self._compact or not opened)
+        label = 'Voltar à visualização' if self._compact and opened else 'Detalhes'
+        self.inspector_toggle.setText(label)
+        self._arrange_result_view()
+
+    def reveal_visualization(self):
+        if self._compact:
+            self.inspector_toggle.setChecked(False)
+
+    def _arrange_header(self):
+        super()._arrange_header()
+        self.body().setContentsMargins(LAYOUT.page_margin, 8, LAYOUT.page_margin, LAYOUT.control_gap)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._arrange_inspector()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, 'inspector_toggle'):
+            self._arrange_inspector()
+
+    def _arrange_inspector(self):
         scale = max(1, self.fontMetrics().height() / 19)
-        self.inspector_scroll.setFixedWidth(round(276 * scale))
+        compact = self.width() - 2 * LAYOUT.page_margin < 860 * scale
+        if compact:
+            self.inspector_scroll.setMinimumWidth(0)
+            self.inspector_scroll.setMaximumWidth(16777215)
+        else:
+            self.inspector_scroll.setFixedWidth(round(276 * scale))
+        if compact != self._compact:
+            self._compact = compact
+            with QSignalBlocker(self.inspector_toggle):
+                self.inspector_toggle.setChecked(self._compact_details_open if compact else self._wide_details_open)
+            self._update_inspector()
 
     def _arrange_result_view(self, *_):
-        summary = self.tabs.currentWidget() in (self.results_tab, self.interpretation)
+        summary = self._compact or self.tabs.currentWidget() in (self.results_tab, self.interpretation)
         self.metric_grid.setVisible(summary)
         self.science_note.setVisible(summary)
 

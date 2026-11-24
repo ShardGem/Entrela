@@ -205,13 +205,12 @@ def test_editor_adapts_its_three_panes_without_replacing_the_document(window, qt
     window.resize(1024, 768)
     settle(qt_app)
     assert editor._compact_scene
+    assert editor.inspector_toggle.isHidden()
     for widget in (editor.palette_panel, editor.operation_views, editor.inspector_tabs):
         editor.scene_compact_tabs.setCurrentWidget(widget)
         settle(qt_app)
         assert widget.isVisible()
         assert window.page_circuit._scroll.horizontalScrollBar().maximum() == 0
-    editor.scene_compact_tabs.setCurrentIndex(1)
-    editor.inspector_toggle.click()
     assert editor.scene_compact_tabs.currentWidget() is editor.inspector_tabs
     assert editor.draft_state() == before
     assert editor.run.isVisible()
@@ -220,5 +219,6 @@ def test_editor_adapts_its_three_panes_without_replacing_the_document(window, qt
     window.resize(1920, 1080)
     settle(qt_app)
     assert not editor._compact_scene
+    assert editor.inspector_toggle.isVisible()
     assert editor.scene_splitter.widget(1) is editor.operation_views
     assert editor.draft_state() == before
