@@ -60,7 +60,7 @@ def test_history_detail_load_preserves_current_experiment(window):
 
 def test_search_and_learning_demo_reach_existing_tools(window):
     from core.learning import CONCEPTS
-    assert "Ctrl+K" in [shortcut.key().toString() for shortcut in window.shortcuts]
+    assert "Ctrl+K" not in [shortcut.key().toString() for shortcut in window.shortcuts]
     window.sidebar.search.click()
     assert window.command_palette.isVisible()
     window.command_palette.close()

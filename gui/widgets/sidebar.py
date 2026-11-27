@@ -1,7 +1,7 @@
 """Destinos do laboratório, com seções independentes e acesso por teclado."""
 
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QKeySequence, QPainter
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QToolButton, QVBoxLayout, QWidget
 
 from gui.branding import application_icon
@@ -143,15 +143,8 @@ class Sidebar(QFrame):
         self.search = NavButton("search", "Buscar")
         self.search.setObjectName("SearchButton")
         self.search.setCheckable(False)
-        self.search.setToolTip("Buscar telas, ações e experimentos (Ctrl+K)")
+        self.search.setToolTip("Buscar telas, ações, conceitos e experimentos")
         self.search.clicked.connect(self.search_requested.emit)
-        search_layout = QHBoxLayout(self.search)
-        search_layout.setContentsMargins(0, 0, 8, 0)
-        search_layout.addStretch()
-        self.search_key = QLabel(QKeySequence("Ctrl+K").toString(QKeySequence.NativeText))
-        self.search_key.setObjectName("NavShortcut")
-        self.search_key.setAttribute(Qt.WA_TransparentForMouseEvents)
-        search_layout.addWidget(self.search_key, 0, Qt.AlignVCenter)
         outer.addWidget(self.search)
         outer.addSpacing(6)
         self._add_divider(outer)
@@ -275,7 +268,6 @@ class Sidebar(QFrame):
         label = "Expandir navegação" if self._compact else "Recolher navegação"
         self.toggle.setToolTip(label)
         self.toggle.setAccessibleName(label)
-        self.search_key.setVisible(not self._compact)
         self._fit_width()
 
     def _rows(self):

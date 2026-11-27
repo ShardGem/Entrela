@@ -224,7 +224,8 @@ def test_command_palette_search_and_action(window):
     window._open_commands()
     palette=window.command_palette
     palette.search.setText("fidelidade")
-    assert palette.list.count()==1
+    from PySide6.QtCore import Qt
+    assert palette.list.currentItem().data(Qt.UserRole) == "help:Fidelidade"
     palette._activate()
     assert window.help_dock.isVisible()
     assert window._current_page == current_page

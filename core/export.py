@@ -1,6 +1,7 @@
 """Portable scientific data exports; JSON never executes user code."""
 
 import csv, io, json, tempfile, zipfile
+import shutil
 from hashlib import sha256
 from pathlib import Path
 from data.repository import ExperimentRepository
@@ -8,10 +9,11 @@ from data.repository import ExperimentRepository
 
 def export_counts_csv(counts, filepath):
     path = Path(filepath)
-    with path.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.writer(stream)
-        writer.writerow(["Bitstring", "Counts"])
-        writer.writerows(sorted(counts.items()))
+    stream = io.StringIO(newline="")
+    writer = csv.writer(stream)
+    writer.writerow(["Bitstring", "Counts"])
+    writer.writerows(sorted(counts.items()))
+    _atomic_text(path, stream.getvalue())
     return path
 
 
@@ -19,8 +21,8 @@ def _json_text(value):
     return json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)
 
 
-def _atomic_text(path, text):
-    """Stage beside the destination so replacement stays on the same filesystem."""
+def _stage_text(path, text):
+    """Prepare a complete file without touching the destination."""
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -29,10 +31,77 @@ def _atomic_text(path, text):
         ) as stream:
             temporary = Path(stream.name)
             stream.write(text)
-        temporary.replace(path)
-    finally:
+        return temporary
+    except BaseException:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+        raise
+
+
+def _atomic_text(path, text):
+    """Stage beside the destination so replacement stays on the same filesystem."""
+    temporary = _stage_text(path, text)
+    try:
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _atomic_text_pair(first, second):
+    """Publish CSV and provenance together, rolling back caught write failures.
+
+    The filesystem cannot atomically replace two independent names. Staging and
+    backup protect existing files if publication raises; this is not a power-loss
+    transaction or a synchronization service for concurrent readers/writers.
+    If restoring a previous file also fails, retain its backup and report it.
+    """
+    records = []
+    try:
+        # Finish both writes and both backups before replacing either output.
+        for path, text in (first, second):
+            records.append(dict(path=path, staged=_stage_text(path, text),
+                                backup=None, published=False, retain=False))
+        for record in records:
+            path = record['path']
+            if path.exists() or path.is_symlink():
+                with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.' + path.name + '.',
+                                                 suffix='.backup', delete=False) as stream:
+                    record['backup'] = Path(stream.name)
+                if path.is_symlink():
+                    record['backup'].unlink()
+                shutil.copy2(path, record['backup'], follow_symlinks=False)
+        try:
+            for record in records:
+                record['staged'].replace(record['path'])
+                record['published'] = True
+        except BaseException as failure:
+            recovery = []
+            for record in reversed(records):
+                if not record['published']:
+                    continue
+                try:
+                    if record['backup'] is None:
+                        record['path'].unlink(missing_ok=True)
+                    else:
+                        record['backup'].replace(record['path'])
+                except OSError:
+                    record['retain'] = True
+                    recovery.append(str(record['backup'] or record['path']))
+            if recovery:
+                raise OSError('A exportação falhou e a restauração não pôde ser concluída. '
+                              'Arquivos preservados para recuperação: ' + '; '.join(recovery)) from failure
+            raise
+    finally:
+        for record in records:
+            disposable = [record['staged']]
+            if record['backup'] is not None and not record['retain']:
+                disposable.append(record['backup'])
+            for temporary in disposable:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    # Cleanup must not mask a failed rollback's recovery path.
+                    pass
 
 
 def _experiment_csv(experiment, annotation=None):
@@ -116,8 +185,8 @@ def export_analysis(data, filepath):
         "filename": path.name, "row_count": len(rows), "columns": columns,
         "note": "Preserve este arquivo junto ao CSV para manter configurações e proveniência.",
     }
-    _atomic_text(path.with_suffix(".metadata.json"), _json_text(manifest))
-    _atomic_text(path, table.getvalue())
+    _atomic_text_pair((path.with_suffix(".metadata.json"), _json_text(manifest)),
+                      (path, table.getvalue()))
     return path
 
 
@@ -129,15 +198,7 @@ def export_figure(fig, filepath, dpi=150):
 
 def export_experiment_json(experiment, filepath):
     path = Path(filepath)
-    path.write_text(
-        json.dumps(
-            ExperimentRepository._serialize(experiment),
-            ensure_ascii=False,
-            indent=2,
-            allow_nan=False,
-        ),
-        encoding="utf-8",
-    )
+    _atomic_text(path, _json_text(ExperimentRepository._serialize(experiment)))
     return path
 
 

@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QEvent
 from PySide6.QtWidgets import (
     QLabel,
     QFormLayout,
@@ -6,13 +6,14 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView, QHBoxLayout, QScrollArea,
+    QHeaderView, QHBoxLayout, QScrollArea, QTabWidget,
 )
 from gui.pages.base import PageBase
 from gui.widgets.button import PrimaryButton
 from gui.widgets.card import MetricCard
 from gui.widgets.collapsible import CollapsibleSection
 from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.data_table import configure_table
 from gui.design_system import Surface
 
 from gui.widgets.plot_canvas import MplCanvas
@@ -34,8 +35,15 @@ class MitigationPage(PageBase):
         self.has_experiment = False
         self.body().setSpacing(12)
         workbench = QHBoxLayout()
+        self.workbench_layout = workbench
         workbench.setSpacing(20)
         self.body().addLayout(workbench, 1)
+        self.compact_tabs = QTabWidget()
+        self.compact_tabs.setAccessibleName('Configuração e resultados da ZNE')
+        self.compact_tabs.setUsesScrollButtons(True)
+        self.compact_tabs.hide()
+        self._compact = None
+        self._compact_selection = None
         self.views = ContentTabs()
         workbench.addWidget(self.views, 1)
         inspector = Surface('Configurar extrapolação', role='WorkbenchInspector')
@@ -52,6 +60,7 @@ class MitigationPage(PageBase):
         self.context.setObjectName('FieldHint')
         inspector.add(self.context)
         form = QFormLayout()
+        self.form = form
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.qubit = QSpinBox()
         self.method = QComboBox()
@@ -94,8 +103,8 @@ class MitigationPage(PageBase):
             "Intervalo binomial aproximado para o Z deste fator. A cobertura nominal "
             "não é garantida em amostras pequenas. Não é intervalo da extrapolação."
         )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        configure_table(self.table, numeric_columns=range(4))
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.setAccessibleName("Medições e incerteza de amostragem por fator")
         self.canvas = MplCanvas(height=3)
         self.canvas.setMinimumHeight(250)
@@ -131,10 +140,53 @@ class MitigationPage(PageBase):
         inspector.body().addStretch(1)
         self.reset_result()
         self.set_running(False)
+        self._arrange_workbench()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.inspector_scroll.setFixedWidth(min(round(310 * max(1, self.fontMetrics().height() / 19)), self.width() * 2 // 5))
+        self._arrange_workbench()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._arrange_workbench()
+
+    def _arrange_workbench(self):
+        if not hasattr(self, 'btn_run') or getattr(self, '_arranging_workbench', False):
+            return
+        self._arranging_workbench = True
+        try:
+            scale = max(1, self.fontMetrics().height() / 19)
+            compact = self.width() < 1050 * scale
+            self.form.setRowWrapPolicy(QFormLayout.WrapAllRows if compact else QFormLayout.WrapLongRows)
+            if compact:
+                self.inspector_scroll.setMinimumWidth(0)
+                self.inspector_scroll.setMaximumWidth(16777215)
+            else:
+                self.inspector_scroll.setFixedWidth(round(310 * scale))
+            if compact == self._compact:
+                return
+            self._compact = compact
+            if compact:
+                self.workbench_layout.removeWidget(self.views)
+                self.workbench_layout.removeWidget(self.inspector_scroll)
+                self.compact_tabs.addTab(self.inspector_scroll, 'Configurar ZNE')
+                self.compact_tabs.addTab(self.views, 'Resultados')
+                if self._compact_selection in (self.views, self.inspector_scroll):
+                    self.compact_tabs.setCurrentWidget(self._compact_selection)
+                self.workbench_layout.addWidget(self.compact_tabs)
+                self.compact_tabs.show()
+            else:
+                if self.compact_tabs.count():
+                    self._compact_selection = self.compact_tabs.currentWidget()
+                self.workbench_layout.removeWidget(self.compact_tabs)
+                for widget in (self.views, self.inspector_scroll):
+                    self.compact_tabs.removeTab(self.compact_tabs.indexOf(widget))
+                    self.workbench_layout.addWidget(widget, 1 if widget is self.views else 0)
+                    widget.show()
+                self.compact_tabs.hide()
+        finally:
+            self._arranging_workbench = False
 
     def reset_result(self):
         self.table.setRowCount(0)
@@ -144,6 +196,9 @@ class MitigationPage(PageBase):
         self.extrapolated.hide()
         self.views.setCurrentIndex(0)
         self.views.setTabEnabled(1, False)
+        self._compact_selection = self.inspector_scroll
+        if self._compact:
+            self.compact_tabs.setCurrentWidget(self.inspector_scroll)
         ax = self.canvas.reset_axes()
         ax.set_axis_off()
         ax.text(.5, .5, 'Execute ZNE para visualizar o observável extrapolado.',
@@ -241,6 +296,10 @@ class MitigationPage(PageBase):
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text, fontsize=8)
         self.canvas.draw_idle()
         self.set_running(False)
+        if m and self._compact:
+            self.compact_tabs.setCurrentWidget(self.views)
+        if m:
+            self._compact_selection = self.views
 
     def set_running(self, running):
         for w in (self.qubit, self.method, self.shots, self.btn_run):

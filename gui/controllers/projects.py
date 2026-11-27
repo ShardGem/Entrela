@@ -51,6 +51,14 @@ class ProjectController(QObject):
             self.refresh()
         except (OSError, ValueError, TypeError) as exc:
             self.error(exc)
+        self._history_project_context = self.project
+        window.page_history.set_project_filter(self.project)
+        window.page_history.project_filter_changed.connect(self._remember_history_scope)
+
+    def _remember_history_scope(self, _scope):
+        # Uma escolha explícita de "Todos os projetos" vale enquanto o contexto
+        # não mudar; reabrir o Histórico não deve desfazer esse filtro.
+        self._history_project_context = self.project
 
     @property
     def active(self):
@@ -136,6 +144,10 @@ class ProjectController(QObject):
         self.window._show_page('dashboard')
 
     def open_tool(self, key):
+        if key == 'history' and self._history_project_context != self.project:
+            if self.window.page_history.project_filter != self.project:
+                self.window.page_history.set_project_filter(self.project)
+            self._history_project_context = self.project
         if key in ('simulation', 'circuit'):
             kind = 'circuit' if key == 'circuit' else 'hamiltonian'
             active = self.active

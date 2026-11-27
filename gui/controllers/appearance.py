@@ -11,6 +11,7 @@ from gui.theme import PALETTE, build_qss
 from gui.palettes import THEMES
 from gui.icons import get_icon
 from gui.widgets.data_table import table_row_height
+from gui.widgets.scroll_guard import install_parameter_scroll_guard
 
 ACCENTS = {
     "cyan": (("#58d6ff", "#7ee0ff", "#3fb8e6", "#0d2933"), ("#006e96", "#005779", "#00415c", "#d8eff9")),
@@ -55,6 +56,7 @@ def _rich_text_template(html, default_font, dpi, names):
 
 
 def apply_appearance(window, theme="dark", font_size=15, *, accent="theme", density="comfortable", reduce_motion=False, high_contrast=False):
+    install_parameter_scroll_guard(window)
     theme = resolve_theme(theme)
     before = asdict(PALETTE)
     after = dict(THEMES[theme])

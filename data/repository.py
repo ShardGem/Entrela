@@ -311,13 +311,26 @@ class ExperimentRepository:
             },
         )
 
+    def _paths_by_modified(self):
+        """Tolerate individual files disappearing during a directory listing."""
+        paths = []
+        for path in self.base_dir.glob("*.json"):
+            try:
+                modified = path.stat().st_mtime
+            except FileNotFoundError:
+                # Another local process can legitimately delete an execution.
+                continue
+            except OSError as exc:
+                self.load_errors.append(f"{path.name}: {exc}")
+                continue
+            paths.append((path, modified))
+        return [path for path, _ in sorted(paths, key=lambda item: item[1], reverse=True)]
+
     def list_summaries(self):
         """Read small derived records; decode state arrays only when opening a run."""
         records = []
         self.load_errors = []
-        for path in sorted(
-            self.base_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-        ):
+        for path in self._paths_by_modified():
             try:
                 cache = self.base_dir / ".summaries" / path.name
                 stat = path.stat()
@@ -375,6 +388,8 @@ class ExperimentRepository:
                     experiment = self._deserialize(payload)
                     self._save_summary(experiment, path)
                 records.append(experiment)
+            except FileNotFoundError:
+                continue
             except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
                 self.load_errors.append(f"{path.name}: {exc}")
         return records
@@ -388,11 +403,11 @@ class ExperimentRepository:
     def list_all(self, limit=None):
         self.load_errors = []
         records = []
-        for path in sorted(
-            self.base_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-        ):
+        for path in self._paths_by_modified():
             try:
                 records.append(self.load(path.stem))
+            except FileNotFoundError:
+                continue
             except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 self.load_errors.append(f"{path.name}: {exc}")
             if limit is not None and len(records) >= limit:

@@ -22,6 +22,7 @@ _CATEGORIES = {
     "example": ("Exemplo", "book-stack"),
     "model": ("Modelo", "layers"),
     "help": ("Conceito", "help"),
+    "concept": ("Conceito", "help"),
 }
 
 
@@ -171,7 +172,7 @@ class CommandPalette(QDialog):
 
     def _activate_item(self, item):
         identifier = item.data(Qt.UserRole)
-        if identifier.startswith(("page:", "project:", "run:", "help:")):
+        if identifier.startswith(("page:", "project:", "run:", "help:", "concept:")):
             self._recent = [identifier, *(key for key in self._recent if key != identifier)][:8]
         self.accept()
         self.command_requested.emit(identifier)

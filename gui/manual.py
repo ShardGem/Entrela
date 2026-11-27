@@ -1,10 +1,14 @@
 """Scientific help, shared by the learning page and contextual dock."""
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
-<p>O Laboratório reúne configuração por Hamiltoniano, editor de circuitos, resultados e estados quânticos 3D. Cada ferramenta tem acesso direto pelo nome; em Resultados, selecione gráficos, circuito executado, interpretação e dados.
-O menu lateral mantém os acessos diretos: Laboratório agrupa configuração, editor, resultados e estados 3D; Investigação reúne estudos, ZNE e comparações; Registros reúne histórico, anotações, configurações salvas e relatórios; Aprendizado contém exemplos, conceitos e manual. Início e Preferências permanecem fixos.
-Escolha uma configuração salva ou edite um circuito, execute e consulte os resultados no mesmo ambiente.
-Configurar prepara evoluções por Hamiltoniano; o editor de portas tem seu próprio rascunho e parâmetros.
+<p>Comece em Projetos para abrir uma investigação e retomar um experimento. O menu lateral organiza as ferramentas pelo que você deseja fazer:</p>
+<ul><li><b>Preparar:</b> Simulação configura uma evolução por Hamiltoniano; Circuitos abre o editor de portas.</li>
+<li><b>Explorar:</b> Resultados reúne gráficos, circuito executado, interpretação e dados; Estados 3D mostra os estados locais dos qubits.</li>
+<li><b>Investigar:</b> Comparar execuções, Estudos e varreduras e Mitigação ZNE analisam resultados já calculados.</li>
+<li><b>Acervo:</b> Histórico consulta execuções, Caderno documenta anotações, evidências e relatórios, e Biblioteca reúne exemplos, configurações salvas e circuitos reutilizáveis.</li></ul>
+<p>Aprender, Ajuda contextual e Preferências ficam na base da navegação. Os grupos podem ser recolhidos; a área atual é expandida ao abri-la. Mesmo no menu estreito, os destinos mantêm seus nomes.
+Escolha um exemplo ou modelo na Biblioteca para criar uma cópia editável, ou prepare seu próprio experimento e execute.
+A simulação por Hamiltoniano e o editor de portas têm rascunhos e parâmetros próprios.
 Resultados e anotações acompanham a execução selecionada, sem modificar o que você está editando.</p>
 <p>Use Passo a passo para percorrer a configuração guiada ou Todos os parâmetros (modo Avançado) para abrir as seções que precisar.
 Os mesmos controles preservam a configuração ao alternar. O botão Buscar encontra comandos, exemplos e conceitos.</p>
@@ -12,10 +16,10 @@ Os mesmos controles preservam a configuração ao alternar. O botão Buscar enco
 Use os botões ? ou a ajuda de cada campo para consultar significado, unidades e limites. A prévia do estado inicial
 é descritiva e ideal; não calcula o efeito do ruído nem substitui uma execução.</p>
 <p>Na configuração, a área central reúne Preparação, Revisão do protocolo e Execução selecionada; os parâmetros ficam no inspetor à direita. A preparação acompanha o rascunho, enquanto a execução selecionada continua mostrando os dados já calculados. Em janelas menores, alterne entre Parâmetros e Área de experimentação. A barra de execução permanece acessível.
-Configurações inválidas indicam o campo a revisar. O menu Exemplos carrega configurações da galeria sem executá-las.</p>
+Configurações inválidas indicam o campo a revisar. Biblioteca → Exemplos oferece configurações da galeria; criar uma cópia não executa o experimento.</p>
 <p>Nos gráficos de Resultados, escolha Distribuição, Evolução ou Lado a lado. Contagens são amostras de medição; as curvas temporais representam probabilidades calculadas nos snapshots. Mudar a visualização não executa novamente o experimento.</p>
 <h2 id="Circuitos">Criar e consultar circuitos</h2>
-<p>No menu Editor de circuitos, escolha um modelo ou adicione portas pela paleta. q0 identifica o primeiro qubit; controle e alvo são linhas distintas nas operações controladas. Ângulos de rotação são expressos em radianos. A ajuda de cada porta explica a operação. Desfazer e Refazer recuperam alterações; Salvar revisão guarda o circuito na biblioteca. Arquivo permite importar e exportar formatos compatíveis; Editar reúne copiar, recortar, colar, mover e remover portas. O circuito executado, em Resultados, é uma consulta somente de leitura: modificar o rascunho não recalcula a execução selecionada.</p>
+<p>Em Preparar → Circuitos, escolha um modelo ou adicione portas pela paleta. q0 identifica o primeiro qubit; controle e alvo são linhas distintas nas operações controladas. Ângulos de rotação são expressos em radianos. A ajuda de cada porta explica a operação. Desfazer e Refazer recuperam alterações; Salvar revisão guarda o circuito na biblioteca. Arquivo permite importar e exportar formatos compatíveis; Editar reúne copiar, recortar, colar, mover e remover portas. O circuito executado, em Resultados, é uma consulta somente de leitura: modificar o rascunho não recalcula a execução selecionada.</p>
 <p>O editor apresenta modelos e portas à esquerda, desenho ou lista de operações no centro e um inspetor à direita. Em janelas menores, alterne entre as abas Portas, Circuito e Inspetor. Na aba Porta do inspetor, consulte e ajuste a operação selecionada; na aba Execução, defina shots, semente e ruído. O botão Inspetor abre esse painel e permite recolhê-lo em telas largas; Executar circuito permanece na base da tela. O botão Resultados mostra contagens e métricas da execução de circuito selecionada abaixo do desenho. Esses dados são gravados: editar o desenho não os recalcula, e uma mudança de circuito recebe um aviso explícito.</p>
 <h2 id="Esfera de Bloch">Estados quânticos e esfera de Bloch</h2>
 <p>A esfera representa o estado reduzido de cada qubit, não o estado global. Selecione uma esfera e use Focar selecionado; clique novamente ou escolha Todos os qubits para desfocar. O inspetor reúne câmera, etapa, estados locais e métricas. O cursor percorre somente snapshots realmente armazenados. Sem snapshots, mostra-se apenas o estado final calculado; não há evolução reconstruída. O Estado global permite distinguir mistura de emaranhamento.</p>
@@ -55,11 +59,11 @@ Os erros padrão mostrados descrevem amostragem, não incerteza do modelo de ext
 <h2 id="Reprodutibilidade">Reprodutibilidade</h2><p>O histórico guarda configuração imutável, estados complexos,
 contagens, tempos, versões e semente efetiva. O JSON pode ser importado como cópia independente.
 Pacotes ZIP reúnem os arquivos; extraia o JSON do experimento para importá-lo.
-Editar o formulário não altera execuções anteriores. Dê um nome ao criar a execução; em Histórico, use Visualizar para consultar os detalhes e Abrir para reutilizar os resultados. Descrição, objetivos, hipóteses e anotações documentam o estudo sem modificar os dados científicos originais.</p>
+Editar o formulário não altera execuções anteriores. Dê um nome ao criar a execução; em Histórico, o ícone de olho (Visualizar) abre os detalhes. Abrir resultados consulta a execução; Usar configuração prepara uma cópia editável dos parâmetros. Descrição, objetivos, hipóteses e anotações documentam o estudo sem modificar os dados científicos originais.</p>
 <h2 id="Protocolos">Protocolos e evidências</h2>
-<p>Em Análises, registre pergunta, hipótese, controles e referência no TCC. Salvar nova revisão preserva
+<p>Em Estudos e varreduras → Planejamento, registre pergunta, hipótese, controles e referência no TCC. Salvar nova revisão preserva
 o plano anterior. Carregar protocolo reabre fonte e parâmetros; Calcular análise gera outra evidência.
-A reprodução de uma análise usa as opções registradas. Documentação mostra os vínculos entre fonte,
+A reprodução de uma análise usa as opções registradas. Caderno → Evidências mostra os vínculos entre fonte,
 estudos, protocolos e referências no texto.</p>
 <h2 id="Análises">Estudos de ruído e amostragem</h2>
 <p>Em Estudos e varreduras, escolha uma execução pelo seletor de fonte. A aba Configurar explica os requisitos,
@@ -76,13 +80,13 @@ snapshots sincronizados; sem grades temporais compatíveis, exibe estados finais
 usam o baseline compilado do próprio ajuste. Não há estado mitigado reconstruído por extrapolação.</p>
 <h2 id="Documentação">Documentação científica</h2>
 <h3>Caderno e configurações</h3>
-<p>O caderno guarda nome, objetivo, hipótese e interpretação da execução selecionada. Projeto é um nome usado para
-agrupar execuções no histórico. Configurações salvas guardam os parâmetros do formulário Hamiltoniano; circuitos
+<p>O Caderno permite escolher entre anotações do projeto e da execução selecionada. Projetos agrupam experimentos,
+execuções e evidências de uma investigação; registros antigos sem associação continuam disponíveis em Sem projeto. Configurações salvas guardam os parâmetros do formulário Hamiltoniano; circuitos
 de portas são guardados com revisões na biblioteca do editor. Salvar uma configuração não executa a simulação.</p>
 <p>Exporte uma execução ou a comparação carregada como ZIP, PDF ou GIF. O pacote inclui dados integrais,
 PNG/SVG/PDF, tabelas LaTeX, protocolos, manifesto e hashes. GIF usa snapshots reais, sem interpolação,
 reprodução única e tempo didático. O pacote inclui a sequência PNG selecionada. Na página 3D, exporte
 a vista atual com câmera e snapshot. JSON/CSV mantêm os dados de precisão integral. Relatórios PDF usam páginas A4 de 210 × 297 mm, texto vetorial e resolução configurável para imagens rasterizadas (padrão de 300 DPI).</p>
 <h2 id="Conceitos">Conceitos e exemplos executáveis</h2>
-<p>Em Aprendizado → Conceitos e manual, pesquise os conceitos e abra seus detalhes. Circuitos demonstrativos abrem no editor e precisam ser executados para gerar dados; as previsões do material são analíticas e ideais. Shor e teletransporte são explicados conceitualmente: a plataforma não apresenta protocolos completos desses algoritmos como executados. Referências bibliográficas identificam as fontes; esta biblioteca não inclui links externos sem verificação.</p>
+<p>Em Aprender, pesquise os conceitos e abra seus detalhes ou consulte o manual da plataforma. Biblioteca → Exemplos reúne configurações para criar cópias editáveis; o tutorial de Bell orienta ações reais na interface. Circuitos demonstrativos abrem no editor e precisam ser executados para gerar dados; as previsões do material são analíticas e ideais. Shor e teletransporte são explicados conceitualmente: a plataforma não apresenta protocolos completos desses algoritmos como executados. Referências bibliográficas identificam as fontes; esta biblioteca não inclui links externos sem verificação.</p>
 """

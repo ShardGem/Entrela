@@ -8,6 +8,11 @@ class NavigationController:
     def __init__(self, window):
         self.window = window
         self.last_for_root = dict(dashboard='dashboard', simulation='simulation', analysis='analysis', history='history', docs='examples', settings='settings')
+        window.page_history.project_filter_changed.connect(self._history_scope_changed)
+
+    def _history_scope_changed(self, _scope):
+        if self.window._current_page == 'history':
+            self.update_heading()
 
     def open_page(self, key):
         """Um item visível abre sua função exata, independente da última área."""
@@ -92,7 +97,10 @@ class NavigationController:
             source_project = annotations.get(w._current_experiment.id, {}).get('project', '')
             context = ' · '.join(filter(None, (source_project, title)))
             title = experiment_title(w._current_experiment, annotations)
-        elif key in ('library', 'notebook', 'documentation', 'analysis', 'history', 'mitigation'):
+        elif key == 'history':
+            scope = w.page_history.project_filter
+            context = 'Todos os projetos' if scope is None else (scope or 'Sem projeto')
+        elif key in ('library', 'notebook', 'documentation', 'analysis', 'mitigation'):
             context = project or ''
         w.topbar.set_context(title, context)
 
@@ -115,6 +123,7 @@ class NavigationController:
             return {'system': 'Qubits', 'hamiltonian': 'Hamiltoniano', 'evolution': 'Evolução',
                     'noise': 'Ruído', 'execution': 'Reprodutibilidade'}.get(w.page_simulation.config_panel.current_section, 'Início')
         return {'circuit': 'Circuitos', 'results': 'Fidelidade', 'bloch': 'Esfera de Bloch',
-                'mitigation': 'Mitigação', 'analysis': 'Evolução', 'comparison': 'Comparações',
-                'history': 'Reprodutibilidade', 'library': 'Protocolos', 'documentation': 'Documentação',
+                'mitigation': 'Mitigação', 'analysis': 'Análises', 'comparison': 'Comparações',
+                'history': 'Reprodutibilidade', 'library': 'Documentação', 'documentation': 'Documentação',
+                'notebook': 'Documentação', 'catalog': 'Conceitos', 'docs': 'Conceitos',
                 'settings': 'Configurações'}.get(w._current_page, 'Início')

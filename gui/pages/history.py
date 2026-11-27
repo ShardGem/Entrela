@@ -6,7 +6,7 @@ import json
 
 from core.types import system_label
 from data.workspace import experiment_title
-from PySide6.QtCore import QSignalBlocker, Signal, Qt, QTimer
+from PySide6.QtCore import QSignalBlocker, Signal, Qt, QTimer, QEvent
 from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSplitter, QWidget, QVBoxLayout,
@@ -31,6 +31,7 @@ class HistoryPage(PageBase):
     detail_requested = Signal(str)
     edit_requested = Signal(str)
     use_config_requested = Signal(str)
+    project_filter_changed = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(
@@ -269,6 +270,7 @@ class HistoryPage(PageBase):
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.table.setItem(row, col, item)
             button = SecondaryButton(icon="eye")
+            button.setObjectName("HistoryViewAction")
             button.setToolTip("Visualizar")
             button.setAccessibleName("Visualizar")
             button.setAccessibleDescription(f"Abrir detalhes do experimento {values[1]}")
@@ -278,7 +280,11 @@ class HistoryPage(PageBase):
             self.table.setCellWidget(row, 9, button)
         self.table.setSortingEnabled(True)
         has_matches = bool(matches)
-        self.page_label.setText(f"{len(matches)} registro(s) · página {self.offset // self.page_size + 1}")
+        self.page_label.setText(
+            f"{len(matches)} registro(s) · página {self.offset // self.page_size + 1}"
+            if has_matches else "Nenhum experimento corresponde aos filtros."
+            if self.records else "Nenhum experimento salvo."
+        )
         self.empty.setVisible(not self.records)
         self.no_matches.setVisible(bool(self.records) and not has_matches)
         self.splitter.setVisible(has_matches)
@@ -297,11 +303,14 @@ class HistoryPage(PageBase):
         """Filter the project field exactly, independently of free-text search."""
         if project is not None and not isinstance(project, str):
             raise TypeError("O filtro de projeto deve ser um nome ou None.")
-        self.project_filter = project.strip() if project and project.strip() else None
-        self.project_filter_label.setText(f"Projeto: {self.project_filter}" if self.project_filter else "")
+        self.project_filter = None if project is None else project.strip()
+        self.project_filter_label.setText(
+            "" if self.project_filter is None else f"Projeto: {self.project_filter or 'Sem projeto'}"
+        )
         self.project_filter_bar.setVisible(self.project_filter is not None and not self.expand_details.isChecked())
         self.offset = 0
         self._filter()
+        self.project_filter_changed.emit(self.project_filter)
 
     def _view(self, identifier):
         record = next((record for record in self.records if record.id == identifier), None)
@@ -322,11 +331,17 @@ class HistoryPage(PageBase):
 
     def _arrange_details(self):
         scale = max(1, self.font().pixelSize() / 15)
-        wide = self.width() >= 1050 * scale
+        margins = self.body().contentsMargins()
+        available = self._scroll.viewport().width() - margins.left() - margins.right()
+        master_width = round(700 * scale)
+        inspector_width = max(round(460 * scale), self.detail_panel.minimumSizeHint().width())
+        # A largura da janela não garante espaço para os dois painéis: o menu,
+        # as margens e o mínimo do inspetor também precisam caber no viewport.
+        wide = available >= master_width + inspector_width + self.splitter.handleWidth()
         # O mestre precisa acomodar nome, data, métricas e a ação de consulta.
         # Abaixo dessa largura o cabeçalho Stretch pode reter a largura anterior
         # e deixar o olho e até o título da coluna fora da área visível.
-        self.table.setMinimumWidth(round(700 * scale) if wide else 0)
+        self.table.setMinimumWidth(master_width if wide else 0)
         self.splitter.setOrientation(Qt.Horizontal if wide else Qt.Vertical)
         if wide and self._auto_detail_focus:
             self.expand_details.setChecked(False)
@@ -339,6 +354,11 @@ class HistoryPage(PageBase):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, '_layout_timer'):
+            self._layout_timer.start()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange) and hasattr(self, '_layout_timer'):
             self._layout_timer.start()
 
     def _set_detail_expanded(self, expanded):
@@ -398,6 +418,7 @@ class HistoryPage(PageBase):
             self.circuit.clear("Carregando as operações registradas do circuito…")
         metadata = {key: (f"{len(value)} operações; veja JSON completo" if key == "operations" else value) for key, value in result.metadata.items()}
         self.technical.setPlainText(json.dumps({"id": experiment.id, "created_at": experiment.created_at.isoformat(), "configuration": asdict(config), "metadata": metadata, "mitigation_method": (result.mitigation or {}).get("method")}, ensure_ascii=False, indent=2, default=str))
+        self._layout_timer.start()
 
     def _search_changed(self, *_):
         self.offset = 0

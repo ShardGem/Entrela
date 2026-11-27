@@ -1,5 +1,5 @@
 """Reusable examples and personal models; opening always produces an editable copy."""
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QSignalBlocker
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QLabel, QSplitter
 from gui.pages.base import PageBase
 from gui.widgets.content_tabs import ContentTabs
@@ -7,6 +7,7 @@ from gui.widgets.button import PrimaryButton, SecondaryButton
 from gui.design_system import Surface
 from gui.widgets.preparation_preview import PreparationPreview
 from core.types import config_from_dict
+from gui.pages.examples import normalized
 
 
 class CatalogPage(PageBase):
@@ -55,21 +56,39 @@ class CatalogPage(PageBase):
         self.raw = raw
         self._filter()
 
+    @staticmethod
+    def _entry_key(item):
+        if item is None:
+            return None
+        kind, name, value = item.data(Qt.UserRole)
+        return (kind, name) if kind == 'template' else (kind, value.identifier, value.version)
+
     def _filter(self, *_):
+        selected = self._entry_key(self.entries.currentItem())
+        scroll = self.entries.verticalScrollBar().value()
+        blocker = QSignalBlocker(self.entries)
         self.entries.clear()
-        query = self.search.text().casefold()
+        words = normalized(self.search.text()).split()
         for name, value in self.raw.get('templates', {}).items():
-            if query not in name.casefold(): continue
+            if not all(word in normalized(name + ' configuração por Hamiltoniano') for word in words): continue
             item = QListWidgetItem(name + '\nConfiguração por Hamiltoniano')
             item.setData(Qt.UserRole, ('template', name, value)); item.setToolTip(item.text()); self.entries.addItem(item)
         library = self.editor.library
         if library is not None:
             for entry in library.entries():
                 for revision in reversed(library.revisions(entry.identifier)):
-                    if query not in (revision.name + ' ' + revision.description).casefold(): continue
+                    haystack = normalized(revision.name + ' ' + revision.description + ' circuito livre')
+                    if not all(word in haystack for word in words): continue
                     item = QListWidgetItem(f'{revision.name}\nCircuito livre · revisão {revision.version} · {revision.document.num_qubits} qubits')
                     item.setData(Qt.UserRole, ('circuit', revision.name, revision)); item.setToolTip(item.text()); self.entries.addItem(item)
-        if self.entries.count(): self.entries.setCurrentRow(0)
+        if self.entries.count():
+            row = next((i for i in range(self.entries.count())
+                        if self._entry_key(self.entries.item(i)) == selected), 0)
+            self.entries.setCurrentRow(row)
+            self.entries.verticalScrollBar().setValue(scroll)
+        del blocker
+        if self.entries.count():
+            self._select(self.entries.currentItem())
         else:
             self.copy.setEnabled(False)
             self.description.setText('Nenhum modelo corresponde à busca. Salve uma configuração ou uma revisão no editor para reutilizá-la aqui.')

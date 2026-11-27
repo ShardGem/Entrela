@@ -1,6 +1,6 @@
 """Scientific tools operate on the selected run, preserving its result."""
 
-from PySide6.QtCore import Signal, Qt, QSignalBlocker
+from PySide6.QtCore import Signal, Qt, QSignalBlocker, QEvent
 from PySide6.QtWidgets import (
     QLabel,
     QComboBox,
@@ -46,8 +46,12 @@ class AnalysisPage(PageBase):
         self.context = QLabel("Abra uma execução para começar.")
         self.context.setWordWrap(True)
         self.context.setTextFormat(Qt.PlainText)
-        source_row = QHBoxLayout()
-        source_row.addWidget(self.context, 1)
+        self.source_bar = QWidget()
+        self.source_row = QHBoxLayout(self.source_bar)
+        self.source_row.setContentsMargins(0, 0, 0, 0)
+        self.source_row.addWidget(self.context, 1)
+        source_actions = QWidget()
+        source_actions_layout = FlowLayout(source_actions)
         self.source_button = QToolButton()
         self.source_button.setText("Escolher execução")
         self.source_button.setAccessibleName("Escolher execução de referência do estudo")
@@ -55,7 +59,7 @@ class AnalysisPage(PageBase):
         self.source_menu = QMenu(self.source_button)
         self.source_button.setMenu(self.source_menu)
         self._recent_sources = []
-        source_row.addWidget(self.source_button)
+        source_actions_layout.addWidget(self.source_button)
         self.set_recent_sources([])
         self.saved = QComboBox()
         self.saved.addItem("Estudos salvos", None)
@@ -63,8 +67,9 @@ class AnalysisPage(PageBase):
         self.saved.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.saved.setAccessibleName("Resultados de estudos salvos da execução selecionada")
         self.saved.currentIndexChanged.connect(self._open_saved)
-        source_row.addWidget(self.saved)
-        self.body().addLayout(source_row)
+        source_actions_layout.addWidget(self.saved)
+        self.source_row.addWidget(source_actions)
+        self.body().addWidget(self.source_bar)
         self.tabs = QTabWidget()
         def scroll_tab():
             area = QScrollArea()
@@ -180,6 +185,7 @@ class AnalysisPage(PageBase):
         self.study_catalog.setResizeMode(QListWidget.Adjust)
         catalog = QWidget()
         catalog_body = QVBoxLayout(catalog)
+        self.study_catalog_panel = catalog
         catalog_body.setContentsMargins(0, 0, 12, 0)
         catalog_body.addWidget(QLabel("Pergunta científica"))
         catalog_body.addWidget(self.family)
@@ -208,8 +214,9 @@ class AnalysisPage(PageBase):
         planning.addStretch()
         self.btn_run = PrimaryButton("Calcular análise")
         self.btn_run.clicked.connect(self._request)
-        actions = QHBoxLayout()
-        actions.addStretch(1)
+        self.execution_row = QHBoxLayout()
+        action_controls = QWidget()
+        actions = FlowLayout(action_controls)
         actions.addWidget(self.btn_run)
         self.btn_cancel = SecondaryButton("Cancelar análise")
         self.btn_cancel.clicked.connect(self.cancel_requested.emit)
@@ -221,8 +228,10 @@ class AnalysisPage(PageBase):
         self.availability = QLabel()
         self.availability.setWordWrap(True)
         self.availability.setObjectName("FieldHint")
-        actions.insertWidget(0, self.availability, 1)
-        footer.addLayout(actions)
+        self.execution_row.addWidget(self.availability, 1)
+        self.execution_row.addWidget(action_controls)
+        self.execution_row.setAlignment(action_controls, Qt.AlignRight)
+        footer.addLayout(self.execution_row)
         self.progress = QProgressBar()
         self.progress.setAccessibleName("Progresso da análise científica")
         footer.addWidget(self.progress)
@@ -266,6 +275,8 @@ class AnalysisPage(PageBase):
         self._parameter_guidance()
         self._update_controls()
         self.set_running(False)
+        self._compact_analysis = None
+        self._arrange_analysis()
 
     @staticmethod
     def _family_for(kind):
@@ -724,7 +735,29 @@ class AnalysisPage(PageBase):
         if running:
             self.progress.setValue(0)
 
+    def _arrange_analysis(self):
+        if not hasattr(self, 'execution_row'):
+            return
+        scale = max(1, self.fontMetrics().height() / 19)
+        compact = self.width() < 1050 * scale
+        direction = QHBoxLayout.TopToBottom if compact else QHBoxLayout.LeftToRight
+        self.source_row.setDirection(direction)
+        self.execution_row.setDirection(direction)
+        self.form.setRowWrapPolicy(QFormLayout.WrapAllRows if compact else QFormLayout.WrapLongRows)
+        self.form.setRowVisible(self.kind, compact)
+        self.study_catalog.setVisible(not compact)
+        self._form_widget.setMaximumWidth(round(640 * scale))
+        self.help.setMaximumWidth(round(640 * scale))
+        if compact != getattr(self, '_compact_analysis', None):
+            self._compact_analysis = compact
+            self.study_splitter.setOrientation(Qt.Vertical if compact else Qt.Horizontal)
+            self.study_splitter.setSizes([self.study_catalog_panel.sizeHint().height(), 700] if compact else [300, 700])
+
     def resizeEvent(self,event):
         super().resizeEvent(event)
-        if hasattr(self,'study_splitter'):
-            self.study_splitter.setOrientation(Qt.Vertical if self.width()<950*max(1,self.font().pixelSize()/15) else Qt.Horizontal)
+        self._arrange_analysis()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._arrange_analysis()

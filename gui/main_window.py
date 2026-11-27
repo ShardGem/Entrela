@@ -397,7 +397,6 @@ class MainWindow(QMainWindow):
             ("Ctrl+N", self.sidebar.new_button.showMenu),
             ("Ctrl+O", self._import_experiment),
             ("Ctrl+Return", self._run_active_context),
-            ("Ctrl+K", self._open_commands),
             ("F1", lambda: self._show_help(self.navigation.help_topic())),
             ("F11", self._toggle_presentation),
         ]:
@@ -406,6 +405,8 @@ class MainWindow(QMainWindow):
             self.shortcuts.append(shortcut)
 
     def _open_commands(self):
+        from core.learning import CONCEPTS
+
         commands = [
             ("new", "Novo experimento", "criar Hamiltoniano circuito"),
             ("import", "Importar experimento ou estudo", "abrir arquivo JSON ZIP reprodução"),
@@ -451,6 +452,10 @@ class MainWindow(QMainWindow):
                 "Evolução",
             )
         ]
+        commands += [
+            ("concept:" + concept.key, "Conceito: " + concept.title, concept.search_text())
+            for concept in CONCEPTS
+        ]
         self.command_palette.open_commands(commands)
 
     def _command(self, identifier):
@@ -476,6 +481,20 @@ class MainWindow(QMainWindow):
             self._open_experiment(identifier[4:])
         elif identifier.startswith("help:"):
             self._show_help(identifier[5:])
+        elif identifier.startswith("concept:"):
+            from core.learning import CONCEPT_BY_KEY
+
+            key = identifier[8:]
+            if key not in CONCEPT_BY_KEY:
+                return
+            page = self.page_docs
+            page.search.clear()
+            for row in range(page.concept_list.count()):
+                if page.concept_list.item(row).data(Qt.UserRole) == key:
+                    page.concept_list.setCurrentRow(row)
+                    break
+            self._show_page("docs")
+            page.browser.setFocus(Qt.OtherFocusReason)
         elif identifier.startswith("mode:"):
             self.page_simulation.config_panel.set_mode(identifier[5:])
             self._show_page("simulation")

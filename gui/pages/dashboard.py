@@ -166,9 +166,13 @@ class DashboardPage(PageBase):
         self.ideal.clicked.connect(self.ideal_requested.emit)
         self.first_use = Surface('Seu primeiro experimento')
         start_actions = FlowLayout()
-        for text, icon, signal in [('Abrir exemplos', 'book-stack', self.examples_requested),
-                                   ('Iniciar tutorial de Bell', 'play', self.tutorial_requested)]:
+        for key, text, name, icon, signal in [
+            ('examples_button', 'Abrir exemplos', 'Escolher um exemplo da biblioteca', 'book-stack', self.examples_requested),
+            ('tutorial_button', 'Iniciar tutorial de Bell', 'Iniciar tutorial de Bell', 'play', self.tutorial_requested),
+        ]:
             button = SecondaryButton(text, icon=icon)
+            button.setAccessibleName(name)
+            setattr(self, key, button)
             button.clicked.connect(signal.emit)
             start_actions.addWidget(button)
         self.first_use.body().addLayout(start_actions)

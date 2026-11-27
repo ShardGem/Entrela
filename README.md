@@ -12,12 +12,18 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 - Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
 
 
+## Revisão para a primeira distribuição desktop
+
+O aplicativo mantém acesso direto às ferramentas no menu lateral, organizado em **Preparar, Explorar, Investigar e Acervo**. Buscar reúne comandos, projetos, modelos, exemplos e conceitos; os parâmetros científicos e os registros existentes são preservados.
+
+A [análise de interface, arquitetura e preparação para distribuição](docs/revisao-primeira-distribuicao.md) registra os problemas corrigidos, as verificações desta etapa e os requisitos que faltam para um instalador Windows. O wheel Python continua disponível para validação técnica; a revisão não publica um instalador nativo.
+
 ## Bancada centrada em projetos — 0.27.0
 
-- Cabeçalho com **Projetos, Biblioteca e Aprender**, busca global e Preferências; ferramentas científicas continuam acessíveis por nome.
+- Navegação por projetos e ferramentas com nomes, busca global e Preferências; a revisão posterior reorganiza esses acessos no menu lateral.
 - Projetos com retomada, experimentos, execuções recentes, caderno e evidências. Rascunhos independentes preservam configurações e circuitos durante a navegação.
 - Bancada **Preparar → Observar → Comparar**, com campos centrais, revisão do protocolo, execução fixa e visualizações dos registros calculados.
-- Azul-petróleo, ciano suave, IBM Plex Sans, cantos discretos e adaptação a texto de 24 px em 1024 × 768.
+- Temas Grafite, Claro e Azul Entrela; fontes de interface e monoespaçada distribuídas com o aplicativo, cantos discretos e adaptação a texto de 24 px em 1024 × 768.
 - Caderno com escopo de projeto ou execução, fontes dos arquivos exportados e roteiro do relatório A4.
 - Históricos, revisões, modelos, dados científicos, ícones do autor e splash preservados.
 
@@ -234,7 +240,7 @@ PYTHONDONTWRITEBYTECODE=1 /workspace/.venvs/entrela/bin/python scripts/cloud_smo
 
 ## Desenvolvimento local
 
-Com Python 3.11 ou superior, criar um ambiente virtual e ativá-lo conforme seu sistema:
+Para usar o arquivo de dependências de desenvolvimento `requirements.txt`, utilize Python 3.12 ou superior. Crie um ambiente virtual e ative-o conforme seu sistema:
 
 ```bash
 python -m venv .venv

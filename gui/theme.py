@@ -266,6 +266,10 @@ QLabel#CommandKey {{
 QPushButton#ViewAction {{ background: transparent; border-color: transparent; color: {p.text_muted}; }}
 QPushButton#ViewAction:hover {{ background: {p.surface_hover}; color: {p.text}; }}
 QPushButton#ViewAction:focus {{ border-color: {p.primary}; }}
+/* Reservar a borda evita deslocar o ícone ao receber foco por teclado. */
+QPushButton#HistoryViewAction {{ border: 2px solid transparent; padding: 4px 8px; }}
+QPushButton#HistoryViewAction:hover {{ background: {p.surface_hover}; }}
+QPushButton#HistoryViewAction:focus {{ border-color: {p.primary}; background: {p.primary_faint}; }}
 
 /* Campos e controles */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{

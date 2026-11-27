@@ -74,11 +74,10 @@ def test_dashboard_beginner_help_is_optional_and_shortcuts_keep_contract(qt_app)
         expected = []
         page.examples_requested.connect(lambda: expected.append("examples"))
         page.tutorial_requested.connect(lambda: expected.append("tutorial"))
-        from PySide6.QtWidgets import QPushButton
-
-        buttons = {button.text(): button for button in page.findChildren(QPushButton)}
-        buttons["Escolher um exemplo da biblioteca"].click()
-        buttons["Iniciar tutorial de Bell"].click()
+        # A descrição acessível e a ação permanecem estáveis com rótulos curtos.
+        assert page.examples_button.accessibleName() == "Escolher um exemplo da biblioteca"
+        page.examples_button.click()
+        page.tutorial_button.click()
         assert expected == ["examples", "tutorial"]
     finally:
         page.close()
