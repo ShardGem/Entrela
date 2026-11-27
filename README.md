@@ -1,309 +1,97 @@
 # Entrela
 
-Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
+**Preparar. Observar. Comparar.**
 
-- Modos Guiado e Avançado compartilham os mesmos parâmetros.
-- Galeria com 12 exemplos editáveis e tutorial de Bell com sete etapas verificadas por ações reais.
-- Evolução ideal por vetores de estado e ruidosa por matrizes densidade.
-- Fidelidade, pureza global, energia, circuito, esfera de Bloch, dados e interpretação.
-- Histórico com reabertura, comparação de execuções compatíveis e rascunho persistente.
-- ZNE de um observável Z com fatores efetivos 1, 3 e 5.
-- Exportação CSV, JSON completo, pacote ZIP e figuras PNG; importação como cópia independente.
-- Botão **Buscar** para comandos, exemplos e conceitos; Ctrl+N para criar; Ctrl+O para importar; Ctrl+Enter para executar.
+O Entrela é um laboratório de simulação quântica para construir circuitos,
+acompanhar estados e investigar os efeitos do ruído. Você pode começar por um
+exemplo, preparar seu próprio experimento e comparar os resultados sem perder
+as configurações usadas em cada execução.
 
+**[Baixar o Entrela para Windows](https://github.com/ShardGem/Entrela/releases/download/v0.27.0/Entrela-0.27.0-windows-x64-setup.exe)** ·
+[Versão portátil](https://github.com/ShardGem/Entrela/releases/download/v0.27.0/Entrela-0.27.0-windows-x64-portatil.zip) ·
+[Ver a galeria](docs/screenshots/0.27.0/README.md) ·
+[Conhecer esta versão](https://github.com/ShardGem/Entrela/releases/tag/v0.27.0)
 
-## Revisão para a primeira distribuição desktop
+![Distribuição de medições e evolução das probabilidades de quatro qubits no Entrela](docs/screenshots/0.27.0/04-resultados/resultados-graficos.png)
 
-O aplicativo mantém acesso direto às ferramentas no menu lateral, organizado em **Preparar, Explorar, Investigar e Acervo**. Buscar reúne comandos, projetos, modelos, exemplos e conceitos; os parâmetros científicos e os registros existentes são preservados.
+## Do circuito ao resultado
 
-A [análise de interface, arquitetura e preparação para distribuição](docs/revisao-primeira-distribuicao.md) registra os problemas corrigidos e as verificações. O [roteiro de compilação Windows](docs/compilar-windows.md) explica como gerar o executável, o ZIP portátil e o instalador com as dependências incluídas.
+Escolha uma configuração pronta ou monte uma investigação do início. A preparação
+pode ser guiada, com explicações em cada etapa, ou reunir todos os parâmetros para
+quem já sabe o que deseja testar. Alternar entre os modos preserva seu rascunho.
 
-No Windows x64 com Python 3.12 e Inno Setup 6 instalados:
+Na bancada, você pode:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 -Installer
-```
+- Construir circuitos com portas quânticas, inspecionar cada operação e guardar
+  revisões para continuar depois.
+- Simular a evolução por Hamiltonianos, como Ising, com aproximações de
+  Suzuki–Trotter de segunda ou quarta ordem.
+- Comparar a execução sem ruído com modelos de despolarização ou relaxamento
+  térmico, ajustando os parâmetros do experimento.
+- Consultar contagens, frequências, probabilidades calculadas, fidelidade,
+  pureza e energia, com a referência de cada medida identificada.
+- Investigar a convergência, variar parâmetros e explorar estimativas de
+  observáveis por extrapolação de ruído zero, a ZNE.
 
-Os arquivos ficam em `dist/release/`. O workflow **Distribuição Windows** também compila e verifica os binários no GitHub Actions; uma tag de versão integrada à `main` aciona a publicação do release.
+![Editor de circuitos com paleta de portas, diagrama de GHZ e explicação da operação selecionada](docs/screenshots/0.27.0/03-laboratorio/08-editor.png)
 
-## Primeiros passos no Entrela
+O editor inclui busca de portas, modelos, copiar e colar, desfazer e refazer,
+zoom e importação ou exportação de circuitos em JSON e OpenQASM 2.
 
-Na primeira abertura, uma apresentação opcional oferece três caminhos: conhecer o aplicativo, fazer o primeiro experimento com o tutorial de Bell ou explorar exemplos prontos. **Explorar por conta própria**, Esc e o fechamento da janela dispensam a apresentação. Ela só se repete quando a opção **Mostrar esta apresentação ao iniciar** está marcada.
+## Veja o estado quântico evoluir
 
-Em **Aprender → Primeiros passos**, o guia percorre **Começar, Preparar, Observar e Guardar**, com explicações breves, uma prévia da preparação de Bell e atalhos para as ferramentas. O tópico é salvo para retomar depois. O tutorial de Bell mantém seu próprio progresso e verifica ações e resultados calculados pelo simulador.
+Percorra os snapshots calculados, pause a reprodução e escolha um qubit para
+examinar seus componentes X, Y e Z. A esfera de Bloch mostra o estado local;
+o inspetor do estado global permite consultar a matriz densidade e distinguir
+pureza local de pureza global.
 
-Para reabrir, use Aprender, o botão **Como começar** na tela de projetos vazia ou procure **Primeiros passos** e **Apresentação inicial** em Buscar. Veja as [capturas do guia e da apresentação](docs/screenshots/primeiros-passos/README.md).
+![Esfera de Bloch com o qubit selecionado, a referência ideal e os controles de reprodução](docs/screenshots/0.27.0/04-resultados/bloch-qubit-foco.png)
 
-## Bancada centrada em projetos — 0.27.0
+Nas comparações, distribuições, curvas e métricas usam as execuções escolhidas.
+Quando os registros permitem, o Bloch lado a lado sincroniza os snapshots e as
+câmeras para acompanhar os dois resultados.
 
-- Navegação por projetos e ferramentas com nomes, busca global e Preferências; a revisão posterior reorganiza esses acessos no menu lateral.
-- Projetos com retomada, experimentos, execuções recentes, caderno e evidências. Rascunhos independentes preservam configurações e circuitos durante a navegação.
-- Bancada **Preparar → Observar → Comparar**, com campos centrais, revisão do protocolo, execução fixa e visualizações dos registros calculados.
-- Temas Grafite, Claro e Azul Entrela; fontes de interface e monoespaçada distribuídas com o aplicativo, cantos discretos e adaptação a texto de 24 px em 1024 × 768.
-- Caderno com escopo de projeto ou execução, fontes dos arquivos exportados e roteiro do relatório A4.
-- Históricos, revisões, modelos, dados científicos, ícones do autor e splash preservados.
+## Uma investigação que você pode retomar
 
-**[Galeria completa: 84 capturas verificadas](docs/screenshots/0.27.0/README.md)** · [Arquitetura, fluxos e limites](docs/interface-0.27.md) · [Registro de validação](docs/validacao-0.27.json)
+Os projetos reúnem experimentos, anotações e evidências. O histórico permite
+reabrir uma execução, consultar o circuito e reutilizar seus parâmetros como
+base para um novo trabalho. Editar um rascunho preserva os resultados anteriores.
 
-[![Projeto e retomada da investigação](docs/screenshots/0.27.0/01-inicio/03-projeto.png)](docs/screenshots/0.27.0/01-inicio/03-projeto.png)
+O caderno ajuda a registrar a pergunta, a hipótese, o método e a interpretação.
+Para documentar o estudo, exporte dados em **CSV e JSON**, figuras em
+**PNG, SVG e PDF**, animações em **GIF** ou um **relatório científico A4**.
+O pacote ZIP reúne dados e artefatos com as fontes identificadas.
 
-<details>
-<summary>Configuração, circuitos e resultados</summary>
+## Para começar
 
-![Configuração da simulação com prévia e parâmetros](docs/screenshots/0.27.0/03-laboratorio/04-configurar-ruido.png)
+No Windows, [baixe o instalador](https://github.com/ShardGem/Entrela/releases/download/v0.27.0/Entrela-0.27.0-windows-x64-setup.exe)
+e siga a instalação. **Não precisa instalar Python.** A distribuição é para
+Windows 10 21H2 ou posterior e Windows 11, em computadores x64.
 
-![Editor de circuitos e biblioteca de portas](docs/screenshots/0.27.0/03-laboratorio/08-editor.png)
+Na primeira abertura, uma apresentação opcional oferece caminhos para conhecer
+o aplicativo, explorar exemplos ou fazer o tutorial de Bell. Você pode dispensá-la
+e voltar ao guia em **Aprender → Primeiros passos** quando quiser.
 
-![Distribuições e evolução da simulação](docs/screenshots/0.27.0/04-resultados/resultados-graficos.png)
+![Guia inicial do Entrela, com acesso aos projetos, exemplos e tutorial de Bell](docs/screenshots/primeiros-passos/guia-1440.png)
 
-</details>
+Temas claro, grafite e azul, tamanho de texto, densidade e redução de movimento
+podem ser ajustados nas Preferências.
 
-<details>
-<summary>Pesquisa, comparações e histórico</summary>
+## Sobre o projeto
 
-![Mapa de calor calculado a partir da varredura de parâmetros](docs/screenshots/0.27.0/05-pesquisa/resultado-mapa-calor.png)
+O Entrela nasceu como um Trabalho de Conclusão de Curso em Ciência da Computação
+e segue em desenvolvimento. Os resultados são produzidos por simulação clássica
+de sistemas quânticos. A ZNE estima observáveis; não reconstrói um estado mitigado
+nem garante melhoria em todos os cenários.
 
-![Comparação de estados de Bloch de duas execuções](docs/screenshots/0.27.0/05-pesquisa/comparacao-bloch.png)
+As capturas mostram configurações de demonstração calculadas pelo aplicativo.
+A [galeria](docs/screenshots/0.27.0/README.md) reúne mais telas e identifica os
+cenários utilizados.
 
-![Consulta gráfica do circuito no histórico](docs/screenshots/0.27.0/06-acervo/historico-circuito.png)
+---
 
-</details>
-
-As imagens documentam simulações computacionais para demonstrar a interface. As configurações, sementes e estudos utilizados estão na pasta da galeria; não constituem resultados experimentais do TCC.
-
-## Três estilos e base visual compartilhada — 0.22
-
-- **Preferências → Aparência → Tema** oferece Grafite, Claro científico e Azul escuro. Grafite é o padrão; o modo automático alterna entre Grafite e Claro conforme o sistema.
-- **Padrão do tema** aplica a cor de destaque de cada estilo. As personalizações e preferências anteriores continuam válidas.
-- Painéis com contornos mais discretos, abas mais leves e título concentrado na barra superior, preservando descrições e ações locais.
-- Métricas de Resultados em quatro, duas ou uma coluna conforme o espaço e o tamanho do texto.
-- Splash, navegação com nomes e funções científicas preservadas.
-
-Consulte a [galeria dos três estilos](docs/galeria-interface.html) e o [guia com capturas, limites e próximos refinamentos](docs/interface-0.22.md). Para usar a galeria localmente, abra o arquivo HTML da pasta `docs` no navegador.
-
-## Circuitos no histórico e caderno simplificado — 0.21
-
-- **Histórico → Visualizar → Circuito** apresenta o diagrama gráfico em modo de consulta: seleção de operações, explicações, parâmetros, zoom, navegação por teclado e exportação SVG.
-- **Ampliar detalhes** permite consultar o circuito sem a lista de experimentos ocupar a tela. As operações salvas e o experimento aberto no laboratório são preservados.
-- Registros antigos sem operações são identificados como reconstruídos com as bibliotecas atuais; a fase global não é inferida quando não foi registrada junto das operações.
-- Caderno com seções expansíveis e salvamento fora da rolagem; rascunhos e preferências de navegação continuam persistentes.
-- Renderizadores compartilhados para histogramas, métricas e estudos, com rótulos/unidades comuns. Varreduras mantêm sementes separadas e valores ausentes deixam lacunas.
-
-Consulte o [guia da versão](docs/interface-0.21.md) e o [plano de evolução atualizado](docs/plano-evolucao.md).
-
-## Confiabilidade e interpretação dos resultados — 0.20
-
-- Histogramas comparados com escala comum e curvas temporais que preservam picos anteriores; seleção manual e soma dos estados omitidos em **Outros**.
-- Intervalos de Wilson por fator e diagnóstico de poucos shots/contagens extremas na ZNE, sem confundir erro de amostragem com viés da extrapolação.
-- Inspetor do estado global em Resultados e Estados 3D: matriz densidade, coerência, espectro, pureza, entropia e bipartições.
-- Orientações científicas antes de executar e monitor de tarefas com progresso/cancelamento acessível durante a navegação.
-- Editor com execução fixa, portas pesquisáveis por categoria e lista de operações utilizável pelo teclado.
-- Recuperação de caches, proteção contra gravações concorrentes da biblioteca, tutorial retomado com resultados reais e filtro exato por projeto.
-- Backup completo em **Preferências**, com verificação de integridade, prévia e confirmação antes de substituir o espaço de trabalho.
-
-Veja o [plano completo por prioridade](docs/plano-evolucao.md) e o [guia da entrega e suas limitações](docs/confiabilidade-0.20.md).
-
-## Laboratório integrado e clareza científica — 0.19
-
-- Configuração, circuitos, resultados, estados 3D e caderno nas abas do mesmo laboratório, reutilizando as páginas e os rascunhos existentes.
-- Configurações salvas e execuções recentes acessíveis no laboratório; os resultados abrem no próprio ambiente ao concluir.
-- **Estudos e varreduras** explica finalidade, requisitos, unidades e exemplos por parâmetro; configuração, resultados e planejamento ficam separados em abas.
-- **Caderno e configurações** distingue anotações da execução, agrupamento por projeto, parâmetros do formulário e circuitos salvos.
-- Histórico com ação de olho, tooltip **Visualizar**, rótulo acessível e ativação por teclado.
-- Validação de registros internos e artefatos de análise, preservação de evidências anteriores e unidade correta para índices de portas.
-
-Consulte a [auditoria técnica prévia](docs/auditoria-0.19.md) e o [guia do laboratório, validação e capturas](docs/laboratorio-0.19.md).
-
-## Revisão da interface — 0.18.1
-
-- Splash original restaurada, preservando o orçamento de três segundos.
-- Grupos do menu abertos por padrão e recolhimento independente.
-- Menu estreito com nomes dos itens visíveis e controle de largura identificado.
-- Criação de circuitos com nomes explicados, orientação de preenchimento e modelos editáveis.
-- Novas mensagens de commit e descrições de atualizações em português brasileiro.
-
-Veja o [guia da revisão e sua validação](docs/revisao-interface-0.18.1.md).
-
-## Interface do laboratório — 0.18
-
-- Configuração, preparação ideal e revisão organizadas no mesmo fluxo; execução e validação sempre acessíveis.
-- Etapas guiadas ou seções recolhíveis com resumo, mantendo os mesmos campos e a precisão dos valores.
-- Campos de ruído e campo magnético exibidos conforme o modelo; unidades, padrões e ajuda contextual.
-- Exemplos existentes acessíveis pela simulação, com confirmação ao substituir um rascunho editado.
-- Abas de parâmetros e revisão em espaços menores; menus e ações adaptados a fontes maiores.
-- Paleta sóbria, superfícies consistentes e componentes compartilhados nos temas claro e escuro.
-
-Veja o [guia da interface 0.18, capturas e validação](docs/interface-0.18.md).
-
-## Consolidação e recuperação — 0.17
-
-- Foco 3D pode ser desfeito com outro clique, pelo botão de foco ou por **Restaurar câmera**; até quatro qubits por linha.
-- Recuperação automática de circuito, formulário, anotações e protocolo; até dez rascunhos anteriores do editor.
-- Importação de estudos ZIP com hashes verificados, vínculos restaurados e cópias independentes dos registros.
-- **Reexecutar** e **Reproduzir ZNE** registram verificação numérica, separada da igualdade de contagens.
-- Durações térmicas configuráveis para portas 1q/2q; arquivos anteriores preservam o padrão de 50 ns.
-- Comparação de passos/ordem Trotter com referência exata, mantida na exportação e importação.
-
-Veja o [guia da versão 0.17, limites e próximos passos](docs/evolucao-0.17.md).
-
-## Plataforma científica — 0.16
-
-- Nome e descrição na criação; objetivo, hipótese, metodologia, categorias e notas no caderno do experimento.
-- Histórico mestre-detalhe com **Visualizar**, pesquisa, filtros, ordenação e escolha de colunas.
-- Comparações com abas acessíveis e carregamento sob demanda; estados vazios explicam dados ausentes.
-- Biblioteca de circuitos com revisões, multisseleção e copiar/colar; ângulos preservam precisão integral.
-- Foco 3D sincronizado, probabilidades com precisão numérica e linha do tempo que explicita a granularidade dos snapshots.
-- Biblioteca de 15 conceitos com matemática, exercícios, referências e circuitos demonstrativos.
-- PDF A4 uniforme, texto vetorial, imagens a 300 DPI por padrão e seleção de seções.
-- Tema automático, cores de destaque, densidade, contraste, redução de movimento e preferências persistentes; novo ícone Entrela e splash de três segundos.
-
-Consulte a [auditoria anterior às alterações](docs/auditoria-plataforma-0.16.md) e o [guia de uso, validação e escopo](docs/evolucao-0.16.md).
-
-## Interface e navegação — 0.15
-
-Navegação em quatro grupos recolhíveis: **Começar**, **Laboratório**, **Pesquisa** e **Organização**. O grupo da página ativa abre automaticamente, inclusive ao navegar por comandos ou tutoriais. Preferências ficam no rodapé. A barra pode ser expandida ou recolhida pelo botão do menu.
-
-Fonte padrão maior, áreas de clique ampliadas e ícones SVG vetoriais adaptados à escala da tela. O antigo padrão de 13 px migra uma vez para 15 px; preferências manuais diferentes são mantidas. O tamanho continua ajustável em Preferências.
-
-Veja [detalhes e capturas da interface 0.15](docs/interface-0.15.md).
-
-## Estudos e documentação — 0.14
-
-- **Análises**: protocolos com pergunta, hipótese, controles e referência no TCC; revisões preservadas e reprodução com as opções registradas.
-- Mapas de calor de dois parâmetros, estabilidade ZNE com viés/variância e comparação sob orçamento equivalente de shots.
-- **Comparações**: carregar estados e curvas em segundo plano; gráficos, Bloch A/B, câmeras e snapshots sincronizados, configurações e observáveis ZNE.
-- **Documentação**: pacote ZIP com dados integrais, gráficos PNG/SVG/PDF, tabelas LaTeX, PDF, GIF e sequência PNG de snapshots reais, protocolos, manifesto de origem e hashes.
-- **Evolução 3D**: exportação da vista atual PNG/SVG/PDF com câmera e snapshot registrados.
-
-Para usar: abra uma execução, planeje o estudo em **Análises**, carregue A/B em **Comparações** e exporte em **Documentação**. O GIF usa tempo didático e nunca interpola estados.
-
-Consulte [manual, referências científicas e limites da versão 0.14](docs/evolucao-0.14.md).
-
-## Pesquisa e experiência de uso — 0.13
-
-- Guiado mostra uma etapa por vez; Avançado reúne as categorias e oculta a navegação de etapas. Ambos preservam os mesmos parâmetros.
-- Início explica o fluxo científico; campos têm ajuda e uma prévia descritiva do estado inicial.
-- Em **Projetos**, dê um nome à execução selecionada e registre hipótese, projeto, tags e observações. O ID técnico e o resultado permanecem preservados.
-- Em **Análises**, escolha **Trotter × ruído** para comparar ideal e ruidoso contra a evolução exata, ou **Benchmark de mitigação** para comparar erro de ⟨Z⟩, custos e tempos.
-- O benchmark compara sem mitigação, ZNE linear/quadrática (variantes da mesma técnica) e verificação de paridade Z quando o estado ideal tem paridade determinística. Fidelidade de ZNE fica indisponível, pois o método não reconstrói um estado.
-- Análises podem ser canceladas, reabertas pelo histórico da fonte e reproduzidas com as opções registradas. Exportação CSV acompanha `.metadata.json`; preserve os dois arquivos.
-- CSV de resultados inclui configuração e proveniência. O pacote ZIP inclui a análise selecionada e as anotações; o relatório HTML/PDF inclui curvas reais, referências e limitações.
-- Cálculos dos relatórios rodam fora da thread gráfica; caches limitados evitam repetir derivações de Bloch e desenhos de probabilidades.
-
-Veja [uso, metodologia e limites da versão 0.13](docs/evolucao-0.13.md). Os dados produzidos para validar a aplicação não substituem o protocolo experimental do TCC.
-
-## Circuitos interativos — 0.12
-
-A tela agora oferece diagrama vetorial com inspeção de portas e um editor com paleta, parâmetros, fase global, controles/alvos, arraste, undo/redo e execução Qiskit/Aer. Importa/exporta circuito JSON e OpenQASM 2; exporta SVG. Circuitos editados geram novos registros, sem alterar as execuções de origem.
-
-A área 3D também ganhou ampliação, seleção por clique, pan com Shift e métricas sincronizadas. Veja [manual e imagens da versão 0.12](docs/circuitos-interativos-0.12.md).
-
-## Visualização 3D e estabilidade
-
-A correção do fechamento, o painel de zoom vertical e os controles de câmera estão descritos em [docs/correcao-bloch.md](docs/correcao-bloch.md), com imagem e instruções de atualização no Windows.
-
-As propostas de novas funcionalidades estão em [Próximos ajustes](docs/proximos-ajustes.md).
-
-## Evolução 0.11
-
-A entrega e os limites de validação estão em [docs/evolucao-0.11.md](docs/evolucao-0.11.md).
-
-- Reprodução para no último snapshot; loop explícito, slider sincronizado e rastros derivados da trajetória real.
-- Câmera com zoom por roda, pan, reset e foco por qubit; Bloch e probabilidades ideal × ruidoso no mesmo instante.
-- Parâmetros importados mantêm precisão; **Reexecutar** usa a semente efetiva da execução selecionada.
-- **Análises**: métricas temporais, evolução exata, convergência Trotter, correlações, entropia e negatividade.
-- Varreduras com até 20 pontos, cinco sementes e 50 execuções; cancelamento entre pontos, CSV/JSON e análises reabertas pelo histórico da fonte.
-- ZNE com gráfico, referência ideal de Z, erros absolutos, resíduos e graus de liberdade.
-- Tema claro/escuro, fonte ajustável, navegação compacta e apresentação em tela cheia por **F11**.
-- Histórico paginado, resumos leves, salvamento automático em segundo plano, projetos, notas e modelos pessoais.
-- Relatórios acadêmicos **HTML/PDF** e distribuição Python com assets e comando `entrela`.
-
-Na página **Análises**, escolha o tipo e clique em **Calcular análise**. A análise temporal requer snapshots.
-As análises usam a execução selecionada; as configurações de varredura não modificam seus resultados.
-Clique em uma linha ou ponto da curva temporal para selecionar o mesmo snapshot em **Evolução 3D**.
-Em varreduras, use ponto decimal e vírgulas entre valores: `0, 0.01, 0.05`.
-
-Para instalar o pacote a partir do checkout:
-
-```bash
-python -m pip install .
-entrela
-```
-
-Para construir e validar o wheel fora do checkout:
-
-```bash
-python -m pip wheel --no-deps . -w dist
-python scripts/package_smoke.py dist/entrela-0.21.0-py3-none-any.whl
-```
-
-O wheel requer Python e as dependências Qt/Qiskit; não é um executável autossuficiente.
-
-## Na nuvem
-
-```bash
-cd /workspace/Entrela
-bash scripts/cloud-install.sh
-bash scripts/cloud-start.sh
-```
-
-Sem display, o Qt funciona em modo offscreen para testes. Não há servidor web ou prévia localhost.
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 /workspace/.venvs/entrela/bin/python -m pytest -q -p no:cacheprovider
-PYTHONDONTWRITEBYTECODE=1 /workspace/.venvs/entrela/bin/python scripts/cloud_smoke.py
-```
-
-## Desenvolvimento local
-
-Para usar o arquivo de dependências de desenvolvimento `requirements.txt`, utilize Python 3.12 ou superior. Crie um ambiente virtual e ative-o conforme seu sistema:
-
-```bash
-python -m venv .venv
-# Linux/macOS: source .venv/bin/activate
-# PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pip install --no-deps -e .
-python app.py
-```
-
-A instalação e os testes desta entrega foram executados em Linux, Python 3.12, Qiskit 2.4.1, Aer 0.17.2 e PySide6 6.11.1.
-
-## Usar o aplicativo
-
-Comece pela galeria ou pelo tutorial. Para preparar Bell manualmente, use dois qubits,
-estado inicial Bell, J=0, h=0 e ruído desligado. Ative os snapshots para visualizar a evolução.
-
-O modo Guiado permite navegar livremente por Sistema, Hamiltoniano, Evolução, Ruído e Execução.
-Trocar para Avançado mantém os campos e valores. O tutorial só avança após reconhecer suas ações,
-inclusive executar de verdade e reabrir o resultado pelo histórico.
-
-Cada execução tem configuração imutável e identificador próprio. Alterar o formulário não modifica
-resultados anteriores. Rascunhos válidos e a preferência de modo são restaurados ao reabrir.
-JSON versão 2 preserva estados complexos, contagens, tempos, sementes e versões. Arquivos legados
-de contagens continuam legíveis; arquivos corrompidos são preservados e reportados.
-Na nuvem, os dados ficam por padrão em /workspace/.local/share/entrela/experiments.
-ENTRELA_DATA_DIR permite escolher outro diretório; no desktop, o padrão é ~/.entrela/experiments.
-
-## Convenções científicas
-
-Ising: **H = +J ΣZZ + h ΣX**; J positivo favorece antialinhamento no termo ZZ.
-O tempo de evolução é adimensional, com ℏ=1. T₁ e T₂ são informados em µs e devem
-satisfazer **T₂ ≤ 2T₁**, com ambos positivos. O modelo térmico educativo usa 50 ns por porta;
-o ruído incide nas operações, inclusive de preparação, e não representa calibração de hardware.
-
-A fidelidade compara o mesmo circuito Suzuki–Trotter ideal e ruidoso, e não o erro de Trotter
-contra a evolução exata. Pureza global e local são distintas. Os gráficos de evolução e Bloch
-usam snapshots realmente simulados, sem interpolação tratada como física.
-
-ZNE extrapola Z de um qubit e não reconstrói um estado mitigado. Não há garantia de melhoria.
-As estimativas não são truncadas ao intervalo físico; o erro padrão mostrado descreve amostragem.
-A análise gera outro registro e preserva as contagens e métricas da execução de origem.
-
-## Preservação do trabalho
-
-O código deve estar registrado em commits e confirmado no remoto antes de trocar de ambiente.
-Publicar um ambiente é diferente de enviar commits ao GitHub. Scripts e instruções de configuração
-ficam versionados junto ao aplicativo.
-
-Ver [escopo e validação](docs/entrega-workspace.md) e [visão de produto](docs/design-produto.md).
+Feito com **Python, PySide6, Qiskit e Aer**.
+[Arquitetura e fluxo de trabalho](docs/interface-0.27.md) ·
+[Convenções e limites científicos](docs/evolucao-0.14.md) ·
+[Compilação para Windows](docs/compilar-windows.md) ·
+[Relatar um problema](https://github.com/ShardGem/Entrela/issues)
