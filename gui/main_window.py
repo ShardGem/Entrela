@@ -56,6 +56,7 @@ from gui.controllers.appearance import apply_appearance
 from gui.palettes import DARK
 from gui.controllers.drafts import DraftController
 from gui.controllers.projects import ProjectController
+from gui.controllers.onboarding import OnboardingController
 from gui.pages.catalog import CatalogPage
 from gui.pages.notebook import NotebookPage
 from gui.theme import PALETTE
@@ -202,6 +203,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 "Armazenamento indisponível: " + self._storage_error
             )
+        self.onboarding = OnboardingController(self)
 
     def _build_ui(self):
         root = QWidget()
@@ -411,6 +413,8 @@ class MainWindow(QMainWindow):
             ("new", "Novo experimento", "criar Hamiltoniano circuito"),
             ("import", "Importar experimento ou estudo", "abrir arquivo JSON ZIP reprodução"),
             ("tutorial", "Aprender: tutorial de Bell", "primeiro experimento"),
+            ("getting-started", "Como começar: guia de primeiros passos", "ajuda início iniciante aprender tutorial introdução"),
+            ("welcome", "Rever apresentação inicial", "boas vindas começar mostrar ao iniciar tutorial opcional"),
             ("saved-configurations", "Abrir configurações salvas", "parâmetros reutilizáveis Hamiltoniano modelos"),
             ("mode:guided", "Usar modo Guiado", "ajuda etapas"),
             ("mode:advanced", "Usar modo Avançado", "parâmetros"),
@@ -465,6 +469,10 @@ class MainWindow(QMainWindow):
             self._import_experiment()
         elif identifier == "tutorial":
             self._begin_tutorial()
+        elif identifier == "getting-started":
+            self.onboarding.open_guide()
+        elif identifier == "welcome":
+            self.onboarding.show_welcome()
         elif identifier == "saved-configurations":
             self._show_saved_configurations()
         elif identifier == 'project-new':
@@ -488,11 +496,7 @@ class MainWindow(QMainWindow):
             if key not in CONCEPT_BY_KEY:
                 return
             page = self.page_docs
-            page.search.clear()
-            for row in range(page.concept_list.count()):
-                if page.concept_list.item(row).data(Qt.UserRole) == key:
-                    page.concept_list.setCurrentRow(row)
-                    break
+            page.select_concept(key)
             self._show_page("docs")
             page.browser.setFocus(Qt.OtherFocusReason)
         elif identifier.startswith("mode:"):
@@ -988,6 +992,8 @@ class MainWindow(QMainWindow):
         self.page_analysis.set_running(self._current_worker is not None)
         self._restore_camera_preferences()
         self._refresh_saved_analyses()
+        if hasattr(self, 'onboarding'):
+            self.onboarding.refresh_context()
 
     def _save_current(self):
         if self._current_experiment is None or self._storage_worker is not None:

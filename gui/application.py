@@ -19,6 +19,7 @@ def main():
     splash.show()
     app.processEvents()
     window = MainWindow()
+    window.onboarding.offer_on_startup()
     window.setWindowState(window.windowState() | Qt.WindowMaximized)
     splash.finish_after_minimum(window)
     return app.exec()

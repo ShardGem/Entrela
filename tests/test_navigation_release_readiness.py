@@ -56,10 +56,13 @@ def test_contextual_help_opens_instructions_for_the_current_tool(window, monkeyp
     requested_topics = []
     monkeypatch.setattr(window, '_show_help', requested_topics.append)
     for key, expected in [('analysis', 'Análises'), ('notebook', 'Documentação'),
-                          ('catalog', 'Conceitos'), ('docs', 'Conceitos')]:
+                          ('catalog', 'Conceitos'), ('docs', 'Primeiros passos')]:
         window.sidebar.buttons[key].click()
         window.sidebar.help_button.click()
         assert requested_topics[-1] == expected
+    window.page_docs.select_concept('manual')
+    window.sidebar.help_button.click()
+    assert requested_topics[-1] == 'Conceitos'
 
 
 @pytest.mark.parametrize("query", ["correção", "correcao"])

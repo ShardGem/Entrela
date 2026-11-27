@@ -53,7 +53,7 @@ O par CSV/metadados não constitui uma transação resistente a queda de energia
 
 Não há evidência suficiente para migrar imediatamente o armazenamento para SQLite ou aumentar o limite de qubits. Essas decisões exigem medições de memória, latência e consistência nos cenários esperados da distribuição.
 
-## Verificação desta entrega
+## Verificação da revisão inicial (`95f60df`)
 
 As verificações e capturas são feitas em Linux com Qt offscreen, com repositórios e preferências temporários. Não utilizam os experimentos pessoais do usuário. Dados das capturas são cenários de verificação da interface, não evidências da campanha da monografia.
 
@@ -83,3 +83,25 @@ QT_QPA_PLATFORM=offscreen OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 python script
 ```
 
 Os testes novos exercitam falhas de exportação com recuperação, listagem concorrente do histórico, diagnóstico em diretório do usuário, busca e contexto de projeto, preservação da revisão da Biblioteca, rolagem sem alterar campos, monitor de tarefas e telas científicas compactas. Não demonstram, por si só, compatibilidade de um executável nativo com todas as máquinas Windows.
+
+## Introdução opcional e primeiros passos
+
+A preparação para distribuição passou a incluir uma apresentação inicial com três caminhos: guia de uso, tutorial de Bell e exemplos da Biblioteca. O fechamento por botão, Esc ou controle da janela dispensa a apresentação e devolve o foco ao controle anterior. A preferência de reapresentação é explícita; por padrão, ela aparece uma vez por perfil.
+
+O guia fica em **Aprender → Primeiros passos**, com os tópicos Começar, Preparar, Observar e Guardar. Os acessos correspondem às ferramentas existentes. A prévia de Bell é estrutural e sua previsão é identificada como ideal; os atalhos de resultados dependem de uma execução selecionada. Ler ou concluir o guia não cria experimentos, altera parâmetros ou registra aprendizado como evidência científica.
+
+O tutorial de Bell continua exigindo ações e uma execução compatível. Seus textos agora explicam o motivo de cada etapa e identificam os comandos atuais do Histórico. As proteções contra substituição de rascunho continuam sendo usadas ao iniciá-lo.
+
+`OnboardingController` coordena a apresentação e os acessos; a entrada desktop agenda a oferta somente depois da abertura da janela. A splash mantém seu comportamento. O progresso e as preferências ficam em `onboarding/` no `QSettings`, separados de `tutorial/bell/`; são incluídos pelo mecanismo existente de backup das preferências.
+
+Veja as [capturas da apresentação e do guia](screenshots/primeiros-passos/README.md).
+
+| Verificação do guia | Resultado |
+|---|---|
+| Fluxos de aprendizagem, navegação, tutorial, projetos, interface e splash | **90 testes passaram**, em 2 min 43 s. |
+| Casos próprios da introdução, repetidos sobre o código final | **17 testes passaram**, em 41 s. Incluem dispensa, foco, retomada em outra janela, preservação do rascunho, fontes reais e disposição em três temas/duas escalas. São parte dos 90 casos, não adicionais. |
+| `scripts/cloud_smoke.py` atualizado | Passou: apresentação opcional → guia → exemplos → simulação → tutorial de Bell → histórico → reabertura, além dos quatro cenários de ruído/snapshots, ZNE e JSON já cobertos. |
+| Wheel reconstruído e `scripts/package_smoke.py` atualizado | Passaram fora do checkout, incluindo apresentação, guia retomável, habilitação dos resultados reais e persistência após reabrir. |
+| Capturas | Dez imagens do guia/apresentação em tema Azul Entrela; quatro selecionadas para a documentação. Texto de 24 px e janela de 1024 × 768 incluídos. |
+
+Nesta etapa foi executado o conjunto de regressões relacionado à introdução; a suíte geral de 753 testes acima pertence à revisão inicial. Todas estas verificações continuam sendo em Linux com Qt offscreen. Não houve teste de usabilidade com participantes nem validação de desktop Windows nativo.

@@ -133,6 +133,10 @@ QLabel#PageSubtitle, QLabel#SectionSubtitle, QLabel#LeadText {{ color: {p.text_m
 QLabel#Eyebrow, QLabel#FieldLabel {{ color: {p.text_dim}; font-size: 11px; font-weight: 600; }}
 QLabel#FieldHint {{ color: {p.text_muted}; font-size: 12px; }}
 QLabel#ContextBadge {{ color: {p.primary}; background: {p.primary_faint}; padding: 4px 8px; border-radius: 5px; font-size: 11px; }}
+QPushButton#GuideStep {{ background: transparent; border: 1px solid {p.border}; border-radius: 9px; padding: 7px 12px; }}
+QPushButton#GuideStep:checked {{ background: {p.primary_faint}; color: {p.primary}; border-color: {p.primary}; }}
+QPushButton#GuideStep:hover {{ background: {p.surface_hover}; }}
+QPushButton#GuideStep:focus {{ border: 2px solid {p.primary}; padding: 6px 11px; }}
 QLabel#StateFormula, QLabel#MetricValue, QLabel#MetricCompact {{
     font-family: {FONT_MONO}; font-weight: 500;
 }}

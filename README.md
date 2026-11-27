@@ -18,6 +18,14 @@ O aplicativo mantém acesso direto às ferramentas no menu lateral, organizado e
 
 A [análise de interface, arquitetura e preparação para distribuição](docs/revisao-primeira-distribuicao.md) registra os problemas corrigidos, as verificações desta etapa e os requisitos que faltam para um instalador Windows. O wheel Python continua disponível para validação técnica; a revisão não publica um instalador nativo.
 
+## Primeiros passos no Entrela
+
+Na primeira abertura, uma apresentação opcional oferece três caminhos: conhecer o aplicativo, fazer o primeiro experimento com o tutorial de Bell ou explorar exemplos prontos. **Explorar por conta própria**, Esc e o fechamento da janela dispensam a apresentação. Ela só se repete quando a opção **Mostrar esta apresentação ao iniciar** está marcada.
+
+Em **Aprender → Primeiros passos**, o guia percorre **Começar, Preparar, Observar e Guardar**, com explicações breves, uma prévia da preparação de Bell e atalhos para as ferramentas. O tópico é salvo para retomar depois. O tutorial de Bell mantém seu próprio progresso e verifica ações e resultados calculados pelo simulador.
+
+Para reabrir, use Aprender, o botão **Como começar** na tela de projetos vazia ou procure **Primeiros passos** e **Apresentação inicial** em Buscar. Veja as [capturas do guia e da apresentação](docs/screenshots/primeiros-passos/README.md).
+
 ## Bancada centrada em projetos — 0.27.0
 
 - Navegação por projetos e ferramentas com nomes, busca global e Preferências; a revisão posterior reorganiza esses acessos no menu lateral.

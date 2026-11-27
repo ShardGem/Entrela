@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 
 from core.learning import CONCEPTS, CONCEPT_BY_KEY
 from gui.pages.base import PageBase
+from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.getting_started import GettingStartedGuide
 
 
 def _search_key(text):
@@ -31,6 +33,10 @@ class DocsPage(PageBase):
         )
         self._manual_html = html
         self._selected_key = "manual"
+        self.sections = ContentTabs()
+        self.sections.setAccessibleName('Primeiros passos, conceitos e manual')
+        self.guide = GettingStartedGuide()
+        self.sections.addTab(self.guide, 'Primeiros passos')
         # Both panes own their scrolling. The page itself must not add a second
         # vertical scroll area around the same content.
         self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -79,11 +85,25 @@ class DocsPage(PageBase):
         right.addLayout(action)
         self.splitter.addWidget(detail)
         self.splitter.setSizes([270, 740])
-        self.body().addWidget(self.splitter, 1)
+        self.sections.addTab(self.splitter, 'Conceitos e manual')
+        self.body().addWidget(self.sections, 1)
         self.search.textChanged.connect(self._filter)
         self.concept_list.currentItemChanged.connect(self._select)
         self.demo_button.clicked.connect(self._open_demonstration)
         self._filter("")
+        self.show_guide()
+
+    def show_guide(self):
+        self.sections.setCurrentWidget(self.guide)
+
+    def select_concept(self, key):
+        """Também reabre o detalhe quando o conceito já estava selecionado."""
+        self.search.clear()
+        for row in range(self.concept_list.count()):
+            if self.concept_list.item(row).data(Qt.UserRole) == key:
+                self.concept_list.setCurrentRow(row)
+                self.sections.setCurrentWidget(self.splitter)
+                return
 
     def _filter(self, query):
         selected = self._selected_key
@@ -113,6 +133,7 @@ class DocsPage(PageBase):
         self._select(current)
 
     def _select(self, item, previous=None):
+        self.sections.setCurrentWidget(self.splitter)
         if item is None:
             self._selected_key = ""
             self.browser.setHtml("<h1>Nenhum conceito encontrado</h1><p>Limpe a busca para consultar todos os assuntos.</p>")
@@ -132,6 +153,7 @@ class DocsPage(PageBase):
         """Preserve contextual manual navigation used by previous versions."""
         self.search.clear()
         self.concept_list.setCurrentRow(0)
+        self.sections.setCurrentWidget(self.splitter)
         self.browser.scrollToAnchor(anchor)
 
     def resizeEvent(self, event):

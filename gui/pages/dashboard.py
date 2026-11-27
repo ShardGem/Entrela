@@ -64,6 +64,7 @@ class DashboardPage(PageBase):
     open_history = Signal()
     examples_requested = Signal()
     tutorial_requested = Signal()
+    guide_requested = Signal()
     experiment_selected = Signal(str)
     project_selected = Signal(str)
     project_create_requested = Signal()
@@ -167,6 +168,7 @@ class DashboardPage(PageBase):
         self.first_use = Surface('Seu primeiro experimento')
         start_actions = FlowLayout()
         for key, text, name, icon, signal in [
+            ('guide_button', 'Como começar', 'Abrir o guia de primeiros passos', 'help', self.guide_requested),
             ('examples_button', 'Abrir exemplos', 'Escolher um exemplo da biblioteca', 'book-stack', self.examples_requested),
             ('tutorial_button', 'Iniciar tutorial de Bell', 'Iniciar tutorial de Bell', 'play', self.tutorial_requested),
         ]:

@@ -42,6 +42,14 @@ assert (font_folder/'OFL-Inter.txt').is_file()
 assert (font_folder/'OFL-IBMPlexMono.txt').is_file()
 assert 'SIL OPEN FONT LICENSE' in (font_folder/'OFL.txt').read_text()
 window.show();app.processEvents()
+window.onboarding.show_welcome()
+assert window.onboarding.dialog.isVisible()
+window.onboarding.dialog.skip.click()
+assert window.settings.value('onboarding/welcome_seen',False,type=bool)
+window.onboarding.open_guide()
+assert window.page_docs.sections.currentWidget() is window.page_docs.guide
+window.page_docs.guide.select_step(2)
+assert not window.page_docs.guide.route_buttons['results'].isEnabled()
 for theme in ('dark','light','navy'):
     choice=window.page_settings.theme.findData(theme)
     assert choice>=0
@@ -59,6 +67,7 @@ assert window.repository.load(exp.id).result.counts==exp.result.counts
 assert exp.result.metadata['entrela_version']==core.__version__
 window._current_experiment=exp
 window._display_experiment(exp)
+assert window.page_docs.guide.route_buttons['results'].isEnabled()
 window._show_page('results')
 window.page_results.tabs.setCurrentWidget(window.page_results.state_inspector)
 app.processEvents()
@@ -88,8 +97,10 @@ reopened=MainWindow(window.repository,window.settings)
 assert reopened.page_settings.theme.currentData()=='navy'
 assert reopened.page_circuit.editor.document==custom.config.circuit
 assert reopened.page_circuit.editor.circuit_name.text()=='Recovered packaged circuit'
+assert reopened.page_docs.guide.step==2
+assert reopened.settings.value('onboarding/welcome_seen',False,type=bool)
 reopened.close();splash.close();app.processEvents()
-print('PASS: isolated wheel, assets, Qt workspace, scientific engine, graphical history, state inspector, backup and persistence')
+print('PASS: isolated wheel, assets, optional introduction, resumable guide, Qt workspace, scientific engine, graphical history, state inspector, backup and persistence')
 """
 
 

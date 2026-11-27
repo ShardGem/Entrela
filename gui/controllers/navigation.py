@@ -119,6 +119,8 @@ class NavigationController:
 
     def help_topic(self):
         w = self.window
+        if w._current_page == 'docs' and w.page_docs.sections.currentWidget() is w.page_docs.guide:
+            return 'Primeiros passos'
         if w._current_page == 'simulation':
             return {'system': 'Qubits', 'hamiltonian': 'Hamiltoniano', 'evolution': 'Evolução',
                     'noise': 'Ruído', 'execution': 'Reprodutibilidade'}.get(w.page_simulation.config_panel.current_section, 'Início')

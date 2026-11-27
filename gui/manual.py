@@ -1,6 +1,14 @@
 """Scientific help, shared by the learning page and contextual dock."""
 WELCOME_HTML = """
 <h1 id="Início">Aprender o Entrela</h1>
+<h2 id="Primeiros passos">Primeiros passos, no seu ritmo</h2>
+<p>Em <b>Aprender → Primeiros passos</b>, percorra Começar, Preparar, Observar e Guardar.
+Você pode pular tópicos, sair e retomar depois. Concluir o guia registra apenas a consulta às orientações.
+Para praticar, escolha <b>Fazer o tutorial de Bell</b>: as etapas avançam conforme suas ações e uma execução real.
+O tutorial pode ser pausado e retomado.</p>
+<p>A apresentação inicial é opcional: feche a janela, pressione Esc ou escolha Explorar por conta própria.
+Ela não volta a aparecer automaticamente, a menos que você marque Mostrar esta apresentação ao iniciar.
+Reabra-a pelo guia ou procure Apresentação inicial em Buscar. Consultar o guia não altera seus parâmetros nem executa cálculos.</p>
 <p>Comece em Projetos para abrir uma investigação e retomar um experimento. O menu lateral organiza as ferramentas pelo que você deseja fazer:</p>
 <ul><li><b>Preparar:</b> Simulação configura uma evolução por Hamiltoniano; Circuitos abre o editor de portas.</li>
 <li><b>Explorar:</b> Resultados reúne gráficos, circuito executado, interpretação e dados; Estados 3D mostra os estados locais dos qubits.</li>

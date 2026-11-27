@@ -2,13 +2,13 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QProgressBar
 STEPS=(
-    ("Dois qubits","Altere o número de qubits para 2.","system"),
-    ("Prepare Bell","Escolha Bell em Estado inicial.","system"),
-    ("Referência ideal","Desative o ruído e mantenha J=0 e h=0.","noise"),
-    ("Registre a evolução","Ative Salvar estados ao longo do tempo.","evolution"),
-    ("Execute","Clique em Executar simulação e aguarde o resultado real.","execution"),
-    ("Interprete","Abra Resultados. Observe a distribuição 00/11 e a interpretação.","execution"),
-    ("Reabra","Abra Histórico, use Visualizar para consultar a execução deste tutorial e depois Abrir para reabrir seus resultados.","execution"))
+    ("Dois qubits","Em Sistema, altere o número de qubits para 2. O experimento de Bell precisa de um par de qubits.","system"),
+    ("Prepare Bell","Em Estado inicial, escolha Bell. A preparação ideal usa Hadamard (H) e uma porta controlada (CX) para criar um par emaranhado.","system"),
+    ("Referência ideal","Desative o ruído. Mantenha J=0 e h=0 no Hamiltoniano: assim, a evolução não altera o Bell preparado. Você observará primeiro o caso ideal.","noise"),
+    ("Registre a evolução","Em Evolução, ative Salvar estados ao longo do tempo. Os snapshots são os estados calculados que você poderá percorrer em Resultados e Estados 3D.","evolution"),
+    ("Execute","Revise os shots (amostras de medição), clique em Executar simulação e aguarde. Somente a execução produz os resultados que usaremos nas próximas etapas.","execution"),
+    ("Interprete","Abra Resultados e observe o histograma. A previsão ideal é 50% em 00 e 50% em 11; as contagens podem variar. Consulte também a interpretação da mesma execução.","execution"),
+    ("Reabra","Abra Histórico e encontre esta execução. Use o olho (Visualizar) para consultar os detalhes e depois Abrir resultados. Isso consulta o registro sem calcular novamente.","execution"))
 
 class BellTutorial(QWidget):
     section_requested=Signal(str)
