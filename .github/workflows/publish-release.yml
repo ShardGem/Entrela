@@ -1,0 +1,60 @@
+name: Retomar publicação do release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-release.yml
+      - scripts/publish_release.py
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag já compilada e verificada; em branco, usa a versão atual
+        type: string
+        required: false
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publicar-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Recuperar arquivos verificados e publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ENTRELA_REQUESTED_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Localizar a compilação da tag integrada à main
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENTRELA_TAG="${ENTRELA_REQUESTED_TAG:-$(python -c "import runpy; print('v'+runpy.run_path('core/__init__.py')['__version__'])")}"
+          [[ "$ENTRELA_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          ENTRELA_SHA=$(git rev-list -n 1 "$ENTRELA_TAG")
+          git merge-base --is-ancestor "$ENTRELA_SHA" origin/main
+          ENTRELA_RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml --event push --commit "$ENTRELA_SHA" --limit 20 --json databaseId,status --jq '.[] | select(.status == "completed") | .databaseId')
+          ENTRELA_RUN=''
+          for candidate in $ENTRELA_RUNS; do
+            verified=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate/jobs" --jq 'any(.jobs[]; .name == "Compilar e verificar Windows x64" and .conclusion == "success")')
+            if [[ "$verified" == true ]]; then
+              ENTRELA_RUN="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$ENTRELA_RUN" ]]; then
+            echo 'Nenhuma compilação nativa verificada foi encontrada para a tag.' >&2
+            exit 1
+          fi
+          echo "ENTRELA_TAG=$ENTRELA_TAG" >> "$GITHUB_ENV"
+          gh run download "$ENTRELA_RUN" --repo "$GITHUB_REPOSITORY" --name Entrela-windows-x64 --dir release-assets
+      - name: Conferir os arquivos e retomar o rascunho
+        run: python scripts/publish_release.py --tag "$ENTRELA_TAG" --assets release-assets --repository "$GITHUB_REPOSITORY"
