@@ -16,7 +16,15 @@ Laboratório desktop de simulação quântica com PySide6, Qiskit e Aer.
 
 O aplicativo mantém acesso direto às ferramentas no menu lateral, organizado em **Preparar, Explorar, Investigar e Acervo**. Buscar reúne comandos, projetos, modelos, exemplos e conceitos; os parâmetros científicos e os registros existentes são preservados.
 
-A [análise de interface, arquitetura e preparação para distribuição](docs/revisao-primeira-distribuicao.md) registra os problemas corrigidos, as verificações desta etapa e os requisitos que faltam para um instalador Windows. O wheel Python continua disponível para validação técnica; a revisão não publica um instalador nativo.
+A [análise de interface, arquitetura e preparação para distribuição](docs/revisao-primeira-distribuicao.md) registra os problemas corrigidos e as verificações. O [roteiro de compilação Windows](docs/compilar-windows.md) explica como gerar o executável, o ZIP portátil e o instalador com as dependências incluídas.
+
+No Windows x64 com Python 3.12 e Inno Setup 6 instalados:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 -Installer
+```
+
+Os arquivos ficam em `dist/release/`. O workflow **Distribuição Windows** também compila e verifica os binários no GitHub Actions; uma tag de versão integrada à `main` aciona a publicação do release.
 
 ## Primeiros passos no Entrela
 
