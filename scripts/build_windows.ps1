@@ -30,7 +30,12 @@ try {
     $entrelaCheck = Join-Path $entrelaRoot 'build\native\verificacao.json'
     $entrelaExe = Join-Path $entrelaRoot 'dist\Entrela\Entrela.exe'
     $entrelaProcess = Start-Process -FilePath $entrelaExe -ArgumentList @('--verificar-pacote', "`"$entrelaCheck`"") -Wait -PassThru
-    if ($entrelaProcess.ExitCode -ne 0) { throw "Falha ao verificar o executável. Consulte $entrelaCheck" }
+    if ($entrelaProcess.ExitCode -ne 0) {
+        if (Test-Path $entrelaCheck) { Get-Content $entrelaCheck -Raw -Encoding UTF8 | Write-Host }
+        $entrelaLog = [IO.Path]::ChangeExtension($entrelaCheck, '.log')
+        if (Test-Path $entrelaLog) { Get-Content $entrelaLog -Raw -Encoding UTF8 | Write-Host }
+        throw "Falha ao verificar o executável. Consulte $entrelaCheck"
+    }
     $entrelaReceipt = Get-Content $entrelaCheck -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $entrelaReceipt.success -or -not $entrelaReceipt.frozen) { throw 'A verificação não confirmou um executável independente.' }
     Copy-Item $entrelaCheck (Join-Path $entrelaRelease 'verificacao-portatil.json') -Force
@@ -43,7 +48,7 @@ try {
         & $entrelaIscc "/DAppVersion=$entrelaVersion" "/DBundleDir=$entrelaRoot\dist\Entrela" "/DReleaseDir=$entrelaRelease" packaging\Entrela.iss
         if ($LASTEXITCODE -ne 0) { throw 'Falha na criação do instalador.' }
     }
-    Invoke-EntrelaPython -m pip freeze | Set-Content (Join-Path $entrelaRelease 'dependencias-build.txt') -Encoding UTF8
+    Invoke-EntrelaPython -m pip list --format=freeze --exclude-editable | Set-Content (Join-Path $entrelaRelease 'dependencias-build.txt') -Encoding UTF8
     $entrelaHashes = Get-ChildItem $entrelaRelease -File | Where-Object { $_.Extension -in '.zip', '.exe' } | Sort-Object Name | ForEach-Object {
         $entrelaHash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         "$entrelaHash  $($_.Name)"

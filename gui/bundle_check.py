@@ -81,13 +81,15 @@ def check_bundle(report_path):
             export_report(ideal, pdf, raster_dpi=150)
             assert pdf.read_bytes().startswith(b'%PDF-')
             receipt['checks'].append('Histórico gráfico, JSON e relatório PDF')
+            # O backup exige ausência de gravações concorrentes, como no fluxo
+            # da interface. Encerrar a edição também grava e pausa os rascunhos.
+            window._unsaved_result = False
+            window.close()
+            app.processEvents()
             create_workspace_backup(repo.base_dir, base / 'backup.zip', {'onboarding/welcome_seen': True})
             restored = prepare_workspace_restore(base / 'backup.zip', base / 'restored')
             restored.commit()
             assert ExperimentRepository(base / 'restored').load(ideal.id).result.counts == ideal.result.counts
-            window._unsaved_result = False
-            window.close()
-            app.processEvents()
             window = MainWindow(repo, settings)
             assert window.settings.value('onboarding/welcome_seen', False, type=bool)
             assert len(repo.list_all()) == 2
