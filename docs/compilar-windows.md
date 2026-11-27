@@ -61,4 +61,6 @@ git push origin v0.27.0
 
 A tag precisa coincidir com a versão do motor e apontar para um commit da `main`. O workflow compila, testa e publica o release com instalador, ZIP, hashes e recibos. Se uma verificação falhar, a publicação não acontece; consulte **Actions → Distribuição Windows**.
 
+Se a compilação terminar e apenas o envio dos anexos falhar, use **Actions → Retomar publicação do release → Run workflow** na `main`, indicando a tag. Essa recuperação usa os arquivos da compilação nativa já verificada, confere os hashes e os dois recibos Windows e retoma o rascunho antes de publicá-lo. Logs vazios não são anexados. Releases já publicados são preservados. Mudanças no script de publicação também acionam essa recuperação para a versão atual.
+
 Para outra versão, atualize os identificadores em `core/__init__.py` e `pyproject.toml`, acrescente `docs/releases/vNOVA_VERSAO.md` e use a tag correspondente. Preserve tags e arquivos já publicados.
