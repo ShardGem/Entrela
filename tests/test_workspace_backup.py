@@ -126,6 +126,45 @@ def test_backup_excludes_transient_locks_and_staging_but_keeps_empty_folders(tmp
         prepared.abort()
 
 
+def test_backup_uses_consistent_handle_metadata_when_path_metadata_is_stale(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    root = tmp_path / 'runs'
+    root.mkdir()
+    source = root / 'nota.txt'
+    source.write_bytes(b'observacoes preservadas')
+    original = Path.lstat
+
+    def stale_information(path, *args, **kwargs):
+        information = original(path, *args, **kwargs)
+        if path == source:
+            return SimpleNamespace(st_mode=information.st_mode, st_dev=information.st_dev,
+                                   st_ino=information.st_ino, st_size=information.st_size,
+                                   st_mtime_ns=information.st_mtime_ns - 100,
+                                   st_ctime_ns=information.st_ctime_ns)
+        return information
+
+    monkeypatch.setattr(Path, 'lstat', stale_information)
+    archive = create_workspace_backup(root, tmp_path / 'backup.zip', {})
+    with zipfile.ZipFile(archive) as saved:
+        assert saved.read('workspace/nota.txt') == b'observacoes preservadas'
+
+
+def test_backup_flushes_with_a_writable_descriptor(tmp_path, workspace, monkeypatch):
+    import os
+    from data import workspace_backup
+    original = workspace_backup.os.fsync
+
+    def require_write_access(descriptor):
+        # Escrever zero bytes preserva o arquivo, mas rejeita um descritor
+        # somente de leitura, reproduzindo a exigência do Windows para fsync.
+        assert os.write(descriptor, b'') == 0
+        original(descriptor)
+
+    monkeypatch.setattr(workspace_backup.os, 'fsync', require_write_access)
+    archive = create_workspace_backup(workspace, tmp_path / 'backup.zip', {})
+    assert zipfile.is_zipfile(archive)
+
+
 @pytest.mark.parametrize("relative", ["corrompido.json", ".workspace/workspace.json", "novo.zip"])
 def test_internal_backup_destination_is_rejected_without_changing_sources(workspace, relative):
     before = source_bytes(workspace)

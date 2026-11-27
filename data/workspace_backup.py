@@ -126,6 +126,13 @@ def _snapshot(root, excluded):
             information = path.lstat()
             if not stat.S_ISREG(information.st_mode):
                 raise ValueError("O backup aceita apenas arquivos regulares, sem links ou dispositivos.")
+            # Use a mesma API do descritor durante a captura e a cópia. No
+            # Windows, os metadados consultados por nome podem divergir dos
+            # retornados pelo handle recém-aberto, sem alteração do conteúdo.
+            with path.open("rb") as source:
+                information = os.fstat(source.fileno())
+            if not stat.S_ISREG(information.st_mode):
+                raise ValueError("O backup aceita apenas arquivos regulares, sem links ou dispositivos.")
             relative = path.relative_to(root).as_posix()
             _relative_name(relative)
             if relative.casefold() in aliases:
@@ -217,7 +224,8 @@ def create_workspace_backup(base_dir, destination, preferences, *, progress=None
                 archive.writestr("manifest.json", manifest_data)
             if temporary.stat().st_size > MAX_ARCHIVE_BYTES:
                 raise ValueError("O arquivo de backup excede o limite de 2 GB.")
-            with temporary.open("rb") as stream:
+            # FlushFileBuffers/_commit exige acesso de escrita no Windows.
+            with temporary.open("r+b") as stream:
                 os.fsync(stream.fileno())
             _checkpoint(progress, is_cancelled, 99)
             temporary.replace(destination)
