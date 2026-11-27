@@ -86,6 +86,22 @@ def check_bundle(report_path):
             window._unsaved_result = False
             window.close()
             app.processEvents()
+            # Registra diferenças de stat/fstat do sistema operacional apenas
+            # no recibo técnico; não altera a validação dos arquivos do backup.
+            from data.workspace_backup import _signature
+            signature_differences = []
+            for file_path in sorted(repo.base_dir.rglob('*')):
+                if not file_path.is_file() or file_path.name == '.entrela.lock':
+                    continue
+                import os
+                path_signature = _signature(file_path.lstat())
+                with file_path.open('rb') as source:
+                    handle_signature = _signature(os.fstat(source.fileno()))
+                if path_signature != handle_signature:
+                    signature_differences.append(dict(file=file_path.relative_to(repo.base_dir).as_posix(),
+                                                     path=path_signature, handle=handle_signature))
+            if signature_differences:
+                receipt['stat_differences'] = signature_differences
             create_workspace_backup(repo.base_dir, base / 'backup.zip', {'onboarding/welcome_seen': True})
             restored = prepare_workspace_restore(base / 'backup.zip', base / 'restored')
             restored.commit()
