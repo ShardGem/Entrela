@@ -1,0 +1,45 @@
+{
+  "version": "0.24.1",
+  "platform": "Linux · Qt offscreen",
+  "tests": {
+    "passed": 69,
+    "seconds": 112.87
+  },
+  "checks": [
+    {
+      "step": "galeria",
+      "exit": 0,
+      "seconds": 33.75
+    },
+    {
+      "step": "integridade",
+      "exit": 0,
+      "seconds": 0.07
+    },
+    {
+      "step": "wheel",
+      "exit": 0,
+      "seconds": 0.82
+    },
+    {
+      "step": "pacote",
+      "exit": 0,
+      "seconds": 5.23
+    },
+    {
+      "step": "fluxos",
+      "exit": 0,
+      "seconds": 9.13
+    },
+    {
+      "step": "dependencias",
+      "exit": 0,
+      "seconds": 0.23
+    }
+  ],
+  "wheel_python_modules": 120,
+  "captures": 66,
+  "limits": [
+    "Validação visual manual nativa no Windows pendente."
+  ]
+}

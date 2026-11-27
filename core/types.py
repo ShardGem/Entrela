@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from math import isfinite
 from typing import Literal
 from uuid import uuid4
+from core.circuit_document import CircuitDocument
 
 HamiltonianType = Literal["Ising", "Heisenberg", "XY", "XXZ", "Custom"]
 NoiseType = Literal["Despolarizador", "Termico"]
@@ -78,6 +79,8 @@ class NoiseConfig:
     p2: float = 0.05
     t1_us: float = 50.0
     t2_us: float = 30.0
+    gate_time_1q_ns: float = 50.0
+    gate_time_2q_ns: float = 50.0
 
     def validate(self):
         if type(self.enabled) is not bool or self.kind not in (
@@ -85,7 +88,7 @@ class NoiseConfig:
             "Termico",
         ):
             raise ValueError("Modelo de ruído inválido")
-        for name in ("p1", "p2", "t1_us", "t2_us"):
+        for name in ("p1", "p2", "t1_us", "t2_us", "gate_time_1q_ns", "gate_time_2q_ns"):
             finite(getattr(self, name), name)
         if not self.enabled:
             return
@@ -96,6 +99,8 @@ class NoiseConfig:
                 if not 0 <= value <= 1:
                     raise ValueError(f"{name} deve estar em [0, 1]")
         else:
+            if self.gate_time_1q_ns <= 0 or self.gate_time_2q_ns <= 0:
+                raise ValueError("Durações das portas térmicas devem ser positivas")
             finite(self.t1_us, "T₁")
             finite(self.t2_us, "T₂")
             if self.t1_us <= 0 or self.t2_us <= 0:
@@ -113,8 +118,21 @@ class ExperimentConfig:
     noise: NoiseConfig
     shots: int = 8192
     seed: int | None = None
+    circuit: CircuitDocument | None = None
 
     def validate(self):
+        if self.circuit is not None:
+            self.circuit.validate()
+            if self.protocol.trotter_steps != max(
+                1, len(self.circuit.gates)
+            ) or self.protocol.total_time != float(max(1, len(self.circuit.gates))):
+                raise ValueError(
+                    "Circuitos livres usam índices das portas no protocolo"
+                )
+            if self.circuit.num_qubits != self.system.num_qubits:
+                raise ValueError(
+                    "Circuito e sistema têm quantidades diferentes de qubits"
+                )
         self.system.validate()
         self.protocol.validate()
         self.noise.validate()
@@ -135,6 +153,9 @@ def config_from_dict(raw):
             NoiseConfig(**raw["noise"]),
             raw.get("shots", 8192),
             raw.get("seed"),
+            CircuitDocument.from_dict(raw["circuit"])
+            if raw.get("circuit") is not None
+            else None,
         )
         config.validate()
         return config
@@ -185,3 +206,7 @@ def resource_estimate(config):
     stored = (snapshots + 1) * (dim * dim if config.noise.enabled else dim)
     stored += (snapshots + 1) * dim
     return {"snapshots": snapshots, "state_bytes": stored * 16}
+
+
+def system_label(config):
+    return "Circuito livre" if config.circuit is not None else config.system.hamiltonian

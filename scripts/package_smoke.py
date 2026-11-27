@@ -16,29 +16,104 @@ assert Path(gui.__file__).is_relative_to(sys.argv[1])
 assert Path(core.__file__).is_relative_to(sys.argv[1])
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QPixmap
-from gui.splash import SplashScreen,_ASSETS
+from PySide6.QtGui import QPixmap, QFontInfo
+from gui.splash import SplashScreen
+from gui.branding import application_icon, configure_application_identity
 from gui.main_window import MainWindow
 from data.repository import ExperimentRepository
 from core.examples import create_example_config
 from core.simulation import run_experiment
 from dataclasses import replace
 app=QApplication([])
-assert not QPixmap(str(_ASSETS/'entrela_logo.png')).isNull()
+configure_application_identity(app)
+assert not application_icon().pixmap(16,16).isNull()
+assert not application_icon().pixmap(256,256).isNull()
+assert (Path(gui.__file__).parent/'assets/icons/entrela.ico').is_file()
 splash=SplashScreen()
+assert not splash.logo.pixmap.isNull()
+assert not splash.text.pixmap().isNull()
 window=MainWindow(ExperimentRepository('data'),QSettings('prefs.ini',QSettings.IniFormat))
+assert 'Inter' == QFontInfo(window.topbar.title.font()).family()
+font_folder=Path(gui.__file__).parent/'assets/fonts'
+for weight in ('Regular', 'Medium', 'SemiBold'):
+    assert (font_folder/f'Inter-{weight}.ttf').is_file()
+assert (font_folder/'IBMPlexMono-Regular.ttf').is_file()
+assert (font_folder/'OFL-Inter.txt').is_file()
+assert (font_folder/'OFL-IBMPlexMono.txt').is_file()
+assert 'SIL OPEN FONT LICENSE' in (font_folder/'OFL.txt').read_text()
 window.show();app.processEvents()
+window.onboarding.show_welcome()
+assert window.onboarding.dialog.isVisible()
+window.onboarding.dialog.skip.click()
+assert window.settings.value('onboarding/welcome_seen',False,type=bool)
+window.onboarding.open_guide()
+assert window.page_docs.sections.currentWidget() is window.page_docs.guide
+window.page_docs.guide.select_step(2)
+assert not window.page_docs.guide.route_buttons['results'].isEnabled()
+for theme in ('dark','light','navy'):
+    choice=window.page_settings.theme.findData(theme)
+    assert choice>=0
+    window.page_settings.theme.setCurrentIndex(choice)
+    app.processEvents()
+    assert window.property('entrelaTheme')==theme
+for key in window.page_workspace.KEYS:
+    window._show_page(key)
+    assert window.stack.currentWidget() is window.page_workspace
+    assert window.page_workspace.tabs.currentWidget() is window.pages[key]
+    assert window.is_page_active(key)
 exp=run_experiment(replace(create_example_config('bell'),shots=64))
 window.repository.save(exp)
 assert window.repository.load(exp.id).result.counts==exp.result.counts
-assert exp.result.metadata['entrela_version']=='0.11.0'
-window.close();splash.close();app.processEvents()
-print('PASS: isolated wheel, packaged assets, Qt window, scientific engine and persistence')
+assert exp.result.metadata['entrela_version']==core.__version__
+window._current_experiment=exp
+window._display_experiment(exp)
+assert window.page_docs.guide.route_buttons['results'].isEnabled()
+window._show_page('results')
+window.page_results.tabs.setCurrentWidget(window.page_results.state_inspector)
+app.processEvents()
+assert abs(window.page_results.state_inspector.quantities['purity']-1)<1e-10
+window.page_history.load([exp])
+window.page_history.set_detail(exp,files=[])
+window.page_history.circuit.select_operation(0)
+assert not window.page_history.circuit.canvas.editable
+assert 'Hadamard' in window.page_history.circuit.details.text()
+from core.circuit_document import CircuitDocument,CircuitGate
+from core.types import ExperimentConfig,SystemConfig,SimulationProtocol,NoiseConfig
+custom=run_experiment(ExperimentConfig(SystemConfig(2,J=0,h=0),SimulationProtocol(2,2,True),NoiseConfig(False),64,42,CircuitDocument(2,(CircuitGate('h',(0,)),CircuitGate('cx',(0,1))),.3)))
+window.repository.save(custom)
+assert window.repository.load(custom.id).config.circuit==custom.config.circuit
+window.page_circuit.show_experiment(custom)
+window.page_circuit._copy_to_editor()
+assert window.page_circuit.editor.document==custom.config.circuit
+window.page_circuit.editor.circuit_name.setText('Recovered packaged circuit')
+window.close();app.processEvents()
+from data.workspace_backup import create_workspace_backup,prepare_workspace_restore
+create_workspace_backup('data','backup.zip',{'appearance/theme':'dark'})
+prepared=prepare_workspace_restore('backup.zip','restored-data')
+assert prepared.preview.experiments==2
+assert prepared.commit()=={'appearance/theme':'dark'}
+assert ExperimentRepository('restored-data').load(exp.id).result.counts==exp.result.counts
+reopened=MainWindow(window.repository,window.settings)
+assert reopened.page_settings.theme.currentData()=='navy'
+assert reopened.page_circuit.editor.document==custom.config.circuit
+assert reopened.page_circuit.editor.circuit_name.text()=='Recovered packaged circuit'
+assert reopened.page_docs.guide.step==2
+assert reopened.settings.value('onboarding/welcome_seen',False,type=bool)
+reopened.close();splash.close();app.processEvents()
+print('PASS: isolated wheel, assets, optional introduction, resumable guide, Qt workspace, scientific engine, graphical history, state inspector, backup and persistence')
 """
 
 
 def main():
-    wheel = Path(sys.argv[1]).resolve()
+    if len(sys.argv) > 1:
+        wheel = Path(sys.argv[1]).resolve()
+    else:
+        import tomllib
+        root = Path(__file__).resolve().parents[1]
+        version = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))['project']['version']
+        wheel = root / 'dist' / f'entrela-{version}-py3-none-any.whl'
+    if not wheel.is_file():
+        raise FileNotFoundError(f'Gere o wheel da versão atual antes de validar: {wheel}')
     with TemporaryDirectory(prefix="entrela-wheel-") as temp:
         target = Path(temp) / "installed"
         with ZipFile(wheel) as archive:

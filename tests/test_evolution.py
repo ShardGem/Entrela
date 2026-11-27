@@ -175,9 +175,9 @@ def test_history_uses_summary_without_decoding_states(tmp_path, bell, monkeypatc
 def test_summary_invalidates_after_source_changes(tmp_path, bell):
     repo = ExperimentRepository(tmp_path)
     path = repo.save(bell)
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
     raw["result"]["metadata"] = None
-    path.write_text(json.dumps(raw))
+    path.write_text(json.dumps(raw), encoding="utf-8")
     assert repo.list_summaries() == []
     assert repo.load_errors
 
@@ -228,12 +228,13 @@ def test_gui_analysis_rerun_and_library(window):
 def test_preferences_theme_and_restart(window, qt_app):
     from gui.main_window import MainWindow
     from gui.theme import PALETTE
+    from gui.palettes import LIGHT
 
     window.page_settings.theme.setCurrentIndex(1)
     window.page_settings.font_size.setValue(15)
     window.page_bloch.speed_combo.setCurrentText("2x")
     window.page_bloch.loop.setChecked(True)
-    assert PALETTE.bg == "#f3f6fb"
+    assert PALETTE.bg == LIGHT['bg']
     repo, settings = window.repository, window.settings
     window.close()
     other = MainWindow(repo, settings)

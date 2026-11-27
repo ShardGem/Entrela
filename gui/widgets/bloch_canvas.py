@@ -1,0 +1,512 @@
+"""Bloch scene and bounded camera. Drawing and playback never move the camera."""
+
+import math
+from itertools import product
+import numpy as np
+from PySide6.QtCore import Signal
+from matplotlib.backend_bases import MouseEvent, MouseButton
+from matplotlib.figure import Figure
+from gui.theme import PALETTE
+from gui.widgets.figure_canvas import StableFigureCanvas
+from gui.widgets.bloch_projection import BlochAxes3D
+
+
+class BlochCanvas(StableFigureCanvas):
+    interface_surface = "bg_elevated"
+    camera_changed = Signal()
+    focus_changed = Signal(int)
+    qubit_selected = Signal(int)
+    MAX_QUBITS_PER_ROW = 4
+    MIN_ZOOM = 0.5
+    MAX_ZOOM = 3.0
+
+    def __init__(self, parent=None):
+        self.fig = Figure(figsize=(8, 5), facecolor=PALETTE.bg_elevated)
+        super().__init__(self.fig, parent, minimum=(240, 280))
+        self.ax = self.fig.add_subplot(111, projection=BlochAxes3D.name)
+        self.fig.subplots_adjust(0, 0, 1, 1)
+        self._sphere_centers = []
+        self._line_handles = []
+        self._ideal_handles = []
+        self._trail_lines = []
+        self._trail_data = []
+        self._axis_artists = []
+        self._qubit_artists = []
+        self.axes_visible = True
+        self.mouse_enabled = True
+        self.zoom = 1.0
+        self.focus = -1
+        self._pan = np.zeros(3)
+        self._applying_camera = False
+        self._drag = None
+        self._click_origin = None
+        self.selected_qubit = -1
+        self.projection = "persp"
+        self._configure_axes()
+        self.mpl_connect("scroll_event", self._on_scroll)
+        self.mpl_connect("button_press_event", self._on_press)
+        self.mpl_connect("motion_notify_event", self._on_motion)
+        self.mpl_connect("button_release_event", self._end_drag)
+        self.mpl_connect("figure_leave_event", self._end_drag)
+        self.setToolTip(
+            "Roda: zoom · arrastar com botão esquerdo: girar · botão central: mover. "
+            "Clique na esfera em foco para mostrar todos os qubits; Restaurar câmera também desfoca."
+        )
+
+    def _configure_axes(self):
+        self.ax.set_axis_off()
+        self.ax.set_facecolor(PALETTE.bg_elevated)
+        # A single controller owns zoom, pan and rotation, including mouse input.
+        self.ax.mouse_init(rotate_btn=[], pan_btn=[], zoom_btn=[])
+        self.ax.set_autoscale_on(False)
+
+    def setup(self, num_qubits):
+        if not 1 <= num_qubits <= 6:
+            raise ValueError("São suportados de 1 a 6 qubits")
+        self.selected_qubit = -1
+        self.ax.clear()
+        self._configure_axes()
+        columns = min(self.MAX_QUBITS_PER_ROW, num_qubits)
+        rows = int(np.ceil(num_qubits / columns))
+        self._sphere_centers = [
+            (
+                (q % columns - (columns - 1) / 2) * 3.5,
+                0.0,
+                ((rows - 1) / 2 - q // columns) * 3.5,
+            )
+            for q in range(num_qubits)
+        ]
+        self._line_handles = []
+        self._ideal_handles = []
+        self._trail_lines = []
+        self._trail_data = []
+        self._axis_artists = []
+        self._qubit_artists = []
+        u, v = np.meshgrid(np.linspace(0, 2 * np.pi, 49), np.linspace(0, np.pi, 25))
+        for q, c in enumerate(self._sphere_centers):
+            color = getattr(PALETTE, f"q{q + 1}")
+            artists = []
+            wire = self.ax.plot_wireframe(
+                c[0] + np.cos(u) * np.sin(v),
+                c[1] + np.sin(u) * np.sin(v),
+                c[2] + np.cos(v),
+                color=PALETTE.border_strong,
+                rstride=4, cstride=6,
+                linewidth=0.35,
+                alpha=0.4,
+            )
+            artists.append(wire)
+            axes_start = len(self._axis_artists)
+            for axis, label in enumerate("XYZ"):
+                end = np.array(c)
+                end[axis] += 1.3
+                self._axis_artists.extend(
+                    self.ax.plot(*zip(c, end), color=PALETTE.text_dim, linewidth=0.7)
+                )
+                self._axis_artists.append(
+                    self.ax.text(*end, label, color=PALETTE.text_muted, fontsize=9)
+                )
+            artists.extend(self._axis_artists[axes_start:])
+            artists.append(
+                self.ax.text(c[0], c[1], c[2] - 1.45, f"q{q}", color=color, ha="center")
+            )
+            (line,) = self.ax.plot(
+                [],
+                [],
+                [],
+                color=color,
+                linewidth=3,
+                label="Simulado" if q == 0 else None,
+            )
+            (ideal,) = self.ax.plot(
+                [],
+                [],
+                [],
+                "--",
+                color=PALETTE.text,
+                linewidth=1.8,
+                label="Circuito ideal" if q == 0 else None,
+            )
+            (trail,) = self.ax.plot([], [], [], color=color, alpha=0.55, linewidth=1.2)
+            self._line_handles.append(line)
+            self._ideal_handles.append(ideal)
+            self._trail_lines.append(trail)
+            self._trail_data.append([])
+            artists.extend((line, ideal, trail))
+            self._qubit_artists.append(artists)
+        self.ax.legend(
+            loc="upper left",
+            bbox_to_anchor=(0.01, 0.99),
+            bbox_transform=self.fig.transFigure,
+            facecolor=PALETTE.surface,
+            labelcolor=PALETTE.text,
+            fontsize=9,
+        )
+        self.set_axes_visible(self.axes_visible)
+        self.focus = -1
+        self.reset_camera()
+
+    def _bounds(self):
+        centers = np.array(self._sphere_centers or [(0.0, 0.0, 0.0)], dtype=float)
+        if 0 <= self.focus < len(centers):
+            return centers[self.focus].copy(), np.full(3, 1.7)
+        low, high = centers.min(axis=0) - 1.8, centers.max(axis=0) + 1.8
+        return (low + high) / 2, (high - low) / 2
+
+    def _apply_camera(self):
+        if self._applying_camera:
+            return
+        self._applying_camera = True
+        try:
+            if not math.isfinite(self.zoom):
+                self.zoom = 1.0
+            self.zoom = float(np.clip(self.zoom, self.MIN_ZOOM, self.MAX_ZOOM))
+            center, base_half = self._bounds()
+            pan = np.asarray(self._pan, dtype=float)
+            if pan.shape != (3,) or not np.all(np.isfinite(pan)):
+                pan = np.zeros(3)
+            self._pan = np.clip(pan, -base_half * 0.6, base_half * 0.6)
+            center += self._pan
+            half = base_half / self.zoom
+            # Do not emit axis-limit callbacks back into the camera controller.
+            self.ax.set_xlim(
+                center[0] - half[0], center[0] + half[0], emit=False, auto=False
+            )
+            self.ax.set_ylim(
+                center[1] - half[1], center[1] + half[1], emit=False, auto=False
+            )
+            self.ax.set_zlim(
+                center[2] - half[2], center[2] + half[2], emit=False, auto=False
+            )
+            # set_box_aspect normalizes its ndarray argument in-place.
+            single_sphere = self.focus >= 0 or len(self._sphere_centers) == 1
+            self.ax.set_box_aspect(base_half.copy(), zoom=1.85 if single_sphere else 1.45)
+            self.ax.set_proj_type(self.projection)
+            self._sync_visibility()
+        finally:
+            self._applying_camera = False
+        self.camera_changed.emit()
+        self.draw_idle()
+
+    def set_zoom(self, value):
+        value = float(value)
+        if not math.isfinite(value):
+            return
+        value = float(np.clip(value, self.MIN_ZOOM, self.MAX_ZOOM))
+        if math.isclose(value, self.zoom, abs_tol=1e-12):
+            return
+        self.zoom = value
+        self._apply_camera()
+
+    def zoom_by(self, factor):
+        if not self._sphere_centers or not math.isfinite(factor) or factor <= 0:
+            return
+        self.set_zoom(self.zoom * factor)
+
+    def _on_scroll(self, event):
+        if self.mouse_enabled and event.inaxes is self.ax:
+            step = float(getattr(event, "step", 0))
+            if math.isfinite(step):
+                self.zoom_by(math.exp(0.12 * float(np.clip(step, -4, 4))))
+
+    def wheelEvent(self, event):
+        # Pixel deltas are not wheel notches: normalize precision touchpads too.
+        if not self.mouse_enabled:
+            event.ignore()
+            return
+        x, y = self.mouseEventCoords(event)
+        if not self.ax.bbox.contains(x, y):
+            event.ignore()
+            return
+        angle, pixel = event.angleDelta().y(), event.pixelDelta().y()
+        steps = angle / 120 if angle else pixel / 120
+        if not steps:
+            event.ignore()
+            return
+        MouseEvent("scroll_event", self, x, y, step=steps, guiEvent=event)._process()
+        event.accept()
+
+    def _on_press(self, event):
+        if event.inaxes is not self.ax:
+            return
+        modifiers = getattr(event, "modifiers", ()) or ()
+        shift = "shift" in modifiers or "shift" in (getattr(event, "key", "") or "")
+        self._click_origin = (
+            (event.x, event.y)
+            if event.button == MouseButton.LEFT and not shift
+            else None
+        )
+        if self.mouse_enabled and event.button in (
+            MouseButton.LEFT,
+            MouseButton.MIDDLE,
+        ):
+            mode = MouseButton.MIDDLE if shift else event.button
+            self._drag = (mode, event.x, event.y)
+
+    def _on_motion(self, event):
+        if self._drag is None or not self.mouse_enabled:
+            return
+        button, x, y = self._drag
+        if event.inaxes is not self.ax:
+            self._drag = None
+            self._click_origin = None
+            return
+        dx, dy = event.x - x, event.y - y
+        self._drag = (button, event.x, event.y)
+        if not dx and not dy:
+            return
+        width, height = self.get_width_height(physical=True)
+        if button == MouseButton.LEFT:
+            self.set_view(
+                self.ax.elev - dy * 180 / max(1, height),
+                self.ax.azim - dx * 180 / max(1, width),
+            )
+        else:
+            az, el = np.deg2rad([self.ax.azim, self.ax.elev])
+            right = np.array([-np.sin(az), np.cos(az), 0.0])
+            up = np.array(
+                [-np.sin(el) * np.cos(az), -np.sin(el) * np.sin(az), np.cos(el)]
+            )
+            _, half = self._bounds()
+            self._pan -= (
+                (dx * right + dy * up) * 2 * max(half) / self.zoom / max(1, height)
+            )
+            self._apply_camera()
+
+    def _end_drag(self, event=None):
+        origin = self._click_origin
+        self._drag = None
+        self._click_origin = None
+        if (
+            origin is not None
+            and event is not None
+            and getattr(event, "inaxes", None) is self.ax
+        ):
+            distance = math.hypot(event.x - origin[0], event.y - origin[1])
+            if distance <= 6 * self.device_pixel_ratio:
+                qubit = self.pick_qubit(event.x, event.y)
+                if qubit is not None:
+                    if qubit == self.focus:
+                        self.set_focus(-1)
+                        return
+                    self.select_qubit(qubit)
+                    self.qubit_selected.emit(qubit)
+
+    def pick_qubit(self, x, y):
+        from mpl_toolkits.mplot3d import proj3d
+
+        candidates = []
+        matrix = self.ax.get_proj()
+        samples = np.linspace(0, 2 * np.pi, 48)
+        rings = np.concatenate(
+            [
+                np.column_stack(
+                    (np.cos(samples), np.sin(samples), np.zeros(len(samples)))
+                ),
+                np.column_stack(
+                    (np.cos(samples), np.zeros(len(samples)), np.sin(samples))
+                ),
+                np.column_stack(
+                    (np.zeros(len(samples)), np.cos(samples), np.sin(samples))
+                ),
+            ]
+        )
+        for q, center in enumerate(self._sphere_centers):
+            if self.focus not in (-1, q):
+                continue
+            points = np.vstack((np.array(center), np.array(center) + rings))
+            px, py, _ = proj3d.proj_transform(*points.T, matrix)
+            projected = self.ax.transData.transform(np.column_stack((px, py)))
+            radius = np.max(np.abs(projected[1:] - projected[0]), axis=0)
+            if not np.isfinite(radius).all() or min(radius) < 1:
+                continue
+            score = np.sum(((np.array([x, y]) - projected[0]) / radius) ** 2)
+            if score <= 1:
+                candidates.append((score, q))
+        return min(candidates)[1] if candidates else None
+
+    def select_qubit(self, index):
+        self.selected_qubit = index if 0 <= index < len(self._sphere_centers) else -1
+        for q, artists in enumerate(self._qubit_artists):
+            artists[0].set_linewidth(0.6 if q == self.selected_qubit else 0.35)
+            artists[0].set_color(
+                getattr(PALETTE, f"q{q + 1}")
+                if q == self.selected_qubit
+                else PALETTE.border_strong
+            )
+        self.draw_idle()
+
+    def set_mouse_enabled(self, enabled):
+        self.mouse_enabled = bool(enabled)
+        self._end_drag()
+
+    def set_focus(self, index):
+        self.focus = index if -1 <= index < len(self._sphere_centers) else -1
+        self.select_qubit(self.focus)
+        self.zoom = 1.0
+        self._pan = np.zeros(3)
+        self._apply_camera()
+        self.focus_changed.emit(self.focus)
+
+    def pan(self, dx=0, dz=0):
+        self._pan += np.array([dx, 0.0, dz])
+        self._apply_camera()
+
+    def center_camera(self):
+        self._pan = np.zeros(3)
+        self._apply_camera()
+
+    def set_view(self, elev, azim):
+        if not all(math.isfinite(float(x)) for x in (elev, azim)):
+            return
+        self.ax.view_init(
+            elev=float(np.clip(elev, -90, 90)), azim=(azim + 180) % 360 - 180, roll=0
+        )
+        self._apply_camera()
+
+    def set_projection(self, kind):
+        if kind not in ("persp", "ortho"):
+            return
+        self.projection = kind
+        self._apply_camera()
+
+    def set_axes_visible(self, visible):
+        self.axes_visible = bool(visible)
+        self._sync_visibility()
+        self.draw_idle()
+
+    def reset_camera(self):
+        self._end_drag()
+        self.focus = -1
+        self.select_qubit(-1)
+        self.zoom = 1.0
+        self._pan = np.zeros(3)
+        self.projection = "persp"
+        self.ax.view_init(elev=22, azim=-60, roll=0)
+        self._apply_camera()
+        self.focus_changed.emit(-1)
+
+    def clear_trails(self):
+        self._trail_data = [[] for _ in self._sphere_centers]
+        for line in self._trail_lines:
+            line.set_data_3d([], [], [])
+
+    def update_frame(
+        self, bloch_vectors, record_trail=True, ideal_vectors=None, history=None
+    ):
+        for q, c in enumerate(self._sphere_centers):
+            end = np.array(c) + bloch_vectors[q]
+            self._line_handles[q].set_data_3d(*zip(c, end))
+            if ideal_vectors is not None:
+                self._ideal_handles[q].set_data_3d(
+                    *zip(c, np.array(c) + ideal_vectors[q])
+                )
+            else:
+                self._ideal_handles[q].set_data_3d([], [], [])
+            if history is not None:
+                self._trail_data[q] = [
+                    tuple(np.array(c) + frame[q]) for frame in history
+                ]
+            elif record_trail:
+                self._trail_data[q].append(tuple(end))
+            self._trail_data[q] = self._trail_data[q][-80:]
+            points = self._trail_data[q]
+            self._trail_lines[q].set_data_3d(*zip(*points) if points else ([], [], []))
+        self.draw_idle()
+
+    def camera_state(self):
+        return dict(
+            zoom=self.zoom,
+            pan=self._pan.tolist(),
+            elev=float(self.ax.elev),
+            azim=float(self.ax.azim),
+            projection=self.projection,
+        )
+
+    def restore_camera(
+        self,
+        *,
+        zoom=1.0,
+        pan=(0.0, 0.0, 0.0),
+        elev=22.0,
+        azim=-60.0,
+        projection="persp",
+    ):
+        self._end_drag()
+        self.zoom = float(zoom) if math.isfinite(float(zoom)) else 1.0
+        self._pan = np.asarray(pan, dtype=float)
+        if not all(math.isfinite(float(x)) for x in (elev, azim)):
+            elev, azim = 22.0, -60.0
+        self.ax.view_init(
+            elev=float(np.clip(elev, -90, 90)), azim=(azim + 180) % 360 - 180, roll=0
+        )
+        self.projection = projection if projection in ("persp", "ortho") else "persp"
+        self._apply_camera()
+
+    def _sync_visibility(self):
+        axes = set(self._axis_artists)
+        for q, artists in enumerate(self._qubit_artists):
+            for artist in artists:
+                artist.set_visible(
+                    self.focus in (-1, q) and (self.axes_visible or artist not in axes)
+                )
+        legend = self.ax.get_legend()
+        if legend and legend.get_lines():
+            legend.get_lines()[0].set_color(
+                getattr(PALETTE, f"q{max(0, self.focus) + 1}")
+            )
+
+    def scene_corners(self):
+        """Conservative bounds include the spheres, axis tips and labels."""
+        return np.array(
+            [
+                np.array(center) + offset
+                for q, center in enumerate(self._sphere_centers)
+                if self.focus in (-1, q)
+                for offset in product((-1.55, 1.55), repeat=3)
+            ]
+        )
+
+    def fit_scene(self):
+        """Fit visible qubits at the current orientation without changing data."""
+        if not self._sphere_centers:
+            return
+        self.ax.apply_aspect()
+        points = self.scene_corners()
+        homogeneous = np.column_stack((points, np.ones(len(points))))
+        center, _ = self._bounds()
+        # Reuse the current projection to evaluate centered candidate zooms.
+        # Uniform scaling about the data center equals scaling all data limits.
+        translation = np.eye(4)
+        translation[:3, 3] = self._pan
+        centered = self.ax.get_proj() @ translation
+        margin = max(10.0, min(self.ax.bbox.width, self.ax.bbox.height) * 0.06)
+        bbox = self.ax.bbox
+
+        def fits(zoom):
+            ratio = zoom / self.zoom
+            scale = np.diag([ratio, ratio, ratio, 1.0])
+            scale[:3, 3] = center * (1 - ratio)
+            projected = homogeneous @ (centered @ scale).T
+            if np.any(projected[:, 3] <= 1e-9):
+                return False
+            xy = self.ax.transData.transform(projected[:, :2] / projected[:, 3, None])
+            return bool(
+                np.isfinite(xy).all()
+                and np.all(xy[:, 0] >= bbox.x0 + margin)
+                and np.all(xy[:, 0] <= bbox.x1 - margin)
+                and np.all(xy[:, 1] >= bbox.y0 + margin)
+                and np.all(xy[:, 1] <= bbox.y1 - margin)
+            )
+
+        low, high = self.MIN_ZOOM, self.MAX_ZOOM
+        for _ in range(18):
+            middle = (low + high) / 2
+            if fits(middle):
+                low = middle
+            else:
+                high = middle
+        self._pan = np.zeros(3)
+        self.zoom = max(self.MIN_ZOOM, low * 0.995)
+        self._end_drag()
+        self._apply_camera()

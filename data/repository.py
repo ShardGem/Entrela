@@ -55,6 +55,16 @@ def validate_result(config, result):
     ):
         raise ValueError("Texto de resultado inválido")
     integer(result.circuit_depth, "Profundidade", 0)
+    if config.circuit is not None and result.energy is not None:
+        raise ValueError("Circuito livre não define um observável de energia")
+    if "time_unit" in result.metadata and not isinstance(
+        result.metadata["time_unit"], str
+    ):
+        raise ValueError("Unidade temporal inválida")
+    if "experiment_kind" in result.metadata and result.metadata["experiment_kind"] != (
+        "circuit" if config.circuit is not None else "hamiltonian"
+    ):
+        raise ValueError("Tipo de experimento incompatível")
     for key in (*STATE_LISTS, "times", "labels"):
         value = getattr(result, key)
         if value is not None and not isinstance(value, list):
@@ -72,6 +82,8 @@ def validate_result(config, result):
         raise ValueError("Referência ideal e snapshots incompatíveis")
     if result.counts is not None and not isinstance(result.counts, dict):
         raise ValueError("Contagens devem ser um objeto")
+    if "circuit_global_phase" in result.metadata:
+        finite(result.metadata["circuit_global_phase"], "Fase global")
     operations = result.metadata.get("operations", [])
     if not isinstance(operations, list):
         raise ValueError("Operações devem ser uma lista")
@@ -89,6 +101,10 @@ def validate_result(config, result):
             op.get("parameters"), list
         ):
             raise ValueError("Parâmetros de operação inválidos")
+        if not op["qubits"]:
+            raise ValueError("Operação sem qubits")
+        if "logical_gate" in op and not isinstance(op["logical_gate"], str):
+            raise ValueError("Origem lógica de porta inválida")
         for q in op["qubits"]:
             integer(q, "Qubit de operação", 0)
             if q >= config.system.num_qubits:
@@ -276,7 +292,7 @@ class ExperimentRepository:
     def _summary_payload(experiment):
         result = experiment.result
         return dict(
-            schema_version=2,
+            schema_version=3 if experiment.config.circuit is not None else 2,
             id=experiment.id,
             created_at=experiment.created_at.isoformat(),
             duration_s=experiment.duration_s,
@@ -295,28 +311,54 @@ class ExperimentRepository:
             },
         )
 
+    def _paths_by_modified(self):
+        """Tolerate individual files disappearing during a directory listing."""
+        paths = []
+        for path in self.base_dir.glob("*.json"):
+            try:
+                modified = path.stat().st_mtime
+            except FileNotFoundError:
+                # Another local process can legitimately delete an execution.
+                continue
+            except OSError as exc:
+                self.load_errors.append(f"{path.name}: {exc}")
+                continue
+            paths.append((path, modified))
+        return [path for path, _ in sorted(paths, key=lambda item: item[1], reverse=True)]
+
     def list_summaries(self):
         """Read small derived records; decode state arrays only when opening a run."""
         records = []
         self.load_errors = []
-        for path in sorted(
-            self.base_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-        ):
+        for path in self._paths_by_modified():
             try:
                 cache = self.base_dir / ".summaries" / path.name
                 stat = path.stat()
                 payload = None
+                experiment = None
                 if cache.exists():
                     try:
                         saved = json.loads(cache.read_text(encoding="utf-8"))
                         if (
-                            saved.get("mtime_ns") == stat.st_mtime_ns
+                            isinstance(saved, dict)
+                            and isinstance(saved.get("experiment"), dict)
+                            and saved.get("mtime_ns") == stat.st_mtime_ns
                             and saved.get("size") == stat.st_size
                         ):
                             payload = saved["experiment"]
-                    except (ValueError, KeyError, TypeError):
-                        pass
-                if payload is None:
+                            if payload.get("id") != path.stem:
+                                raise ValueError("Identificador do resumo incompatível")
+                            result = payload.get("result")
+                            if not isinstance(result, dict) or any(
+                                key in result for key in (*STATE_LISTS, *SINGLE_STATES)
+                            ):
+                                raise ValueError("Conteúdo de resumo inválido")
+                            experiment = self._deserialize(payload)
+                    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError):
+                        # O cache é descartável: sua corrupção não torna a fonte
+                        # ilegível. Reabrir a fonte também cobre payloads inválidos.
+                        experiment = None
+                if experiment is None:
                     raw = json.loads(path.read_text(encoding="utf-8"))
                     if not isinstance(raw, dict) or raw.get("id") != path.stem:
                         raise ValueError("Identificador incompatível")
@@ -343,10 +385,12 @@ class ExperimentRepository:
                             if key in result
                         },
                     )
-                    exp = self._deserialize(payload)
-                    self._save_summary(exp, path)
-                records.append(self._deserialize(payload))
-            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                    experiment = self._deserialize(payload)
+                    self._save_summary(experiment, path)
+                records.append(experiment)
+            except FileNotFoundError:
+                continue
+            except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
                 self.load_errors.append(f"{path.name}: {exc}")
         return records
 
@@ -359,11 +403,11 @@ class ExperimentRepository:
     def list_all(self, limit=None):
         self.load_errors = []
         records = []
-        for path in sorted(
-            self.base_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-        ):
+        for path in self._paths_by_modified():
             try:
                 records.append(self.load(path.stem))
+            except FileNotFoundError:
+                continue
             except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 self.load_errors.append(f"{path.name}: {exc}")
             if limit is not None and len(records) >= limit:
@@ -399,7 +443,7 @@ class ExperimentRepository:
         for key in SINGLE_STATES:
             result[key] = encode_state(result[key])
         return dict(
-            schema_version=2,
+            schema_version=3 if exp.config.circuit is not None else 2,
             config=asdict(exp.config),
             result=result,
             id=exp.id,
@@ -413,7 +457,7 @@ class ExperimentRepository:
         if not isinstance(raw, dict):
             raise ValueError("Arquivo deve conter um objeto")
         schema = raw.get("schema_version", 1)
-        if type(schema) is not int or schema not in (1, 2):
+        if type(schema) is not int or schema not in (1, 2, 3):
             raise ValueError("Versão de arquivo desconhecida")
         if not isinstance(raw, dict):
             raise ValueError("Arquivo deve conter um objeto")
@@ -432,8 +476,12 @@ class ExperimentRepository:
         if not isinstance(raw.get("result", {}), dict):
             raise ValueError("Resultado inválido")
         config = config_from_dict(raw["config"])
+        if config.circuit is not None and schema < 3:
+            raise ValueError("Circuitos livres exigem esquema de arquivo 3")
+        if schema == 3 and config.circuit is None:
+            raise ValueError("Documento de circuito ausente no esquema 3")
         result = dict(raw.get("result", {}))
-        if schema == 2:
+        if schema >= 2:
             for key in STATE_LISTS:
                 result[key] = (
                     [decode_state(s) for s in result[key]]

@@ -1,3 +1,5 @@
+"""Tela de abertura original com inicialização limitada a três segundos."""
+
 from PySide6.QtWidgets import (
     QApplication,
     QSplashScreen,
@@ -9,6 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import (
     Qt,
     QTimer,
+    QElapsedTimer,
     QPointF,
     Property,
     QPropertyAnimation,
@@ -25,6 +28,8 @@ from PySide6.QtGui import (
 
 import math
 from pathlib import Path
+from gui.branding import application_icon
+from gui.palettes import DARK
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -55,7 +60,6 @@ class RotatingLogo(QWidget):
 
         self.anim.setEasingCurve(QEasingCurve.Linear)
 
-        self.anim.start()
 
     def getAngle(self):
         return self._angle
@@ -105,7 +109,6 @@ class QuantumBackground(QWidget):
 
         self.animation.setEasingCurve(QEasingCurve.Linear)
 
-        self.animation.start()
 
     def getOffset(self):
         return self._offset
@@ -128,8 +131,8 @@ class QuantumBackground(QWidget):
         # =========================================================
         gradient = QLinearGradient(0, 0, rect.width(), rect.height())
 
-        gradient.setColorAt(0, QColor("#04060a"))
-        gradient.setColorAt(1, QColor("#0a1120"))
+        gradient.setColorAt(0, QColor(DARK["chrome"]))
+        gradient.setColorAt(1, QColor(DARK["chrome_hover"]))
 
         painter.fillRect(rect, gradient)
 
@@ -158,6 +161,7 @@ class QuantumBackground(QWidget):
 
         painter.setPen(Qt.NoPen)
 
+        light = QColor(DARK["chrome_accent"])
         particle_count = 90
 
         for i in range(particle_count):
@@ -175,7 +179,8 @@ class QuantumBackground(QWidget):
 
             size = max(1.5, 4 - (i * 0.03))
 
-            painter.setBrush(QColor(88, 214, 255, alpha))
+            light.setAlpha(alpha)
+            painter.setBrush(light)
 
             painter.drawEllipse(QPointF(x, y), size, size)
 
@@ -189,7 +194,8 @@ class QuantumBackground(QWidget):
         for i in range(8):
             alpha = 18 - i * 2
 
-            painter.setBrush(QColor(88, 214, 255, alpha))
+            light.setAlpha(alpha)
+            painter.setBrush(light)
 
             painter.drawEllipse(
                 QPointF(center_x, center_y), glow_radius - i * 18, glow_radius - i * 18
@@ -200,6 +206,8 @@ class QuantumBackground(QWidget):
 # Splash Screen
 # =========================================================
 class SplashScreen(QSplashScreen):
+    DURATION_MS = 3000
+
     def __init__(self):
 
         pixmap = QPixmap(1100, 650)
@@ -211,6 +219,13 @@ class SplashScreen(QSplashScreen):
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
 
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowIcon(application_icon())
+        self._elapsed = QElapsedTimer()
+        self._window = None
+        self._completion_timer = QTimer(self)
+        self._completion_timer.setSingleShot(True)
+        self._completion_timer.setTimerType(Qt.PreciseTimer)
+        self._completion_timer.timeout.connect(self._complete)
 
         # =========================================================
         # Main Container
@@ -219,12 +234,9 @@ class SplashScreen(QSplashScreen):
 
         self.container.setGeometry(0, 0, 1100, 650)
 
-        self.container.setStyleSheet("""
-            QWidget {
-                background-color: #090d14;
-                border-radius: 28px;
-            }
-        """)
+        self.container.setStyleSheet(
+            f"background-color: {DARK['chrome']}; border-radius: 28px;"
+        )
 
         # =========================================================
         # Background
@@ -309,39 +321,56 @@ class SplashScreen(QSplashScreen):
 
         self.loading.setAlignment(Qt.AlignCenter)
 
-        self.loading.setStyleSheet("""
-            QLabel {
-                color: #58d6ff;
-                font-size: 12px;
-                font-family: Inter;
-                letter-spacing: 2px;
-                background: transparent;
-                margin-bottom: 10px;
-            }
-        """)
+        self.loading.setStyleSheet(
+            f"color: {DARK['chrome_muted']}; font-size: 13px;"
+            "background: transparent; margin-bottom: 10px;"
+        )
 
         layout.addWidget(self.loading)
 
         # =========================================================
-        # Fade In PRA FICAR ESCURO AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASLOUFGWE9HF0´3WGVB4EG08HNERW´B´GRIBWEOÚBGFUIYWB´I0BGFPI9UW
+        # Entrada e animações originais; início condicionado à preferência de movimento.
         # =========================================================
-        supports_opacity = QApplication.platformName() not in ("offscreen", "minimal")
-        if supports_opacity:
-            self.setWindowOpacity(0)
-
-        self.fade = QPropertyAnimation(self, b"windowOpacity")
-
+        self.fade = QPropertyAnimation(self, b"windowOpacity", self)
         self.fade.setDuration(1800)
-
-        self.fade.setStartValue(0)
-        self.fade.setEndValue(1)
-
+        self.fade.setStartValue(0.)
+        self.fade.setEndValue(1.)
         self.fade.setEasingCurve(QEasingCurve.OutCubic)
 
-        if supports_opacity:
-            self.fade.start()
+    def showEvent(self, event):
+        if not self._elapsed.isValid():
+            self._elapsed.start()
+            app = QApplication.instance()
+            if not app.property("entrelaReduceMotion"):
+                self.logo.anim.start()
+                self.bg.animation.start()
+                if app.platformName() not in ("offscreen", "minimal"):
+                    self.fade.start()
+        super().showEvent(event)
 
-    def closeEvent(self, event):
+    def remaining_ms(self):
+        return max(0, self.DURATION_MS - self._elapsed.elapsed()) if self._elapsed.isValid() else self.DURATION_MS
+
+    def finish_after_minimum(self, window):
+        """Conta o tempo de inicialização dentro do orçamento de três segundos."""
+        self._window = window
+        self._completion_timer.start(self.remaining_ms())
+
+    def _complete(self):
+        if self.remaining_ms():
+            self._completion_timer.start(self.remaining_ms())
+            return
+        self.stop_animations()
+        if self._window is not None:
+            self._window.show()
+            self.finish(self._window)
+
+    def stop_animations(self):
         self.fade.stop()
         self.logo.anim.stop()
+        self.bg.animation.stop()
+        self._completion_timer.stop()
+
+    def closeEvent(self, event):
+        self.stop_animations()
         super().closeEvent(event)

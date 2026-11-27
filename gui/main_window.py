@@ -1,3 +1,5 @@
+from core.types import system_label
+
 """Application controller: real executions, learning flows and durable records."""
 
 from dataclasses import asdict, replace
@@ -18,13 +20,23 @@ from PySide6.QtWidgets import (
     QTextBrowser,
     QFileDialog,
     QMessageBox,
+    QApplication,
+    QFrame,
+    QTableWidget,
 )
 from gui.theme import build_qss
+from gui.branding import application_icon
 from gui.manual import WELCOME_HTML
 from gui.widgets.sidebar import Sidebar
+from gui.design_system import LAYOUT
+from gui.navigation import NAV_ITEMS
+from gui.controllers.navigation import NavigationController
+from gui.controllers.layout import LayoutController
+from gui.widgets.dialogs import ConfigurationsDialog
 from gui.widgets.topbar import Topbar
 from gui.widgets.tutorial import BellTutorial, STEPS
 from gui.widgets.command_palette import CommandPalette
+from gui.widgets.job_monitor import JobMonitor
 from gui.pages.dashboard import DashboardPage
 from gui.pages.simulation import SimulationPage
 from gui.pages.circuit import CircuitPage
@@ -38,12 +50,29 @@ from gui.pages.examples import ExamplesPage
 from gui.pages.comparison import ComparisonPage
 from gui.pages.analysis import AnalysisPage
 from gui.pages.library import LibraryPage
-from gui.controllers.appearance import apply_appearance, DARK
+from gui.pages.documentation import DocumentationPage
+from gui.pages.experiment_workspace import ExperimentWorkspace
+from gui.controllers.appearance import apply_appearance
+from gui.palettes import DARK
+from gui.controllers.drafts import DraftController
+from gui.controllers.projects import ProjectController
+from gui.controllers.onboarding import OnboardingController
+from gui.pages.catalog import CatalogPage
+from gui.pages.notebook import NotebookPage
 from gui.theme import PALETTE
 from gui.workers.analysis_worker import AnalysisWorker
 from gui.workers.storage_worker import StorageWorker
-from data.workspace import WorkspaceLibrary
-from core.report import export_report
+from gui.workers.report_worker import ReportWorker
+from gui.workers.comparison_worker import ComparisonWorker
+from gui.workers.documentation_worker import DocumentationWorker
+from gui.workers.detail_worker import DetailWorker
+from gui.workers.study_import_worker import StudyImportWorker
+from gui.workers.workspace_backup_worker import WorkspaceBackupWorker
+from gui.controllers.workspace_backup import WorkspaceBackupController
+from gui.widgets.data_table import configure_table
+from data.workspace import WorkspaceLibrary, experiment_title
+from data.protocols import ProtocolRepository
+from core.report import export_rendered_report
 from gui.workers.simulation_worker import SimulationWorker
 from gui.workers.mitigation_worker import MitigationWorker
 from core.types import (
@@ -55,25 +84,28 @@ from core.types import (
     NoiseConfig,
     config_from_dict,
 )
+from copy import deepcopy
 from core.examples import EXAMPLES, get_example, create_example_config
 from core.export import (
-    export_counts_csv,
+    export_experiment_csv,
     export_experiment_json,
     import_experiment_json,
-    export_run_bundle,
     export_figure,
 )
 from data.repository import ExperimentRepository
 
 PAGE_META = {
-    "analysis": ("Análises", "Referência exata, correlações e varreduras"),
-    "library": ("Projetos", "Modelos e notas pessoais"),
-    "dashboard": ("Início", "Seu laboratório quântico"),
+    "documentation": ("Documentação", "Figuras, animações e rastreabilidade"),
+    "analysis": ("Estudos e varreduras", "Análises de ruído, precisão de Trotter e mitigação a partir de uma execução"),
+    "library": ("Anotações da execução", "Caderno, hipóteses, interpretação e agrupamento por projeto"),
+    "dashboard": ("Projetos", "Suas investigações e experimentos"),
+    "catalog": ("Biblioteca", "Exemplos, modelos pessoais e circuitos"),
+    "notebook": ("Caderno do projeto", "Anotações, evidências e relatório"),
     "examples": ("Exemplos", "Aprenda a partir de experimentos reais"),
     "simulation": ("Experimento", "Configure e execute"),
-    "circuit": ("Circuito", "Preparação, evolução e medição"),
+    "circuit": ("Editor de circuitos", "Preparação, portas, modelos e execução de circuitos"),
     "results": ("Resultados", "Dados da execução selecionada"),
-    "bloch": ("Evolução 3D", "Estados efetivamente simulados"),
+    "bloch": ("Estados quânticos 3D", "Esferas de Bloch, estado global e snapshots reais"),
     "mitigation": ("Mitigação", "Extrapolação de observáveis"),
     "comparison": ("Comparações", "Experimentos compatíveis"),
     "history": ("Histórico", "Resultados preservados"),
@@ -81,11 +113,14 @@ PAGE_META = {
     "settings": ("Configurações", "Preferências"),
 }
 
+WORKSPACE_PAGES = ("simulation", "circuit", "results", "bloch")
+
 
 class MainWindow(QMainWindow):
     def __init__(self, repository=None, settings=None):
         super().__init__()
         self.setWindowTitle("Entrela · Laboratório quântico")
+        self.setWindowIcon(application_icon())
         self.resize(1440, 900)
         self.setMinimumSize(1020, 720)
         self.settings = (
@@ -108,12 +143,23 @@ class MainWindow(QMainWindow):
         self._draft_dirty = False
         self._draft_baseline = None
         self._pending_example_id = None
-        self._current_page = "dashboard"
+        self._pending_parent_id = None
+        self._reproduction_source = None
+        self._current_page = "simulation"
         self._history = []
+        self._pending_detail_id = None
+        self._pending_comparison = None
+        self._pending_circuit_context = None
         for key, value in DARK.items():
             object.__setattr__(PALETTE, key, value)
         self.setStyleSheet(build_qss())
         self._build_ui()
+        for table in self.findChildren(QTableWidget):
+            selection_mode = table.selectionMode()
+            configure_table(table, sortable=table.isSortingEnabled())
+            table.setSelectionMode(selection_mode)
+        if self.repository is not None:
+            self.page_circuit.editor.set_storage_directory(self.repository.base_dir / ".circuits")
         self._build_help()
         self._build_tutorial()
         self._wire_signals()
@@ -124,38 +170,68 @@ class MainWindow(QMainWindow):
             shots = 8192
         self.page_settings.spin_shots.setValue(shots)
         self.page_simulation.config_panel.spin_shots.setValue(shots)
+        self._factory_workbench = dict(editor=self.page_circuit.editor.draft_state(), simulation={
+            "controls": self.page_simulation.config_panel.coletar_tudo(), "initial": "zero", "order": 2,
+            "mode": "guided", "section": "system", "name": "", "description": ""})
         self._restore_workspace()
         self._refresh_history()
         self._restore_preferences()
+        QApplication.instance().styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self._refresh_library()
-        self._show_page("dashboard")
+        # Capture the pristine controls before recovering any user-owned draft.
+        self.drafts = DraftController(self)
+        self.projects = ProjectController(self, self._factory_workbench)
+        self.page_notebook.project_save_requested.connect(self._save_project_notes)
+        self.page_catalog.template_requested.connect(self._load_template)
+        self.page_catalog.circuit_requested.connect(self._copy_circuit_model)
+        self.page_catalog.configurations_requested.connect(self._show_saved_configurations)
+        self.page_history.use_config_requested.connect(self.projects.use_configuration)
+        self.page_results.edit_config_requested.connect(lambda: self.projects.use_configuration(self._current_experiment.id) if self._current_experiment else None)
+        self.page_results.results_tab.frame_requested.connect(self.page_bloch.slider.setValue)
+        self.page_bloch.frame_changed.connect(self.page_results.results_tab.select_frame)
+        self.job_monitor.open_requested.connect(self.projects.open_completed)
+
+        self.workspace_backup = WorkspaceBackupController(self)
+        self.page_settings.backup_requested.connect(self.workspace_backup.export)
+        self.page_settings.restore_backup_requested.connect(self.workspace_backup.restore)
+        self.layout_controller = LayoutController(self)
+        self.page_settings.layout_reset_requested.connect(self.layout_controller.reset)
+        active = self.projects.active
+        self._show_page("circuit" if active and active["kind"] == "circuit" else "simulation")
+        self.sidebar.restore_sections(self.settings.value("layout/sidebar_sections"))
         if self._storage_error:
             self.statusBar().showMessage(
                 "Armazenamento indisponível: " + self._storage_error
             )
+        self.onboarding = OnboardingController(self)
 
     def _build_ui(self):
         root = QWidget()
         root.setObjectName("RootWidget")
         self.setCentralWidget(root)
         layout = QHBoxLayout(root)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, LAYOUT.frame_margin, LAYOUT.frame_margin, LAYOUT.frame_margin)
         layout.setSpacing(0)
+        self.topbar = Topbar()
         self.sidebar = Sidebar()
         layout.addWidget(self.sidebar)
-        right = QWidget()
+        right = QFrame()
+        right.setObjectName("Workbench")
         body = QVBoxLayout(right)
-        body.setContentsMargins(0, 0, 0, 0)
+        body.setContentsMargins(1, 1, 1, LAYOUT.control_gap)
         body.setSpacing(0)
-        self.topbar = Topbar()
         body.addWidget(self.topbar)
         self.stack = QStackedWidget()
         body.addWidget(self.stack, 1)
+        self.job_monitor = JobMonitor()
+        body.addWidget(self.job_monitor)
         layout.addWidget(right, 1)
         self.page_dashboard = DashboardPage()
         self.page_examples = ExamplesPage()
         self.page_simulation = SimulationPage()
         self.page_circuit = CircuitPage()
+        self.page_circuit.results_requested.connect(lambda: self.navigation.open_page('results'))
+        self.page_circuit.editor_requested.connect(lambda: self.navigation.open_page('circuit'))
         self.page_results = ResultsPage()
         self.page_bloch = BlochPage()
         self.page_mitigation = MitigationPage()
@@ -165,6 +241,7 @@ class MainWindow(QMainWindow):
         self.page_settings = SettingsPage()
         self.page_analysis = AnalysisPage()
         self.page_library = LibraryPage()
+        self.page_documentation = DocumentationPage()
         self.pages = dict(
             dashboard=self.page_dashboard,
             examples=self.page_examples,
@@ -179,8 +256,26 @@ class MainWindow(QMainWindow):
             settings=self.page_settings,
         )
         self.pages.update(analysis=self.page_analysis, library=self.page_library)
-        for page in self.pages.values():
-            self.stack.addWidget(page)
+        self.pages["documentation"]=self.page_documentation
+        self.page_workspace = ExperimentWorkspace({key: self.pages[key] for key in WORKSPACE_PAGES})
+        self.page_simulation.set_model_action(self.page_workspace.templates_button)
+        self.page_workspace.add_context_action(self.page_results.inspector_toggle, "results")
+        self.page_simulation._header.hide()
+        self.stack.addWidget(self.page_workspace)
+        grouped = {*WORKSPACE_PAGES, "examples", "library", "documentation"}
+        for key, page in self.pages.items():
+            page.use_workspace_context()
+            if key not in grouped:
+                self.stack.addWidget(page)
+        self.page_catalog = CatalogPage(self.page_examples, self.page_circuit.editor)
+        self.page_notebook = NotebookPage(self.page_library, self.page_documentation)
+        self.pages.update(catalog=self.page_catalog, notebook=self.page_notebook)
+        self.page_catalog.use_workspace_context(); self.page_notebook.use_workspace_context()
+        self.stack.addWidget(self.page_catalog)
+        self.stack.addWidget(self.page_notebook)
+        self.navigation = NavigationController(self)
+        self.configuration_dialog = ConfigurationsDialog(self.page_library, self)
+        self.page_library.tabs.tabBar().hide()
         self.setStatusBar(QStatusBar())
 
     def _build_help(self):
@@ -201,17 +296,30 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.tutorial_dock)
         self.tutorial_dock.hide()
         self.tutorial.section_requested.connect(self._tutorial_section)
+        self.tutorial.destination_requested.connect(self._show_page)
         self.tutorial.progress_changed.connect(self._persist_tutorial)
         self.tutorial.paused.connect(self.tutorial_dock.hide)
         self.tutorial.completed.connect(self._tutorial_completed)
         self.tutorial_dock.visibilityChanged.connect(self._tutorial_visibility)
 
     def _wire_signals(self):
-        self.sidebar.navigate.connect(self._show_page)
-        self.topbar.help_requested.connect(lambda: self._show_help("Início"))
-        self.topbar.commands_requested.connect(self._open_commands)
+        self.job_monitor.cancel_requested.connect(self._cancel_simulation)
+        self.sidebar.compact_requested.connect(self._toggle_sidebar)
+        self.sidebar.navigate.connect(self._open_destination)
+        self.sidebar.search_requested.connect(self._open_commands)
+        self.sidebar.new_button.setMenu(self.page_dashboard.new_experiment.menu())
+        self.sidebar.sections_changed.connect(lambda groups: self.settings.setValue("layout/sidebar_sections", groups))
+        self.sidebar.help_requested.connect(lambda: self._show_help(self.navigation.help_topic()))
+        self.page_history.configure_requested.connect(lambda: self._show_page("simulation"))
+        self.page_workspace.page_selected.connect(self._show_page)
+        self.page_workspace.template_requested.connect(self._load_template)
+        self.page_workspace.recent_requested.connect(self._open_experiment)
+        self.page_workspace.configurations_requested.connect(self._show_saved_configurations)
+        self.page_library.configurations_requested.connect(self._show_saved_configurations)
         p = self.page_simulation
         p.run_requested.connect(self._run_simulation)
+        p.example_requested.connect(self._load_example)
+        p.navigation_requested.connect(self._show_page)
         p.cancel_requested.connect(self._cancel_simulation)
         p.config_panel.ajuda_acionada.connect(self._show_help)
         p.config_panel.parametros_alterados.connect(self._draft_changed)
@@ -228,6 +336,13 @@ class MainWindow(QMainWindow):
         self.page_examples.example_requested.connect(self._load_example)
         self.page_examples.tutorial_requested.connect(self._begin_tutorial)
         self.page_history.experiment_selected.connect(self._open_experiment)
+        self.page_history.detail_requested.connect(self._request_history_detail)
+        self.page_history.edit_requested.connect(self._edit_history_annotation)
+        self.page_history.compare_requested.connect(self._compare_from_history)
+        self.page_results.history_requested.connect(lambda: self._show_page('history'))
+        self.page_circuit.tabs.currentChanged.connect(lambda *_: self._show_page('circuit') if self.is_page_active('circuit') else None)
+        self.page_results.tabs.currentChanged.connect(lambda *_: self._show_page('results') if self.is_page_active('results') else None)
+        self.page_docs.demonstration_requested.connect(self._load_demonstration)
         self.page_results.save_requested.connect(self._save_current)
         self.page_results.export_requested.connect(self._export_counts)
         self.page_results.export_experiment_requested.connect(self._export_experiment)
@@ -238,25 +353,53 @@ class MainWindow(QMainWindow):
         self.page_settings.restore_requested.connect(self._reset_preferences)
         self.page_bloch.preferences_changed.connect(self._persist_bloch_preferences)
         self.page_bloch.frame_changed.connect(self.page_analysis.select_frame)
-        self.page_circuit.snapshot_requested.connect(self.page_bloch.slider.setValue)
+        self.page_bloch.temporal_requested.connect(
+            lambda: self._run_analysis("temporal", {})
+        )
+        self.page_circuit.snapshot_requested.connect(self._show_circuit_snapshot)
+        self.page_circuit.run_requested.connect(self._run_editor_circuit)
+        self.page_circuit.cancel_requested.connect(self._cancel_simulation)
         self.page_analysis.requested.connect(self._run_analysis)
+        self.page_analysis.cancel_requested.connect(self._cancel_simulation)
+        self.page_analysis.source_requested.connect(self._open_study_source)
+        self.page_analysis.protocol.save_requested.connect(self._save_protocol)
+        self.page_analysis.protocol.load_requested.connect(self._load_protocol)
+        self.page_comparison.prepare_requested.connect(self._prepare_comparison)
+        self.page_comparison.documentation_requested.connect(self._document_comparison)
+        self.page_documentation.export_requested.connect(self._export_documentation)
+        self.page_documentation.import_requested.connect(self._import_study)
+        self.page_documentation.cancel_requested.connect(self._cancel_simulation)
+        self.page_documentation.comparison_changed.connect(self._refresh_documentation)
+        self.page_documentation.analysis_selected.connect(self._open_evidence)
+        self.page_documentation.artifact_requested.connect(self._open_artifact)
+        from gui.widgets.button import SecondaryButton
+        self.export_bloch_view=SecondaryButton("Exportar Bloch…", icon="export")
+        self.export_bloch_view.setEnabled(False)
+        self.export_bloch_view.setToolTip("Exporta as esferas de Bloch em PNG, SVG ou PDF, com câmera, estado e metadados da execução selecionada.")
+        self.export_bloch_view.clicked.connect(self._export_bloch_view)
+        self.page_workspace.add_context_action(self.export_bloch_view, "bloch")
         self.page_results.rerun_requested.connect(self._rerun_current)
-        self.page_results.report_requested.connect(self._export_report)
+        self.page_results.report_requested.connect(lambda: self._open_export_dialog("pdf"))
         self.page_library.template_save_requested.connect(self._save_template)
         self.page_library.template_load_requested.connect(self._load_template)
         self.page_library.annotation_requested.connect(self._annotate_current)
         self.page_library.template_delete_requested.connect(self._delete_template)
+        self.page_library.navigation_requested.connect(self._show_page)
+        self.page_library.project_history_requested.connect(self._show_project_history)
+        self.page_library.view_preferences_changed.connect(self._persist_library_view)
+
+    def _open_destination(self, key):
+        self.projects.open_tool(key)
 
     def _build_commands(self):
         self.command_palette = CommandPalette(self)
         self.command_palette.command_requested.connect(self._command)
         self.shortcuts = []
         for key, callback in [
-            ("Ctrl+K", self._open_commands),
-            ("Ctrl+N", self._new_experiment),
+            ("Ctrl+N", self.sidebar.new_button.showMenu),
             ("Ctrl+O", self._import_experiment),
-            ("Ctrl+Return", self._run_simulation),
-            ("F1", lambda: self._show_help("Início")),
+            ("Ctrl+Return", self._run_active_context),
+            ("F1", lambda: self._show_help(self.navigation.help_topic())),
             ("F11", self._toggle_presentation),
         ]:
             shortcut = QShortcut(QKeySequence(key), self)
@@ -264,22 +407,39 @@ class MainWindow(QMainWindow):
             self.shortcuts.append(shortcut)
 
     def _open_commands(self):
+        from core.learning import CONCEPTS
+
         commands = [
-            ("new", "Criar experimento", "novo"),
-            ("import", "Importar experimento JSON", "abrir arquivo"),
+            ("new", "Novo experimento", "criar Hamiltoniano circuito"),
+            ("import", "Importar experimento ou estudo", "abrir arquivo JSON ZIP reprodução"),
             ("tutorial", "Aprender: tutorial de Bell", "primeiro experimento"),
+            ("getting-started", "Como começar: guia de primeiros passos", "ajuda início iniciante aprender tutorial introdução"),
+            ("welcome", "Rever apresentação inicial", "boas vindas começar mostrar ao iniciar tutorial opcional"),
+            ("saved-configurations", "Abrir configurações salvas", "parâmetros reutilizáveis Hamiltoniano modelos"),
             ("mode:guided", "Usar modo Guiado", "ajuda etapas"),
             ("mode:advanced", "Usar modo Avançado", "parâmetros"),
         ]
-        commands += [
-            ("page:" + key, "Abrir " + title, "navegar")
-            for key, (title, _) in PAGE_META.items()
+        commands[:0] = [
+            ("page:" + key, label, "navegar " + " ".join(PAGE_META.get(key, (label, ""))))
+            for key, label in NAV_ITEMS
         ]
+        commands += [
+            ("page:" + key, title, description)
+            for key, (title, description) in PAGE_META.items()
+            if key not in dict(NAV_ITEMS)
+        ]
+        if hasattr(self, 'projects'):
+            try:
+                commands += [('project:' + p['name'], 'Projeto: ' + p['name'], p.get('description', '')) for p in self.projects.store.projects()]
+                commands += [('model:' + name, 'Modelo: ' + name, 'configuração salva cópia editável') for name in self._workspace_library().read()['templates']]
+            except (OSError, ValueError, TypeError) as exc:
+                self.statusBar().showMessage('A busca de dados pessoais está indisponível: ' + str(exc))
+            commands += [('project-new', 'Criar projeto', 'nova investigação coleção de evidências')]
         commands += [
             ("example:" + e.id, "Exemplo: " + e.title, e.description) for e in EXAMPLES
         ]
         commands += [
-            ("run:" + e.id, "Abrir execução " + e.id, e.config.system.hamiltonian)
+            ("run:" + e.id, "Abrir " + self._experiment_name(e), system_label(e.config))
             for e in self._history[:20]
         ]
         commands += [
@@ -296,25 +456,72 @@ class MainWindow(QMainWindow):
                 "Evolução",
             )
         ]
+        commands += [
+            ("concept:" + concept.key, "Conceito: " + concept.title, concept.search_text())
+            for concept in CONCEPTS
+        ]
         self.command_palette.open_commands(commands)
 
     def _command(self, identifier):
         if identifier == "new":
-            self._new_experiment()
+            self.sidebar.new_button.showMenu()
         elif identifier == "import":
             self._import_experiment()
         elif identifier == "tutorial":
             self._begin_tutorial()
+        elif identifier == "getting-started":
+            self.onboarding.open_guide()
+        elif identifier == "welcome":
+            self.onboarding.show_welcome()
+        elif identifier == "saved-configurations":
+            self._show_saved_configurations()
+        elif identifier == 'project-new':
+            self.projects.create_project()
+        elif identifier.startswith('project:'):
+            self.projects.open_project(identifier[8:])
+        elif identifier.startswith('model:'):
+            self._load_template(identifier[6:])
         elif identifier.startswith("page:"):
-            self._show_page(identifier[5:])
+            self.projects.open_tool(identifier[5:])
         elif identifier.startswith("example:"):
             self._load_example(identifier[8:])
         elif identifier.startswith("run:"):
             self._open_experiment(identifier[4:])
         elif identifier.startswith("help:"):
             self._show_help(identifier[5:])
+        elif identifier.startswith("concept:"):
+            from core.learning import CONCEPT_BY_KEY
+
+            key = identifier[8:]
+            if key not in CONCEPT_BY_KEY:
+                return
+            page = self.page_docs
+            page.select_concept(key)
+            self._show_page("docs")
+            page.browser.setFocus(Qt.OtherFocusReason)
         elif identifier.startswith("mode:"):
             self.page_simulation.config_panel.set_mode(identifier[5:])
+            self._show_page("simulation")
+
+    def _run_active_context(self):
+        """Executa o editor visível, sem confundi-lo com o formulário Hamiltoniano."""
+        if self._current_worker is not None:
+            return
+        if self._current_page == "circuit":
+            if self.page_circuit.tabs.currentWidget() is self.page_circuit.editor:
+                self.page_circuit.editor.run.click()
+            else:
+                self.statusBar().showMessage("Abra a aba Editor de circuitos para executar uma cópia editável.")
+        elif self._current_page == "analysis":
+            self.page_analysis.btn_run.click()
+        elif self._current_page in WORKSPACE_PAGES:
+            if self._current_page != "simulation":
+                self._open_destination("simulation")
+                self.statusBar().showMessage("Revise a configuração e use Executar simulação ou Ctrl+Enter.")
+            else:
+                self._run_simulation()
+        else:
+            self.statusBar().showMessage("Abra o laboratório ou um estudo para executar a configuração desse contexto.")
 
     def _show_help(self, topic):
         aliases = {
@@ -327,6 +534,8 @@ class MainWindow(QMainWindow):
             "Despolarização 1q": "Ruído",
             "Despolarização 2q": "Ruído",
             "Modelo de ruído": "Ruído",
+            "Duração de porta 1q": "Ruído",
+            "Duração de porta 2q": "Ruído",
         }
         topic = aliases.get(topic, topic)
         if self.width() < 1250:
@@ -336,13 +545,28 @@ class MainWindow(QMainWindow):
         self.help_browser.find(topic)
 
     def _show_page(self, key):
-        if key not in self.pages:
-            return
-        self._current_page = key
-        self.stack.setCurrentWidget(self.pages[key])
-        self.sidebar.set_active(key)
-        self.topbar.set_context(*PAGE_META[key])
-        self._update_tutorial()
+        self.navigation.show(key)
+
+    def is_page_active(self, key):
+        return self.navigation.is_active(key)
+
+    def _show_project_history(self, project):
+        self.page_history.set_project_filter(project)
+        self._show_page("history")
+
+    def _compare_from_history(self, a, b):
+        self._show_page('comparison')
+        self.page_comparison.set_runs(a, b)
+        self._prepare_comparison(a, b)
+
+    def _show_saved_configurations(self):
+        self.configuration_dialog.message.clear()
+        self.configuration_dialog.open()
+
+    def _open_study_source(self, identifier):
+        self._open_experiment(identifier)
+        if self._current_experiment is not None and self._current_experiment.id == identifier:
+            self._show_page("analysis")
 
     def _restore_workspace(self):
         panel = self.page_simulation.config_panel
@@ -360,6 +584,11 @@ class MainWindow(QMainWindow):
         self._loading_draft = False
 
     def _apply_draft(self, config, title="Rascunho"):
+        if config.circuit is not None:
+            self.statusBar().showMessage(
+                "Circuito livre selecionado: use a página Circuitos para criar uma cópia editável."
+            )
+            return
         self._loading_draft = True
         try:
             self.page_simulation.config_panel.load_config(config)
@@ -371,6 +600,8 @@ class MainWindow(QMainWindow):
             title, "Cópia editável · resultados anteriores permanecem preservados."
         )
         self.settings.setValue("workspace/draft", json.dumps(asdict(config)))
+        if hasattr(self,"drafts"):
+            self.drafts.mark_identity_baseline()
 
     def _draft_changed(self):
         if not self._loading_draft:
@@ -380,7 +611,12 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("workspace/draft", json.dumps(asdict(config)))
             except ValueError:
                 self._draft_dirty = True
+        self._update_configuration_context()
         self._update_tutorial()
+
+    def _update_configuration_context(self):
+        rows = self.page_simulation._summary_rows
+        self.page_library.set_configuration_context(rows["sistema"].text() + " · " + rows["protocolo"].text())
 
     def _can_replace(self, config=None):
         if self._current_worker is not None:
@@ -393,12 +629,12 @@ class MainWindow(QMainWindow):
             current = self.page_simulation.config_panel.get_config()
         except ValueError:
             pass
-        if self._draft_dirty and current != config:
+        if (self._draft_dirty and current != config) or (hasattr(self,"drafts") and self.drafts.identity_dirty):
             return (
                 QMessageBox.question(
                     self,
                     "Substituir configuração?",
-                    "O rascunho foi editado. Deseja substituí-lo? Os resultados salvos serão preservados.",
+                    "O rascunho, nome ou descrição foi editado. Deseja substituí-lo? Os resultados salvos serão preservados.",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
@@ -406,7 +642,26 @@ class MainWindow(QMainWindow):
             )
         return True
 
+    def _save_project_notes(self, fields):
+        try:
+            if self.projects.project:
+                self.projects.store.annotate_project(self.projects.project, fields)
+                self.page_notebook.message.setText("Anotações do projeto salvas.")
+        except (OSError, ValueError, TypeError) as exc:
+            self.page_notebook.message.setText("Anotações ainda não salvas. Tente novamente: " + str(exc))
+
+    def _copy_circuit_model(self, revision):
+        if self.projects.create_work('circuit', revision.name + ' · cópia'):
+            editor = self.page_circuit.editor
+            editor.replace_document(revision.document, 'Criar cópia do modelo')
+            editor.circuit_description.setText(revision.description)
+            editor._library_id = editor._loaded_revision = None
+            self.projects.persist_active()
+
     def _new_experiment(self):
+        if hasattr(self, 'projects'):
+            self.projects.create_work('hamiltonian')
+            return
         cfg = ExperimentConfig(
             SystemConfig(),
             SimulationProtocol(),
@@ -419,6 +674,8 @@ class MainWindow(QMainWindow):
         if self.tutorial.active:
             self.tutorial.pause()
         self._pending_example_id = None
+        self.page_simulation.experiment_name.clear()
+        self.page_simulation.experiment_description.clear()
         self._apply_draft(cfg, "Novo experimento")
         self.page_simulation.config_panel.set_section("system")
         self._show_page("simulation")
@@ -426,11 +683,16 @@ class MainWindow(QMainWindow):
     def _load_example(self, identifier):
         example = get_example(identifier)
         cfg = example.create_config()
-        if not self._can_replace(cfg):
+        if hasattr(self, 'projects'):
+            if not self.projects.create_work('hamiltonian', example.title, cfg, example.description):
+                return
+        elif not self._can_replace(cfg):
             return
         if self.tutorial.active:
             self.tutorial.pause()
         self._pending_example_id = identifier
+        self.page_simulation.experiment_name.setText(example.title)
+        self.page_simulation.experiment_description.setText(example.description)
         self._apply_draft(cfg, example.title + " · cópia")
         self.page_simulation.config_panel.set_section("system")
         self._show_page("simulation")
@@ -481,12 +743,17 @@ class MainWindow(QMainWindow):
             return
         self._pending_example_id = "bell"
         self._apply_draft(cfg, "Tutorial · Seu primeiro Bell")
+        if experiment is not None and step >= 4:
+            self._current_experiment = experiment
+            self._unsaved_result = False
+            self._display_experiment(experiment)
         self.page_simulation.config_panel.set_mode("guided")
         self.help_dock.hide()
         self.tutorial_dock.show()
         self.settings.setValue("tutorial/bell/completed", False)
-        self.tutorial.start(step, experiment)
         self._show_page("simulation")
+        self.tutorial.start(step, experiment)
+        self._update_tutorial()
         self._persist_tutorial()
 
     def _tutorial_section(self, key):
@@ -501,7 +768,9 @@ class MainWindow(QMainWindow):
             config = self.page_simulation.config_panel.get_config()
         except ValueError:
             config = None
-        self.tutorial.update_context(config, self._current_page)
+        displayed = getattr(self.page_results, "_experiment", None)
+        self.tutorial.update_context(config, self._current_page,
+                                     getattr(displayed, "id", None))
 
     def _persist_tutorial(self):
         if not self.tutorial.started:
@@ -523,23 +792,56 @@ class MainWindow(QMainWindow):
         if self._current_worker is not None or not self._confirm_unsaved():
             return
         try:
-            config = self.page_simulation.config_panel.get_config()
+            config = self.page_simulation.validate_configuration()
         except ValueError as exc:
             self.page_simulation.status.set_error(str(exc))
             return
         self._start_worker(SimulationWorker(config, self), self._on_experiment)
 
     def _start_worker(self, worker, callback):
+        if isinstance(worker, SimulationWorker) and hasattr(self, 'projects'):
+            try:
+                self.projects.capture_launch(worker)
+            except (OSError, ValueError, TypeError) as exc:
+                self.projects.error('Configuração mantida em memória; o rascunho não pôde ser gravado: ' + str(exc))
+                self.projects.launch = dict(work_id=self.projects.active_id, project=self.projects.project or '',
+                    title=self.page_circuit.editor.circuit_name.text() if worker.config.circuit else self.page_simulation.experiment_name.text(),
+                    description=self.page_simulation.experiment_description.text(), config=deepcopy(worker.config),
+                    example_id=self._pending_example_id, circuit_context=deepcopy(self._pending_circuit_context), page=self._current_page)
         self._current_worker = worker
         self._running_config = worker.config
+        worker.ui_context = dict(project=self.projects.project, work=self.projects.active_id, page=self._current_page) if hasattr(self, 'projects') else None
         worker.completed.connect(callback)
         worker.error.connect(self._on_error)
         worker.cancelled.connect(self._on_cancelled)
         worker.progress.connect(self.page_simulation.status._progress.setValue)
+        worker.progress.connect(self.page_analysis.progress.setValue)
+        worker.progress.connect(self.page_documentation.progress.setValue)
+        worker.progress.connect(self.job_monitor.set_progress)
         worker.finished.connect(self._on_thread_finished)
         self.page_simulation.set_running(True)
         self.page_mitigation.set_running(True)
         self.page_analysis.set_running(True)
+        self.page_circuit.set_running(True)
+        self.page_bloch.metrics.set_busy(True)
+        self.page_comparison.set_running(True)
+        self.page_documentation.set_running(True)
+        self.page_workspace.set_running(True)
+        task = {SimulationWorker:"Simulando circuito…",MitigationWorker:"Calculando mitigação…",
+                AnalysisWorker:"Calculando análise…",ComparisonWorker:"Preparando comparação…",
+                DocumentationWorker:"Exportando documentação…",ReportWorker:"Preparando relatório…",
+                StudyImportWorker:"Importando estudo…",DetailWorker:"Carregando experimento…"}.get(type(worker),"Processando…")
+        if isinstance(worker, WorkspaceBackupWorker):
+            task = "Criando backup completo…" if worker.mode == "export" else "Validando backup completo…"
+        self.page_simulation.status.set_running(task)
+        context = ""
+        if isinstance(worker, WorkspaceBackupWorker):
+            context = "Espaço de trabalho"
+        elif isinstance(worker, SimulationWorker):
+            context = self.page_simulation.experiment_name.text().strip()
+        elif self._current_experiment is not None:
+            context = self._experiment_name(self._current_experiment)
+        self.job_monitor.start(task, context)
         worker.start()
 
     def _run_mitigation(self, qubit, method, shots):
@@ -560,18 +862,36 @@ class MainWindow(QMainWindow):
         if self._current_worker and self._current_worker.isInterruptionRequested():
             self._on_cancelled()
             return
-        if self._pending_example_id:
-            experiment.result.metadata["example_id"] = self._pending_example_id
+        launch = self.projects.launch if hasattr(self, 'projects') else None
+        example_id = launch.get('example_id') if launch else self._pending_example_id
+        circuit_context = launch.get('circuit_context') if launch else self._pending_circuit_context
+        if example_id:
+            experiment.result.metadata["example_id"] = example_id
+        if circuit_context is not None:
+            experiment.result.metadata["circuit_library"] = circuit_context
+            self._pending_circuit_context = None
+        if self._pending_parent_id:
+            experiment.result.metadata["reproduced_from_id"]=self._pending_parent_id
+            self._pending_parent_id=None
+        if self._reproduction_source is not None:
+            from core.reproduction import compare_reproduction
+            experiment.result.metadata["reproduction_check"] = compare_reproduction(self._reproduction_source, experiment)
+            self._reproduction_source = None
+        self._name_new_experiment(experiment)
+        foreground = self.projects.receive(experiment) if hasattr(self, 'projects') else True
+        if not foreground:
+            self._autosave_current(experiment)
+            self.job_monitor.completed_result(experiment.id, self._experiment_name(experiment))
+            return
         self._current_experiment = experiment
         self._unsaved_result = True
-        self._draft_baseline = experiment.config
-        self._draft_dirty = False
+        if experiment.config.circuit is None:
+            self._draft_baseline = experiment.config
+            self._draft_dirty = False
         self.tutorial.record_run(experiment)
         self._display_experiment(experiment)
         self._autosave_current()
-        self._show_page(
-            "bloch" if experiment.config.protocol.save_snapshots else "results"
-        )
+        self._show_page("results")
 
     def _on_mitigation(self, analysis):
         if self._current_worker and self._current_worker.isInterruptionRequested():
@@ -579,37 +899,101 @@ class MainWindow(QMainWindow):
             return
         source = self._zne_source
         analysis = {**analysis, "source_experiment_id": source.id}
-        self._current_experiment = Experiment(
+        metadata = deepcopy(source.result.metadata)
+        metadata.setdefault("reproduction", {}).update(
+            mitigation_method="zne",
+            mitigation_parameters={key: analysis[key] for key in ("method", "scale_factors", "qubit", "shots", "seed")},
+            mitigation_environment=analysis.get("provenance",{}),
+        )
+        if self._reproduction_source is not None:
+            from core.reproduction import compare_mitigation_reproduction
+            metadata["reproduction_check"] = compare_mitigation_reproduction(self._reproduction_source,analysis)
+            self._reproduction_source = None
+        else:
+            metadata.pop("reproduction_check", None)
+        calculated = Experiment(
             source.config,
-            replace(source.result, mitigation=analysis),
+            replace(source.result, mitigation=analysis, metadata=metadata),
             duration_s=analysis["duration_s"],
             tags=list(dict.fromkeys(source.tags + ["ZNE"])),
         )
+        self._copy_annotation(source, calculated, " · ZNE " + analysis["method"])
+        context = getattr(self._current_worker, 'ui_context', None)
+        if hasattr(self, 'projects'):
+            self.projects.results[calculated.id] = calculated
+            self.projects.unsaved_runs[calculated.id] = calculated
+            try:
+                owner = self.projects.store.work_for_execution(source.id)
+                if owner: self.projects.store.link_execution(owner['id'], calculated.id)
+            except (OSError, ValueError, TypeError) as exc:
+                self.statusBar().showMessage('ZNE calculada; associação do projeto ainda não salva: ' + str(exc))
+        if context and (context['project'], context['work']) != (self.projects.project, self.projects.active_id):
+            self._autosave_current(calculated)
+            self.job_monitor.completed_result(calculated.id, self._experiment_name(calculated))
+            return
+        self._current_experiment = calculated
         self._unsaved_result = True
         self._display_experiment(self._current_experiment)
         self._autosave_current()
         self._show_page("mitigation")
 
-    def _display_experiment(self, experiment):
-        self.page_results.show_experiment(experiment)
-        self.page_bloch.load_statevectors(
-            experiment.result.states,
-            experiment.result.times,
-            experiment.result.ideal_statevectors,
-        )
-        self.page_circuit.show_circuit(
-            experiment.result.circuit_text,
-            experiment.result.metadata.get("operations"),
-            bool(experiment.result.states),
-        )
-        self.page_analysis.load_experiment(experiment)
+    def clear_execution_context(self):
+        """Clear dependent source views together; never leave another work's values visible."""
+        self._current_experiment = None
+        self.page_results._set_available(False)
+        self.page_bloch.load_statevectors([])
+        self.export_bloch_view.setEnabled(False)
+        self.page_bloch._experiment = None
+        self.page_circuit.inspector.clear()
+        self.page_circuit.editor.evidence.set_experiment(None)
+        self.page_circuit.copy_button.setEnabled(False)
+        self.page_simulation.clear_experiment()
+        self.page_workspace.set_selected_experiment(None, None)
+        self.page_analysis.experiment = None
+        self.page_analysis.data = None
+        self.page_analysis.table.setRowCount(0)
+        self.page_analysis.set_experiment_title('')
+        self.page_analysis.export_button.setEnabled(False)
+        self.page_analysis.set_running(self._current_worker is not None)
+        self.page_mitigation.has_experiment = False
+        self.page_mitigation.context.setText('Abra ou execute uma simulação para estimar um observável.')
+        self.page_mitigation.reset_result()
+        self.page_mitigation.set_running(self._current_worker is not None)
+        if hasattr(self, 'drafts'):
+            owner = self.projects.active_id if hasattr(self, 'projects') else None
+            self.drafts.set_source('work:' + owner if owner else None)
         self._refresh_library()
+        self._refresh_documentation()
+
+    def _display_experiment(self, experiment):
+        self.page_settings.set_preview_source(experiment, self._experiment_name(experiment))
+        self.page_results.show_experiment(experiment)
+        self.page_results.set_saved(not self._unsaved_result and any(e.id == experiment.id for e in self._history))
+        self.page_bloch.load_statevectors(
+            experiment.result.states or ([experiment.result.final_state] if experiment.result.final_state is not None else []),
+            experiment.result.times if experiment.result.states else None,
+            experiment.result.ideal_statevectors if experiment.result.states else ([experiment.result.ideal_final_state] if experiment.result.ideal_final_state is not None else []),
+            time_unit=experiment.result.metadata.get("time_unit", "adimensional (ℏ=1)"),
+        )
+        self.page_bloch.set_experiment(experiment)
+        self.export_bloch_view.setEnabled(bool(self.page_bloch.original_svs))
+        self.page_circuit.show_experiment(experiment, self._experiment_name(experiment))
+        self.page_analysis.load_experiment(experiment)
+        if hasattr(self, "drafts"):
+            self.drafts.set_source(experiment.id)
         self.page_mitigation.load_experiment(experiment)
+        self._refresh_library()
+        self.page_simulation.set_experiment(experiment,self._experiment_name(experiment))
+        if hasattr(self.page_workspace, "set_selected_experiment"):
+            self.page_workspace.set_selected_experiment(self._experiment_name(experiment),
+                                                       "circuit" if experiment.config.circuit is not None else "hamiltonian")
         if self._current_worker:
             self.page_mitigation.set_running(True)
         self.page_analysis.set_running(self._current_worker is not None)
         self._restore_camera_preferences()
         self._refresh_saved_analyses()
+        if hasattr(self, 'onboarding'):
+            self.onboarding.refresh_context()
 
     def _save_current(self):
         if self._current_experiment is None or self._storage_worker is not None:
@@ -625,13 +1009,36 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Use Salvar para tentar novamente.")
             return False
         self._unsaved_result = False
+        if hasattr(self, 'projects'):
+            self.projects.unsaved_runs.pop(self._current_experiment.id, None)
+        self.page_results.set_saved(True)
         self._refresh_history()
         self.statusBar().showMessage(
-            "Experimento " + self._current_experiment.id + " salvo."
+            self._experiment_name(self._current_experiment) + " salvo."
         )
         return True
 
     def _confirm_unsaved(self):
+        pending = self.projects.unsaved_runs if hasattr(self, 'projects') else {}
+        if pending:
+            choice = QMessageBox.warning(self, 'Execuções ainda não salvas',
+                f'{len(pending)} execução(ões) calculada(s) ainda não foi(ram) gravada(s). Salve todas antes de continuar ou descarte explicitamente.',
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
+            if choice == QMessageBox.Cancel:
+                return False
+            if choice == QMessageBox.Save:
+                try:
+                    if self.repository is None: self.repository = ExperimentRepository()
+                    for identifier, record in list(pending.items()):
+                        self.repository.save(record)
+                        pending.pop(identifier, None)
+                    self._refresh_history()
+                except (OSError, ValueError, TypeError) as exc:
+                    self.statusBar().showMessage('As execuções continuam em memória. Não foi possível salvar todas: ' + str(exc))
+                    return False
+            else:
+                pending.clear()
+            self._unsaved_result = False
         if not self._unsaved_result:
             return True
         choice = QMessageBox.warning(
@@ -663,48 +1070,69 @@ class MainWindow(QMainWindow):
         self.page_history.load(records)
         self.page_comparison.load(records)
         self.page_dashboard.load_recent(records[:5])
+        self._refresh_workspace_recent()
         latest = next((e for e in records if not e.result.error), None)
         self.page_dashboard.update_stats(
             len(records),
-            latest.config.system.hamiltonian if latest else None,
+            system_label(latest.config) if latest else None,
             latest.result.fidelity if latest else None,
             latest.result.purity if latest else None,
         )
 
     def _open_experiment(self, identifier):
-        if self.repository is None:
-            return
-        try:
-            experiment = self.repository.load(identifier)
-            if not self._can_replace(experiment.config):
-                return
-            self._apply_draft(experiment.config, "Execução " + experiment.id)
-            self._current_experiment = experiment
-            self._unsaved_result = False
-            self._display_experiment(experiment)
-            self._pending_example_id = experiment.result.metadata.get("example_id")
-        except (OSError, ValueError, TypeError, KeyError) as exc:
-            self.statusBar().showMessage("Não foi possível abrir: " + str(exc))
-            return
-        self._show_page("results")
-        self.tutorial.record_open(identifier)
+        if hasattr(self, 'projects'):
+            return self.projects.show_execution(identifier)
 
     def _cancel_simulation(self):
+        if self._storage_worker is not None and self._current_worker is not None and self._current_worker.isFinished():
+            self.statusBar().showMessage("Concluindo a gravação do resultado; aguarde para preservar os dados.")
+            return
         if self._current_worker:
             self._current_worker.requestInterruption()
+            self.job_monitor.cancelling()
             self.page_simulation.btn_cancel.setEnabled(False)
             self.statusBar().showMessage(
                 "Cancelando; aguardando a operação atual do simulador."
             )
 
     def _on_cancelled(self):
+        self.statusBar().showMessage("Tarefa cancelada; os dados de origem e os resultados anteriores foram preservados.")
+        if isinstance(self._current_worker, WorkspaceBackupWorker):
+            self.page_settings.backup_message.setText("Operação cancelada; espaço de trabalho preservado.")
+        self.page_analysis.message.setText("Tarefa cancelada; resultados anteriores preservados.")
+        if isinstance(self._current_worker,DocumentationWorker):
+            self.page_documentation.message.setText("Exportação cancelada; arquivo de destino anterior e dados de origem preservados.")
+        elif isinstance(self._current_worker,StudyImportWorker):
+            self.page_documentation.message.setText("Importação cancelada; nenhuma cópia foi instalada e os registros anteriores foram preservados.")
+        elif isinstance(self._current_worker,ComparisonWorker):
+            self.page_comparison.message.setText("Carregamento cancelado; registros de origem preservados.")
         self.page_simulation.status.set_idle(
             "Execução cancelada; resultados anteriores preservados"
         )
 
     def _on_error(self, message):
+        if isinstance(self._current_worker, WorkspaceBackupWorker):
+            self.page_settings.backup_message.setText(message)
+            self.statusBar().showMessage(message)
+            return
+        if isinstance(self._current_worker, (DetailWorker, StudyImportWorker)):
+            if isinstance(self._current_worker,StudyImportWorker):
+                self.page_documentation.message.setText(message)
+            self.statusBar().showMessage(message)
+            return
+        if isinstance(self._current_worker,(ComparisonWorker,DocumentationWorker)):
+            self.page_documentation.message.setText(message)
+            self.page_comparison.message.setText(message)
+            self.statusBar().showMessage(message)
+            self.page_simulation.status.set_error(message)
+            return
+        if isinstance(self._current_worker, ReportWorker):
+            self.statusBar().showMessage(message)
+            self.page_simulation.status.set_error(message)
+            return
         if isinstance(self._current_worker, AnalysisWorker):
             self.page_analysis.message.setText(message)
+            self.page_bloch.metrics.summary.setText(message)
             self.page_simulation.status.set_error(message)
             return
         self.page_simulation.status.set_error(message)
@@ -732,16 +1160,36 @@ class MainWindow(QMainWindow):
         self.page_simulation.set_running(False)
         self.page_mitigation.set_running(False)
         self.page_analysis.set_running(False)
+        self.page_circuit.set_running(False)
+        self.page_bloch.metrics.set_busy(False)
+        self.page_comparison.set_running(False)
+        self.page_documentation.set_running(False)
+        self.page_workspace.set_running(False)
+        self.job_monitor.finish()
+        if hasattr(self, 'projects'):
+            context = getattr(worker, 'ui_context', None)
+            if context and context['work'] != self.projects.active_id and self.page_simulation._valid:
+                self.page_simulation.status.set_idle('Rascunho pronto · consulte a tarefa concluída no monitor')
+            self.projects.launch = None
+            self.projects.refresh()
+        self._pending_parent_id=None
+        self._pending_circuit_context = None
+        self._reproduction_source = None
         if worker:
             worker.deleteLater()
         if self._close_pending:
             QTimer.singleShot(0, self.close)
+        else:
+            QTimer.singleShot(0, self._drain_pending_reads)
 
     def _import_experiment(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Importar experimento", "", "JSON (*.json)"
+            self, "Importar experimento ou estudo", "", "Experimento JSON ou estudo ZIP (*.json *.zip);;JSON (*.json);;Pacote completo ZIP (*.zip)"
         )
         if not path:
+            return
+        if Path(path).suffix.lower() == ".zip":
+            self._start_study_import(path)
             return
         try:
             source = import_experiment_json(path)
@@ -768,50 +1216,110 @@ class MainWindow(QMainWindow):
         except (OSError, ValueError, TypeError, KeyError) as exc:
             self.statusBar().showMessage("Não foi possível importar: " + str(exc))
 
+    def _import_study(self):
+        path, _ = QFileDialog.getOpenFileName(self,"Importar estudo verificável","","Pacote completo Entrela (*.zip)")
+        if path:
+            self._start_study_import(path)
+
+    def _start_study_import(self, path):
+        if self._current_worker is not None or self._storage_worker is not None or not self._confirm_unsaved():
+            return
+        if self.repository is None:
+            self.page_documentation.message.setText("Escolha um armazenamento disponível para importar o estudo.")
+            return
+        self._start_worker(StudyImportWorker(path,self.repository,self),self._on_study_imported)
+        self.page_documentation.message.setText("Verificando integridade e preparando cópias independentes do estudo…")
+
+    def _on_study_imported(self, prepared):
+        if self._current_worker and self._current_worker.isInterruptionRequested():
+            prepared.abort()
+            self._on_cancelled()
+            return
+        try:
+            experiments = prepared.commit()
+            self._refresh_history()
+            self._current_experiment = experiments[0]
+            self._unsaved_result = False
+            self._display_experiment(experiments[0])
+            if len(experiments) == 2:
+                self.page_comparison.comparison_mode.setCurrentIndex(max(0,self.page_comparison.comparison_mode.findData(prepared.comparison_mode)))
+                self.page_comparison.set_runs(experiments[0].id,experiments[1].id)
+            self.page_history.selected_identifier = experiments[0].id
+            self.page_history.set_detail(experiments[0])
+            self._show_page("history")
+            self.page_documentation.message.setText(f"Estudo importado: {len(experiments)} execução(ões), análises e protocolos. Hashes verificados; originais preservados no pacote de origem.")
+            self.statusBar().showMessage("Estudo importado e verificado. Use Reexecutar para conferir a reprodução numérica.")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            message = "Não foi possível concluir a importação: " + str(exc)
+            self.page_documentation.message.setText(message)
+            self.statusBar().showMessage(message)
+
+    def _remember_export(self, path, sources, kind):
+        if not hasattr(self, 'projects'): return True
+        try:
+            self.projects.store.register_artifact([source.id for source in sources], path, kind)
+            self._refresh_documentation()
+            return True
+        except (OSError, ValueError, TypeError) as exc:
+            self.statusBar().showMessage('Arquivo gerado em ' + str(path) + '; vínculo no caderno ainda não salvo: ' + str(exc))
+            return False
+
     def _export_counts(self):
         if (
             self._current_experiment is None
             or not self._current_experiment.result.counts
         ):
             return
+        source = self._current_experiment
+        annotation = self._current_annotation()
         path, _ = QFileDialog.getSaveFileName(
             self, "Exportar contagens", "contagens.csv", "CSV (*.csv)"
         )
         if path:
             try:
-                export_counts_csv(self._current_experiment.result.counts, path)
-                self.statusBar().showMessage("CSV exportado")
-            except OSError as exc:
+                export_experiment_csv(source, path, annotation=annotation)
+                if self._remember_export(path, [source], 'csv'):
+                    self.statusBar().showMessage("CSV exportado com configuração e proveniência")
+            except (OSError, ValueError) as exc:
                 self.statusBar().showMessage(str(exc))
 
     def _export_experiment(self):
-        if self._current_experiment is None:
+        if self._current_experiment is None or self._current_worker is not None:
             return
+        source = self._current_experiment
         path, kind = QFileDialog.getSaveFileName(
             self,
             "Exportar experimento",
-            "experimento.json",
+            "experimento",
             "JSON (*.json);;Pacote ZIP (*.zip)",
         )
         if path:
             try:
-                if "ZIP" in kind and not Path(path).suffix:
-                    path += ".zip"
+                if not Path(path).suffix:
+                    path += ".zip" if "ZIP" in kind else ".json"
                 if Path(path).suffix.lower() == ".zip":
-                    export_run_bundle(self._current_experiment, path)
+                    self.page_documentation.use_comparison.setChecked(False)
+                    self._show_page("documentation")
+                    self._start_documentation_export([source],path,"zip")
+                    return
                 else:
-                    export_experiment_json(self._current_experiment, path)
-                self.statusBar().showMessage("Experimento completo exportado")
+                    export_experiment_json(source, path)
+                if self._remember_export(path, [source], 'json'):
+                    self.statusBar().showMessage("Experimento completo exportado")
             except (OSError, ValueError) as exc:
                 self.statusBar().showMessage(str(exc))
 
     def _export_figures(self):
         if self._current_experiment is None:
             return
+        source = self._current_experiment
         directory = QFileDialog.getExistingDirectory(self, "Exportar figuras PNG")
         if not directory:
             return
-        prefix = Path(directory) / ("entrela-" + self._current_experiment.id)
+        if self._current_experiment is None or self._current_experiment.id != source.id:
+            self.statusBar().showMessage('A seleção mudou durante a escolha do destino. Confira a execução e exporte as figuras novamente.')
+            return
+        prefix = Path(directory) / ("entrela-" + source.id)
         figures = [
             (
                 self.page_results.results_tab.canvas_hist.fig,
@@ -838,12 +1346,20 @@ class MainWindow(QMainWindow):
                 return
         try:
             for figure, path in figures:
-                export_figure(figure, path)
-            self.statusBar().showMessage("Figuras exportadas")
+                export_figure(figure, path, dpi=self.page_settings.export_dpi.value())
+            registered = [self._remember_export(path, [source], 'png') for _, path in figures]
+            if all(registered): self.statusBar().showMessage("Figuras exportadas e vinculadas às fontes")
         except OSError as exc:
             self.statusBar().showMessage(str(exc))
 
     def closeEvent(self, event):
+        if getattr(self, "_workspace_replaced", False):
+            self.page_bloch.timer.stop()
+            self.drafts.timer.stop()
+            self._pending_detail_id = None
+            self._pending_comparison = None
+            event.accept()
+            return
         if self._current_worker is not None or self._storage_worker is not None:
             self._close_pending = True
             self._cancel_simulation()
@@ -852,38 +1368,58 @@ class MainWindow(QMainWindow):
         if not self._confirm_unsaved():
             event.ignore()
             return
+        if hasattr(self, "drafts") and not self.drafts.flush():
+            choice = QMessageBox.warning(self, "Rascunho não protegido", self.drafts.error +
+                "\nFechar sem recuperar as últimas alterações?", QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
+            if choice != QMessageBox.Discard:
+                event.ignore()
+                return
         self._close_pending = False
         self._persist_tutorial()
         self.page_bloch.timer.stop()
         self._persist_camera()
+        self.settings.setValue("comparison/view", json.dumps(self.page_comparison.collect_view_preferences()))
+        self.settings.setValue("export/report_options", json.dumps(self.page_documentation.report_options()))
+        self.layout_controller.save()
         self.settings.sync()
         event.accept()
 
-    def _autosave_current(self):
+    def _autosave_current(self, experiment=None):
         if self.repository is None:
             self.page_simulation.status.set_error(
                 "Armazenamento indisponível; resultado permanece disponível."
             )
             return
         self._storage_worker = StorageWorker(
-            self.repository, self._current_experiment, self
+            self.repository, experiment or self._current_experiment, self
         )
         self._storage_worker.completed.connect(self._on_saved)
         self._storage_worker.error.connect(self._on_save_error)
         self._storage_worker.finished.connect(self._on_storage_finished)
         self.statusBar().showMessage("Salvando resultado em segundo plano…")
+        if self._current_worker is not None:
+            self.job_monitor.set_phase("Salvando resultado…", cancellable=False)
         self._storage_worker.start()
 
     def _on_saved(self, identifier):
+        if hasattr(self, 'projects'):
+            self.projects.unsaved_runs.pop(identifier, None)
         if self._current_experiment and self._current_experiment.id == identifier:
             self._unsaved_result = False
+            self.page_results.set_saved(True)
         self._refresh_history()
+        if hasattr(self, "projects"):
+            self.projects.refresh()
         self.page_simulation.status.set_success(
             "Execução concluída e salva no histórico"
         )
-        self.statusBar().showMessage("Experimento " + identifier + " salvo.")
+        if self._current_experiment and self._current_experiment.id == identifier:
+            self.statusBar().showMessage(self._experiment_name(self._current_experiment) + " salvo.")
+        if self.page_settings.completion_notifications.isChecked():
+            QApplication.alert(self, 1500)
 
     def _on_save_error(self, message):
+        self.page_results.set_saved(False)
         self.page_simulation.status.set_error(
             "Resultado disponível, mas não foi salvo: " + message
         )
@@ -907,28 +1443,52 @@ class MainWindow(QMainWindow):
             source.config,
             seed=source.result.metadata.get("effective_seed", source.config.seed),
         )
+        panel=self.page_analysis.protocol
+        replay=self.page_analysis.replay_context
+        self.page_analysis.replay_context=None
+        self._analysis_protocol=deepcopy(panel.context() if replay is None else replay)
+        if replay is None and panel.loaded and (panel.loaded["source_id"]!=source.id or panel.loaded["kind"]!=kind or panel.loaded["options"]!=options):
+            self._analysis_protocol["derived_from_protocol_id"]=panel.loaded["protocol_id"]
+            self._analysis_protocol["protocol_id"]=None
+        self._analysis_protocol["execution_options"]=deepcopy(options)
         self._start_worker(
             AnalysisWorker(config, kind, source, options, self), self._on_analysis
         )
         self.page_analysis.message.setText(
-            "Calculando em segundo plano; cancele pela página Simulação."
+            "Calculando em segundo plano. Você pode cancelar nesta tela."
         )
 
     def _on_analysis(self, data):
-        self.page_analysis.show_analysis(data)
+        # Bind all artifacts to the source captured by the worker, never to a
+        # subsequently selected record. Inputs and effective seeds remain explicit.
+        worker = self._current_worker
+        if worker is not None and worker.isInterruptionRequested():
+            self._on_cancelled()
+            return
+        source = worker.source if isinstance(worker, AnalysisWorker) else self._current_experiment
+        data.setdefault("source_id", source.id)
+        data.setdefault("analysis_id", uuid4().hex[:12])
+        data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+        data.setdefault("config", asdict(source.config))
+        data.setdefault("source_metadata", source.result.metadata)
+        data.setdefault("protocol",deepcopy(getattr(self,"_analysis_protocol",{})))
+        foreground = self._current_experiment is not None and self._current_experiment.id == source.id
+        if foreground:
+            self.page_analysis.show_analysis(data)
+            if data.get("kind") == "temporal":
+                self.page_bloch.metrics.set_rows(data["rows"])
+        elif hasattr(self, 'projects'):
+            self.projects.completed_studies[source.id] = deepcopy(data)
+            self.job_monitor.completed_result(source.id, 'Estudo concluído · ' + self._experiment_name(source))
         if self.repository is not None:
             folder = (
-                self.repository.base_dir / ".analyses" / self._current_experiment.id
+                self.repository.base_dir / ".analyses" / source.id
             )
-            folder.mkdir(parents=True, exist_ok=True)
-            data["source_id"] = self._current_experiment.id
-            path = folder / (uuid4().hex[:12] + ".json")
+            path = folder / (data["analysis_id"] + ".json")
             try:
-                path.write_text(
-                    json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False),
-                    encoding="utf-8",
-                )
-            except OSError as exc:
+                from data.analyses import save_analysis
+                save_analysis(data, path)
+            except (OSError, ValueError, TypeError) as exc:
                 self.statusBar().showMessage(
                     "Análise disponível; falha ao guardar: " + str(exc)
                 )
@@ -941,21 +1501,46 @@ class MainWindow(QMainWindow):
         if self._current_experiment is None or self._current_worker is not None:
             return
         source = self._current_experiment
+        if source.result.mitigation:
+            m = source.result.mitigation
+            zne_seed = m.get("seed", source.result.metadata.get("effective_seed", source.config.seed))
+            if zne_seed is None:
+                self.statusBar().showMessage("Análise ZNE sem semente registrada; configure uma nova análise.")
+                return
+            if not self._confirm_unsaved():
+                return
+            self._zne_source = source
+            self._reproduction_source = source
+            self._start_worker(
+                MitigationWorker(replace(source.config, seed=zne_seed), m["qubit"], m["method"], m["shots"], self, scale_factors=m["scale_factors"]),
+                self._on_mitigation,
+            )
+            self.statusBar().showMessage("Reproduzindo ZNE; métricas da execução de origem preservadas.")
+            return
         seed = source.result.metadata.get("effective_seed", source.config.seed)
         if seed is None:
             self.statusBar().showMessage(
                 "Registro sem semente efetiva; escolha uma no formulário para criar uma nova execução."
             )
             return
-        if not self._confirm_unsaved():
+        if not self._can_replace(source.config):
             return
         self._pending_example_id = source.result.metadata.get("example_id")
+        self._pending_parent_id=source.id
+        self._reproduction_source=source
         config = replace(source.config, seed=seed)
-        self._apply_draft(config, "Reprodução de " + source.id)
+        if config.circuit is None:
+            self._apply_draft(config, "Reprodução de " + self._experiment_name(source))
+            self.page_simulation.experiment_name.setText((self._experiment_name(source) + " · reprodução")[:160])
+            self.page_simulation.experiment_description.setText((self._current_annotation() or {}).get("description",""))
+        else:
+            self._pending_circuit_context = deepcopy(source.result.metadata.get("circuit_library",{}))
+            self._pending_circuit_context.update(name=(self._experiment_name(source) + " · reprodução")[:160],
+                description=(self._current_annotation() or {}).get("description",""))
         self._start_worker(SimulationWorker(config, self), self._on_experiment)
 
     def _export_report(self):
-        if self._current_experiment is None:
+        if self._current_experiment is None or self._current_worker is not None:
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -966,22 +1551,136 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            annotation = (
-                self._workspace_library()
-                .read()["annotations"]
-                .get(self._current_experiment.id)
+            annotation = self._current_annotation()
+            self._report_path = path
+            self._start_worker(
+                ReportWorker(self._current_experiment, self.page_analysis.data, annotation, self,
+                    pdf_path=path if Path(path).suffix.lower() == ".pdf" else None,
+                    options=self.page_documentation.report_options(),
+                    raster_dpi=self.page_settings.export_dpi.value()),
+                self._on_report_prepared,
             )
-            export_report(
-                self._current_experiment, path, self.page_analysis.data, annotation
-            )
-            self.statusBar().showMessage("Relatório exportado")
+            self.statusBar().showMessage("Preparando gráficos e relatório em segundo plano…")
         except (OSError, ValueError) as exc:
             self.statusBar().showMessage(str(exc))
+
+    def _on_report_prepared(self, html):
+        if self._current_worker and self._current_worker.isInterruptionRequested():
+            self._on_cancelled()
+            return
+        try:
+            if not getattr(self._current_worker, "pdf_path", None):
+                export_rendered_report(html, self._report_path)
+            self.statusBar().showMessage("Relatório exportado: " + self._report_path)
+            self.page_simulation.status.set_success("Relatório concluído")
+        except (OSError, ValueError, RuntimeError) as exc:
+            self.statusBar().showMessage("Não foi possível exportar: " + str(exc))
 
     def _workspace_library(self):
         if self.repository is None:
             raise ValueError("Armazenamento indisponível.")
         return WorkspaceLibrary(self.repository.base_dir / ".workspace")
+
+    def _current_annotation(self):
+        # Exports remain a recovery path even if workspace storage is unavailable.
+        if self.repository is None or self._current_experiment is None:
+            return None
+        try:
+            return self._workspace_library().read()["annotations"].get(self._current_experiment.id)
+        except (OSError, ValueError, TypeError, KeyError):
+            return None
+
+    def _experiment_name(self, experiment):
+        if experiment is None:
+            return "Experimento"
+        try:
+            annotations = self._workspace_library().read()["annotations"]
+        except (OSError, ValueError, TypeError, KeyError):
+            annotations = {}
+        return experiment_title(experiment, annotations)
+
+    def _name_new_experiment(self, experiment):
+        """Keep the human notebook separate from immutable scientific records."""
+        try:
+            context = experiment.result.metadata.get("circuit_library",{}) if experiment.config.circuit else None
+            launch = self.projects.launch if hasattr(self, 'projects') else None
+            title = (launch.get('title', '') if launch else (context.get("name","") if context is not None else self.page_simulation.experiment_name.text())).strip()
+            if not title:
+                try:
+                    sequence = int(self.settings.value("workspace/experiment_sequence", 0)) + 1
+                except (TypeError, ValueError):
+                    sequence = len(self._history) + 1
+                self.settings.setValue("workspace/experiment_sequence", sequence)
+                noise = experiment.config.noise
+                label = noise.kind if noise.enabled else "ideal"
+                title = f"Experimento {sequence:03d} · {system_label(experiment.config)} · {label}"
+            self._workspace_library().annotate(
+                experiment.id, launch.get("project", "") if launch else "", "", [], title=title[:160],
+                description=(launch.get("description", "") if launch else (context.get("description","") if context is not None else self.page_simulation.experiment_description.text())).strip(),
+            )
+            if context is None and (not launch or launch['work_id'] == self.projects.active_id):
+                self.drafts.mark_identity_baseline()
+        except (OSError, ValueError, TypeError) as exc:
+            self.statusBar().showMessage("Resultado disponível; não foi possível salvar o nome: " + str(exc))
+
+    def _copy_annotation(self, source, target, suffix):
+        try:
+            library = self._workspace_library()
+            annotation = library.read()["annotations"].get(source.id, {})
+            extras = {key: annotation[key] for key in
+                      ("description", "objective", "hypothesis", "methodology", "categories") if key in annotation}
+            library.annotate(target.id, annotation.get("project", ""), annotation.get("notes", ""),
+                             annotation.get("tags", []), title=(self._experiment_name(source) + suffix)[:160], **extras)
+        except (OSError, ValueError, TypeError) as exc:
+            self.statusBar().showMessage("Resultado disponível; não foi possível copiar as anotações: " + str(exc))
+
+    def _request_history_detail(self, identifier):
+        if self.repository is None:
+            return
+        self._pending_detail_id = identifier
+        if self._current_worker is None and self._storage_worker is None:
+            self._drain_pending_reads()
+
+    def _drain_pending_reads(self):
+        if self._close_pending or self._current_worker is not None or self._storage_worker is not None:
+            return
+        if self._pending_comparison is not None:
+            identifiers = self._pending_comparison
+            self._pending_comparison = None
+            self._prepare_comparison(*identifiers)
+        elif self._pending_detail_id is not None and self.repository is not None:
+            identifier = self._pending_detail_id
+            self._pending_detail_id = None
+            summary = next((record for record in self._history if record.id == identifier), None)
+            if summary is not None:
+                self._start_worker(DetailWorker(self.repository, identifier, summary.config, self), self._on_history_detail)
+
+    def _on_history_detail(self, experiment):
+        if self._current_worker and self._current_worker.isInterruptionRequested():
+            return
+        files = []
+        if self.repository is not None:
+            folder = self.repository.base_dir / ".analyses" / experiment.id
+            files = sorted(folder.glob("*.json"))
+            if hasattr(self, 'projects'):
+                try:
+                    files += [Path(item['path']) for item in self.projects.store.artifacts([experiment.id])]
+                except (OSError, ValueError, TypeError):
+                    pass
+        self.page_history.set_detail(experiment, files=files)
+
+    def _edit_history_annotation(self, identifier):
+        self._open_experiment(identifier)
+        if self._current_experiment and self._current_experiment.id == identifier:
+            self._show_page("library")
+
+    def _load_demonstration(self, document):
+        if self._current_worker is not None:
+            self.statusBar().showMessage("Aguarde a tarefa atual antes de abrir uma demonstração.")
+            return
+        self.page_circuit.editor.replace_document(document, "Exemplo didático")
+        self.page_circuit.tabs.setCurrentWidget(self.page_circuit.editor)
+        self._show_page("circuit")
 
     def _refresh_library(self):
         try:
@@ -989,11 +1688,36 @@ class MainWindow(QMainWindow):
             identifier = (
                 self._current_experiment.id if self._current_experiment else None
             )
-            self.page_library.load(data, identifier)
+            current = self._current_experiment
+            self.page_library.load(data, identifier, self._experiment_name(current) if current else None)
+            self.page_workspace.set_templates([{"id": name, "name": name}
+                                               for name in sorted(data["templates"], key=str.casefold)])
+            self._update_configuration_context()
             self.page_history.annotations = data["annotations"]
             self.page_history._filter()
+            self._refresh_protocols()
+            self.page_comparison.annotations = data["annotations"]
+            self.page_comparison.load(list(self.page_comparison.records.values()))
+            if hasattr(self.page_dashboard, "set_annotations"):
+                self.page_dashboard.set_annotations(data["annotations"])
+            self._refresh_workspace_recent()
+            if identifier:
+                title = experiment_title(current, data["annotations"])
+                self.page_workspace.set_selected_experiment(title, "circuit" if current.config.circuit is not None else "hamiltonian")
+                self.page_analysis.set_experiment_title(title)
+                self.page_mitigation.context.setText(title)
+                self.page_circuit.context.setText(title + " · " + system_label(current.config)
+                    + f" · {current.config.system.num_qubits} qubits · {len(self.page_circuit.operations)} portas · profundidade {current.result.circuit_depth}")
+            self.navigation.update_heading()
         except (OSError, ValueError, TypeError, KeyError) as exc:
-            self.page_library.message.setText(str(exc))
+            self.page_workspace.set_templates([])
+            self.page_library.set_unavailable(str(exc))
+
+    def _refresh_workspace_recent(self):
+        annotations = self.page_history.annotations
+        entries = [(record.id, experiment_title(record, annotations)) for record in self._history[:20]]
+        self.page_workspace.set_recent(entries)
+        self.page_analysis.set_recent_sources(entries)
 
     def _save_template(self, name):
         try:
@@ -1008,7 +1732,10 @@ class MainWindow(QMainWindow):
     def _load_template(self, name):
         try:
             config = self._workspace_library().template(name)
-            if not self._can_replace(config):
+            if hasattr(self, 'projects'):
+                if not self.projects.create_work('hamiltonian', name + ' · cópia', config):
+                    return
+            elif not self._can_replace(config):
                 return
             self._pending_example_id = None
             self._apply_draft(config, name)
@@ -1033,8 +1760,10 @@ class MainWindow(QMainWindow):
             return
         try:
             self._workspace_library().annotate(
-                self._current_experiment.id, project, notes, tags
+                self._current_experiment.id, project, notes, tags,
+                **self.page_library.annotation_payload(),
             )
+            self.drafts.annotation_committed(self._current_experiment.id)
             self._refresh_library()
             self.page_library.message.setText(
                 "Projeto e anotações salvos; dados científicos preservados."
@@ -1043,44 +1772,54 @@ class MainWindow(QMainWindow):
             self.page_library.message.setText(str(exc))
 
     def _restore_preferences(self):
-        page = self.page_settings
-        widgets = [
-            page.theme,
-            page.font_size,
-            page.presentation,
-            page.compact,
-            self.page_bloch.speed_combo,
-            self.page_bloch.loop,
-            self.page_bloch.trails,
-        ]
-        blockers = [QSignalBlocker(w) for w in widgets]
-        theme = self.settings.value("appearance/theme", "dark")
-        page.theme.setCurrentIndex(max(0, page.theme.findData(theme)))
+        values = {}
+        for key, default in SettingsPage.DEFAULTS.items():
+            path = self._preference_path(key)
+            values[key] = self.settings.value(path, default, type=bool) if isinstance(default, bool) else self.settings.value(path, default)
+        if not self.settings.value("appearance/readability_v1", False, type=bool):
+            if str(values["font_size"]) == "13":
+                values["font_size"] = 15
+            self.settings.setValue("appearance/readability_v1", True)
+        self.page_settings.apply_values(values)
         try:
-            page.font_size.setValue(int(self.settings.value("appearance/font", 13)))
+            self.page_library.apply_view_preferences(json.loads(self.settings.value("library/view", '{"tab":0,"expanded":["identification","notes"]}')))
         except (ValueError, TypeError):
-            page.font_size.setValue(13)
-        page.presentation.setChecked(
-            self.settings.value("appearance/presentation", False, type=bool)
-        )
-        page.compact.setChecked(
-            self.settings.value("appearance/compact", False, type=bool)
-        )
+            self.page_library.apply_view_preferences({})
+        try:
+            self.page_documentation.apply_report_options(json.loads(self.settings.value("export/report_options", "{}")))
+        except (ValueError, TypeError):
+            self.page_documentation.apply_report_options({})
+        try:
+            self.page_comparison.apply_view_preferences(json.loads(self.settings.value("comparison/view", "{}")))
+        except (ValueError, TypeError):
+            self.page_comparison.apply_view_preferences({})
+        page = self.page_bloch
+        blockers = [QSignalBlocker(widget) for widget in (page.speed_combo, page.loop, page.trails)]
         speed = self.settings.value("bloch/speed", "1x")
-        self.page_bloch.speed_combo.setCurrentText(
-            speed if speed in ("0.5x", "1x", "2x", "4x") else "1x"
-        )
-        self.page_bloch.loop.setChecked(
-            self.settings.value("bloch/loop", False, type=bool)
-        )
-        self.page_bloch.trails.setChecked(
-            self.settings.value("bloch/trails", True, type=bool)
-        )
-        blocker = QSignalBlocker(self.page_bloch)
+        page.speed_combo.setCurrentText(speed if speed in ("0.5x", "1x", "2x", "4x") else "1x")
+        page.loop.setChecked(self.settings.value("bloch/loop", False, type=bool))
+        page.trails.setChecked(self.settings.value("bloch/trails", True, type=bool))
         del blockers
-        self.page_bloch._update_speed(self.page_bloch.speed_combo.currentText())
+        try:
+            page.apply_view_preferences(json.loads(self.settings.value('bloch/view', '{}')))
+        except (ValueError, TypeError):
+            page.apply_view_preferences({})
+        blocker = QSignalBlocker(page)
+        page._update_speed(page.speed_combo.currentText())
         del blocker
         self._apply_preferences()
+
+    @staticmethod
+    def _preference_path(key):
+        return {"font_size": "appearance/font", "export_dpi": "export/dpi",
+                "completion_notifications": "notifications/completion"}.get(key, "appearance/" + key)
+
+    def _persist_library_view(self):
+        self.settings.setValue("library/view", json.dumps(self.page_library.collect_view_preferences()))
+
+    def _system_theme_changed(self, *_):
+        if self.page_settings.theme.currentData() == "auto":
+            self._apply_preferences()
 
     def _persist_bloch_preferences(self):
         if not hasattr(self, "page_bloch"):
@@ -1089,6 +1828,7 @@ class MainWindow(QMainWindow):
         self.settings.setValue("bloch/speed", page.speed_combo.currentText())
         self.settings.setValue("bloch/loop", page.loop.isChecked())
         self.settings.setValue("bloch/trails", page.trails.isChecked())
+        self.settings.setValue('bloch/view', json.dumps(page.collect_view_preferences()))
         if page.precomputed_bloch:
             self.settings.setValue("bloch/focus", page.focus_combo.currentData())
 
@@ -1097,75 +1837,53 @@ class MainWindow(QMainWindow):
         if not canvas._sphere_centers:
             return
         try:
-            zoom = float(self.settings.value("bloch/zoom", 1.0))
-            elev = float(self.settings.value("bloch/elev", 22.0))
-            azim = float(self.settings.value("bloch/azim", -60.0))
             focus = int(self.settings.value("bloch/focus", -1))
-            import math
-
-            if not all(math.isfinite(x) for x in (zoom, elev, azim)):
-                return
             index = self.page_bloch.focus_combo.findData(focus)
-            if index >= 0:
-                self.page_bloch.focus_combo.setCurrentIndex(index)
-            canvas.zoom = max(0.5, min(3.0, zoom))
-            canvas.ax.view_init(elev=elev, azim=azim)
-            pan = json.loads(self.settings.value("bloch/pan", "[0,0,0]"))
-            if (
-                isinstance(pan, list)
-                and len(pan) == 3
-                and all(isinstance(x, (int, float)) and math.isfinite(x) for x in pan)
-            ):
-                import numpy as np
-
-                _, half = canvas._bounds()
-                canvas._pan = np.clip(np.array(pan), -half, half)
-            canvas._apply_camera()
-        except (ValueError, TypeError):
-            pass
+            self.page_bloch.focus_combo.setCurrentIndex(max(0, index))
+            canvas.set_focus(self.page_bloch.focus_combo.currentData())
+            canvas.restore_camera(
+                zoom=float(self.settings.value("bloch/zoom", 1.0)),
+                elev=float(self.settings.value("bloch/elev", 22.0)),
+                azim=float(self.settings.value("bloch/azim", -60.0)),
+                pan=json.loads(self.settings.value("bloch/pan", "[0,0,0]")),
+                projection=self.settings.value("bloch/projection", "persp"),
+            )
+        except (ValueError, TypeError, OverflowError):
+            canvas.reset_camera()
+        self.page_bloch._refresh_ui()
 
     def _persist_camera(self):
         canvas = self.page_bloch.canvas
         if not canvas._sphere_centers:
             return
-        import numpy as np
-
-        center, _ = canvas._bounds()
-        pan = (
-            np.array(
-                [
-                    np.mean(canvas.ax.get_xlim()),
-                    np.mean(canvas.ax.get_ylim()),
-                    np.mean(canvas.ax.get_zlim()),
-                ]
+        for key, value in canvas.camera_state().items():
+            self.settings.setValue(
+                "bloch/" + key, json.dumps(value) if key == "pan" else value
             )
-            - center
-        )
-        self.settings.setValue("bloch/pan", json.dumps(pan.tolist()))
-        self.settings.setValue("bloch/zoom", canvas.zoom)
-        self.settings.setValue("bloch/elev", canvas.ax.elev)
-        self.settings.setValue("bloch/azim", canvas.ax.azim)
 
     def _apply_preferences(self):
         if not hasattr(self, "page_settings"):
             return
-        p = self.page_settings
-        self.settings.setValue("appearance/theme", p.theme.currentData())
-        self.settings.setValue("appearance/font", p.font_size.value())
-        self.settings.setValue("appearance/presentation", p.presentation.isChecked())
-        self.settings.setValue("appearance/compact", p.compact.isChecked())
+        values = self.page_settings.collect_values()
+        for key, value in values.items():
+            self.settings.setValue(self._preference_path(key), value)
         apply_appearance(
-            self,
-            p.theme.currentData(),
-            max(17, p.font_size.value())
-            if p.presentation.isChecked()
-            else p.font_size.value(),
+            self, values["theme"],
+            max(17, values["font_size"]) if values["presentation"] else values["font_size"],
+            accent=values["accent"], density=values["density"],
+            reduce_motion=values["reduce_motion"], high_contrast=values["high_contrast"],
         )
+        for table in self.findChildren(QTableWidget):
+            selection_mode = table.selectionMode()
+            configure_table(table, sortable=table.isSortingEnabled())
+            table.setSelectionMode(selection_mode)
         self._adaptive_sidebar()
 
     def _reset_preferences(self):
-        for prefix in ("appearance", "bloch"):
+        self.settings.remove("library/view")
+        for prefix in ("appearance", "bloch", "export", "notifications", "comparison"):
             self.settings.remove(prefix)
+        self.page_settings.spin_shots.setValue(8192)
         self._restore_preferences()
         self.page_bloch.focus_combo.setCurrentIndex(0)
         self.page_bloch.canvas.reset_camera()
@@ -1175,20 +1893,29 @@ class MainWindow(QMainWindow):
             not self.page_settings.presentation.isChecked()
         )
         if self.page_settings.presentation.isChecked():
+            self._maximized_before_presentation = self.isMaximized()
             self.help_dock.hide()
             self.tutorial_dock.hide()
             self.showFullScreen()
         else:
-            self.showNormal()
+            if getattr(self, '_maximized_before_presentation', False):
+                self.showMaximized()
+            else:
+                self.showNormal()
 
     def _adaptive_sidebar(self):
         if not hasattr(self, "page_settings"):
             return
         self.sidebar.set_compact(
-            self.width() < 1250
+            (self.width() < 1150 and not getattr(self,'_sidebar_explicitly_expanded',False))
             or self.page_settings.compact.isChecked()
             or self.page_settings.presentation.isChecked()
         )
+
+    def _toggle_sidebar(self,compact):
+        self._sidebar_explicitly_expanded=not compact
+        self.page_settings.compact.setChecked(compact)
+        self._adaptive_sidebar()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1209,8 +1936,276 @@ class MainWindow(QMainWindow):
                         "temporal": "Métricas temporais",
                         "convergence": "Convergência Trotter",
                         "sweep": "Varredura",
+                        "trotter_noise": "Trotter × ruído",
+                        "mitigation_benchmark": "Benchmark de mitigação",
+                        "heatmap":"Mapa de calor",
+                        "zne_stability":"Estabilidade ZNE",
+                        "equal_budget":"Orçamento equivalente",
                     }.get(data["kind"], "Análise")
-                    paths.append((label + " · " + path.stem, path))
+                    created = data.get("created_at", "")
+                    try:
+                        created = datetime.fromisoformat(created).astimezone().strftime("%d/%m %H:%M")
+                    except (TypeError, ValueError):
+                        created = "salva"
+                    paths.append((label + " · " + created, path))
                 except (OSError, ValueError, KeyError, TypeError):
                     pass
         self.page_analysis.set_saved(paths)
+
+    def _show_circuit_snapshot(self, index):
+        self.page_bloch.slider.setValue(index)
+        self._show_page("bloch")
+
+    def _run_editor_circuit(self, config):
+        if self._current_worker is not None or not self._confirm_unsaved():
+            return
+        try:
+            config.validate()
+        except ValueError as exc:
+            self.page_circuit.editor.message.setText(str(exc))
+            return
+        if self.tutorial.active:
+            self.tutorial.pause()
+        self._pending_example_id = None
+        editor = self.page_circuit.editor
+        self._pending_circuit_context = {
+            **editor.revision_context(),
+            "description":editor.circuit_description.text().strip(),
+            "note": "O circuito executado completo está registrado em config.circuit; o rascunho pode diferir da revisão de origem.",
+        }
+        self._start_worker(SimulationWorker(config, self), self._on_experiment)
+
+    def _protocol_repository(self):
+        if self.repository is None:
+            raise ValueError("Armazenamento indisponível para protocolos.")
+        return ProtocolRepository(self.repository.base_dir/".protocols")
+
+    def _refresh_protocols(self):
+        records=self._protocol_repository().list_all() if self.repository is not None else []
+        self.page_analysis.protocol.set_saved(records)
+
+    def _save_protocol(self):
+        if self._current_experiment is None or self._current_worker is not None:
+            return
+        try:
+            kind,options=self.page_analysis.analysis_options()
+            data=self._protocol_repository().save(self._current_experiment,kind,options,self.page_analysis.protocol.context()["fields"])
+            self.page_analysis.protocol.set_protocol(data)
+            self.drafts.protocol_edited()
+            self._refresh_protocols()
+            self.page_analysis.message.setText("Nova revisão do protocolo salva.")
+        except (OSError,ValueError,TypeError) as exc:
+            self.page_analysis.message.setText(str(exc))
+
+    def _load_protocol(self,identifier):
+        if not identifier or self._current_worker is not None:
+            return
+        try:
+            data=self._protocol_repository().load(identifier)
+            if self._current_experiment is None or self._current_experiment.id!=data["source_id"]:
+                self._open_experiment(data["source_id"])
+            source=self._current_experiment
+            if source is None or source.id!=data["source_id"]:
+                return
+            actual=asdict(source.config)
+            actual["seed"]=source.result.metadata.get("effective_seed",actual["seed"])
+            if actual!=data["config"]:
+                raise ValueError("A configuração da fonte mudou; protocolo preservado. Crie uma nova revisão.")
+            self.page_analysis.apply_options(data["kind"],data["options"])
+            self.page_analysis.protocol.set_protocol(data)
+            self.drafts.protocol_edited()
+            self.page_analysis.message.setText("Protocolo carregado. Calcular análise cria outra evidência sem modificar o plano salvo.")
+            self._show_page("analysis")
+        except (OSError,ValueError,KeyError,TypeError) as exc:
+            self.page_analysis.message.setText("Não foi possível carregar o protocolo: "+str(exc))
+
+    def _prepare_comparison(self,a,b):
+        if self.repository is None:
+            return
+        if self._current_worker is not None or self._storage_worker is not None:
+            self._pending_comparison = (a, b)
+            self.page_comparison.message.setText("A comparação será carregada ao concluir a tarefa atual.")
+            return
+        try:
+            from core.comparison import incompatibility
+            records=self.page_comparison.records
+            mode=self.page_comparison.comparison_mode.currentData()
+            error=incompatibility(records[a],records[b],mode=mode)
+            if error:
+                raise ValueError(error)
+            self._start_worker(ComparisonWorker(self.repository,(a,b),records[a].config,self,mode=mode),self._on_comparison)
+            self.page_comparison.message.setText("Carregando estados e calculando curvas em segundo plano…")
+        except (KeyError,ValueError) as exc:
+            self.page_comparison.message.setText(str(exc))
+
+    def _on_comparison(self,data):
+        if self._current_worker and self._current_worker.isInterruptionRequested():
+            return
+        self.page_comparison.set_full_data(data)
+        self.statusBar().showMessage("Comparação preparada. Os resultados A e B estão disponíveis para consulta.", 6000)
+
+    def _documentation_sources(self):
+        if self.page_documentation.use_comparison.isChecked():
+            data=self.page_comparison.full_data
+            if data is None:
+                return []
+            return data["experiments"]
+        return [self._current_experiment] if self._current_experiment is not None else []
+
+    def _document_comparison(self):
+        self.page_documentation.use_comparison.setChecked(True)
+        self._refresh_documentation()
+        self._show_page('documentation')
+        self.page_documentation.open_export("pdf")
+
+    def _refresh_documentation(self):
+        sources=self._documentation_sources()
+        analyses=[]
+        protocols=[]
+        try:
+            if self.repository is not None:
+                from data.analyses import load_analysis
+                for source in sources:
+                    for path in sorted((self.repository.base_dir/".analyses"/source.id).glob("*.json")):
+                        analyses.append((load_analysis(path,source.id),path))
+                ids={e.id for e in sources}
+                protocols=[p for p in self._protocol_repository().list_all() if p["source_id"] in ids]
+            try:
+                annotations = self._workspace_library().read()["annotations"]
+            except (OSError, ValueError, TypeError):
+                annotations = {}
+            self.page_documentation.set_lineage(sources,analyses,protocols,annotations=annotations)
+            if hasattr(self, 'page_notebook'):
+                self.page_notebook.update_report_preview(sources, annotations)
+            if hasattr(self, 'projects'):
+                self.page_documentation.add_artifacts(self.projects.store.artifacts([source.id for source in sources]), annotations)
+        except (OSError,ValueError,TypeError,KeyError) as exc:
+            self.page_documentation.message.setText("Não foi possível ler todas as evidências: "+str(exc))
+
+    def _open_evidence(self,source_id,path):
+        if self._current_worker is not None:
+            return
+        try:
+            from data.analyses import load_analysis
+            data=load_analysis(path,source_id)
+            if self._current_experiment is None or self._current_experiment.id!=source_id:
+                self._open_experiment(source_id)
+            if self._current_experiment is not None and self._current_experiment.id==source_id:
+                self.page_analysis.show_analysis(data)
+                self._show_page("analysis")
+        except (OSError,ValueError,TypeError,KeyError) as exc:
+            self.page_documentation.message.setText(str(exc))
+
+    def _open_export_dialog(self, kind='pdf'):
+        self.page_documentation.use_comparison.setChecked(False)
+        self._refresh_documentation()
+        self._show_page('documentation')
+        self.page_documentation.open_export(kind)
+
+    def _export_documentation(self,kind):
+        if self._current_worker is not None:
+            return
+        sources=self._documentation_sources()
+        if not sources:
+            message = "Abra uma execução ou carregue os estados de uma comparação antes de exportar."
+            self.page_documentation.message.setText(message)
+            self.statusBar().showMessage(message)
+            return
+        extension={"zip":"ZIP (*.zip)","pdf":"PDF (*.pdf)","gif":"GIF (*.gif)"}[kind]
+        path,_=QFileDialog.getSaveFileName(self,"Exportar documentação","entrela-documentacao",extension)
+        if not path:
+            return
+        if not Path(path).suffix:
+            path+="."+kind
+        self._start_documentation_export(sources,path,kind)
+
+    def _start_documentation_export(self,sources,path,kind):
+        try:
+            annotations={}
+            protocols=[]
+            if self.repository is not None:
+                try:
+                    annotations=self._workspace_library().read()["annotations"]
+                    ids={e.id for e in sources}
+                    protocols=[p for p in self._protocol_repository().list_all() if p["source_id"] in ids]
+                except (OSError,ValueError,KeyError):
+                    pass
+            if hasattr(self, 'projects'):
+                raw = self.projects.store.read()
+                annotations = deepcopy(annotations)
+                for source in sources:
+                    project_name = annotations.get(source.id, {}).get('project', '')
+                    project_notes = raw['projects'].get(project_name, {})
+                    if project_notes:
+                        annotations.setdefault(source.id, {})['project_context'] = dict(name=project_name,
+                            **{key: project_notes[key] for key in ('objective', 'hypothesis', 'methodology', 'interpretation', 'next_steps') if key in project_notes})
+            page=self.page_documentation
+            worker=DocumentationWorker(sources,path,kind,self.repository,annotations,protocols,
+                page.include_analyses.isChecked(),page.include_gif.isChecked(),page.max_frames.value(),page.frame_ms.value(),self,
+                live_analyses=(deepcopy(self.page_analysis.data),) if self.page_analysis.data else (),
+                report_options=page.report_options(), export_dpi=self.page_settings.export_dpi.value(),
+                comparison_mode=self.page_comparison.comparison_mode.currentData() if len(sources)==2 and page.use_comparison.isChecked() else "controlled")
+            self._start_worker(worker,self._on_documented)
+            page.message.setText("Preparando documentação em segundo plano; arquivos de origem preservados.")
+            self.statusBar().showMessage("Preparando documentação em segundo plano…")
+        except (OSError,ValueError,TypeError) as exc:
+            self.page_documentation.message.setText(str(exc))
+            self.statusBar().showMessage(str(exc))
+
+    def _open_artifact(self, path):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        file = Path(path)
+        if not file.is_file():
+            self.statusBar().showMessage('Arquivo movido ou indisponível. Os registros de origem foram preservados; exporte novamente se necessário.')
+        elif file.suffix.lower() in {'.pdf', '.png', '.svg', '.gif', '.zip', '.json', '.csv', '.txt'}:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(file)))
+        else:
+            self.statusBar().showMessage('Consulte o arquivo no destino registrado: ' + str(file))
+
+    def _on_documented(self,path):
+        worker = self._current_worker
+        message = "Documentação exportada: " + path
+        if isinstance(worker, DocumentationWorker) and hasattr(self, 'projects'):
+            try:
+                self.projects.store.register_artifact([source.id for source in worker.experiments], path, worker.kind,
+                    checksum=getattr(worker, 'artifact_checksum', None))
+                self._refresh_documentation()
+            except (OSError, ValueError, TypeError) as exc:
+                message += '; vínculo no caderno ainda não salvo: ' + str(exc)
+        self.page_documentation.message.setText(message)
+        self.page_simulation.status.set_success("Exportação concluída")
+        self.statusBar().showMessage(message)
+
+    def _export_bloch_view(self):
+        if self._current_experiment is None or not self.page_bloch.original_svs:
+            self.statusBar().showMessage("Abra uma execução com estado calculado para exportar as esferas de Bloch.")
+            return
+        source = self._current_experiment
+        self.page_bloch._pause()
+        path,filter=QFileDialog.getSaveFileName(self,"Exportar vista atual de Bloch","bloch", "PNG (*.png);;SVG (*.svg);;PDF (*.pdf)")
+        if not path:
+            return
+        if self._current_experiment is None or self._current_experiment.id != source.id:
+            self.statusBar().showMessage('A execução mudou durante a escolha do destino. Confira a fonte e exporte Bloch novamente.')
+            return
+        if not Path(path).suffix:
+            path+=".svg" if "SVG" in filter else ".pdf" if "PDF" in filter else ".png"
+        try:
+            if Path(path).suffix.lower() == ".pdf":
+                from core.pdf_layout import export_figure_a4
+                export_figure_a4(self.page_bloch.canvas.fig, path, raster_dpi=self.page_settings.export_dpi.value())
+            else:
+                export_figure(self.page_bloch.canvas.fig,path,dpi=self.page_settings.export_dpi.value())
+            from core.export import _atomic_text
+            _atomic_text(Path(path).with_suffix(".metadata.json"),json.dumps(dict(source_id=self._current_experiment.id,
+                snapshot=self.page_bloch.slider.value() if self._current_experiment.result.states else None, state_kind="snapshot" if self._current_experiment.result.states else "final", camera=self.page_bloch.canvas.camera_state(),
+                focus=self.page_bloch.canvas.focus,ideal_visible=self.page_bloch.overlay.isChecked(),
+                trails_visible=self.page_bloch.trails.isChecked(),config=asdict(self._current_experiment.config),
+                effective_seed=self._current_experiment.result.metadata.get("effective_seed"),
+                versions=self._current_experiment.result.metadata.get("versions"),
+                note="Esferas de Bloch da execução selecionada, com câmera e estado calculado; preserve o JSON do experimento. Sem snapshots, a vista corresponde somente ao estado final."),ensure_ascii=False,indent=2))
+            if self._remember_export(path, [source], Path(path).suffix.lower().lstrip('.')):
+                self.statusBar().showMessage("Vista de Bloch e metadados exportados")
+        except (OSError,ValueError) as exc:
+            self.statusBar().showMessage(str(exc))

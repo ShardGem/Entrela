@@ -22,10 +22,13 @@ def test_complete_ui_pipeline(window,noisy,snapshots):
     assert sum(exp.result.counts.values())==128
     assert window.page_history.table.rowCount()==1
     assert window.page_dashboard.card_sims._value.text()=="1"
+    assert window.page_results.btn_save.text()=="Execução salva"
+    assert not window.page_results.btn_save.isEnabled()
     assert window.page_results.card_pur._value.text()!="—"
     bars=window.page_results.results_tab.canvas_hist.fig.axes[0].patches
     assert sum(bar.get_height() for bar in bars)==128
-    assert len(window.page_bloch.precomputed_bloch)==(5 if snapshots else 0)
+    assert len(window.page_bloch.precomputed_bloch)==(5 if snapshots else 1)
+    assert window.page_bloch.final_only is (not snapshots)
     np.testing.assert_allclose(window.repository.load(exp.id).result.final_state.data,exp.result.final_state.data)
 def test_modes_share_widgets_and_values(window):
     p=window.page_simulation.config_panel
@@ -92,7 +95,10 @@ def test_actual_tutorial_requires_actions_and_real_reopen(window):
     exp=execute(window)
     assert t.run_id==exp.id
     t.advance()
-    assert t.step==5 and not t.ready()
+    assert t.step==5 and t.ready()
+    assert window.is_page_active("results")
+    window._show_page("simulation")
+    assert not t.ready()
     window._show_page("results")
     assert t.ready()
     t.advance()
@@ -113,9 +119,12 @@ def test_tutorial_resume_and_completed_restart_are_separate(window):
 def test_gallery_replacement_requires_confirmation(window,monkeypatch):
     window.page_simulation.config_panel.spin_J.setValue(2.5)
     original=window.page_simulation.config_panel.get_config()
-    monkeypatch.setattr(QMessageBox,"question",lambda *args:QMessageBox.No)
-    window._load_example("bell")
-    assert window.page_simulation.config_panel.get_config()==original
+    window._load_example('bell')
+    assert window.page_simulation.config_panel.get_config() == create_example_config('bell')
+    preserved = next(w for w in window.projects.store.works() if w['id'] != window.projects.active_id)
+    window.projects.open_work(preserved['id'])
+    assert window.page_simulation.config_panel.get_config() == original
+
 def test_reopen_preserves_original_when_form_edited(window):
     p=window.page_simulation.config_panel
     p.spin_shots.setValue(64)
@@ -185,10 +194,21 @@ def test_comparison_rejects_incompatible_and_normalizes(window):
     page.load([a,b,c])
     page.set_runs(a.id,b.id)
     assert page.metrics_table.rowCount()==3
+    table = page.configuration_table
+    differences = {table.item(row, 0).text(): (table.item(row, 1).text(), table.item(row, 2).text())
+                   for row in range(table.rowCount())}
+    assert differences['Medições (shots)'] == ('64', '128')
+    assert differences['Ruído'] == ('Desativado', 'Despolarizador')
+    assert 'Qubits' not in differences
+    page.only_differences.setChecked(False)
+    assert table.rowCount() > len(differences)
+    assert not page.configuration_details.is_expanded
     bars=page.canvas.fig.axes[0].patches
     assert sum(bar.get_height() for bar in bars)==pytest.approx(2)
     page.set_runs(a.id,c.id)
     assert page.metrics_table.rowCount()==0
+    assert table.rowCount() == 0
+    assert not page.differences.toPlainText()
     assert "Sistemas diferentes" in page.message.text()
 def test_import_creates_independent_record(window,monkeypatch,tmp_path):
     source=run_experiment(replace(create_example_config("bell"),shots=64))
@@ -200,21 +220,64 @@ def test_import_creates_independent_record(window,monkeypatch,tmp_path):
     assert imported.result.metadata["imported_from_id"]==source.id
     assert window.repository.load(imported.id).config==source.config
 def test_command_palette_search_and_action(window):
+    current_page = window._current_page
     window._open_commands()
     palette=window.command_palette
     palette.search.setText("fidelidade")
-    assert palette.list.count()==1
+    from PySide6.QtCore import Qt
+    assert palette.list.currentItem().data(Qt.UserRole) == "help:Fidelidade"
     palette._activate()
     assert window.help_dock.isVisible()
-    assert window._current_page=="dashboard"
+    assert window._current_page == current_page
+def test_command_palette_ranks_matches_and_accepts_arrows_from_search(qt_app):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from gui.widgets.command_palette import CommandPalette
+
+    palette = CommandPalette()
+    destinations = [
+        ("page:history", "Histórico", "execuções"),
+        ("page:simulation", "Simulação", "evolução por Hamiltoniano"),
+        ("tool:sim", "Configurar simulação", "parâmetros"),
+    ]
+    chosen = []
+    palette.command_requested.connect(chosen.append)
+    palette.open_commands(destinations)
+    qt_app.processEvents()
+    palette.search.setText("simulacao")
+    assert palette.list.currentItem().data(Qt.UserRole) == "page:simulation"
+    QTest.keyClick(palette.search, Qt.Key_Down)
+    assert palette.search.hasFocus()
+    assert palette.list.currentItem().data(Qt.UserRole) == "tool:sim"
+    QTest.keyClick(palette.search, Qt.Key_Up)
+    QTest.keyClick(palette.search, Qt.Key_Return)
+    assert chosen == ["page:simulation"]
+    palette.open_commands(destinations)
+    assert palette.list.currentItem().data(Qt.UserRole) == "page:simulation"
+    QTest.keyClick(palette.search, Qt.Key_Escape)
+    assert not palette.isVisible()
+    assert chosen == ["page:simulation"]
+
+
 def test_history_search_filters_records(window):
+    history = window.page_history
+    assert not history.empty.isHidden()
     exp=run_experiment(replace(create_example_config("bell"),shots=64))
     window.repository.save(exp)
     window._refresh_history()
-    window.page_history.search.setText("not-found")
-    assert window.page_history.table.rowCount()==0
-    window.page_history.search.setText(exp.id)
-    assert window.page_history.table.rowCount()==1
+    history.set_project_filter("Projeto ausente")
+    history.status_filter.setCurrentIndex(history.status_filter.findData("error"))
+    history.search.setText("not-found")
+    assert history.table.rowCount() == 0
+    assert history.empty.isHidden()
+    assert not history.no_matches.isHidden()
+    history.no_matches.action_button.click()
+    assert history.table.rowCount() == 1
+    assert history.project_filter is None
+    assert history.status_filter.currentData() == "all"
+    assert not history.search.text()
+    history.search.setText(exp.id)
+    assert history.table.rowCount() == 1
 
 def test_unopened_tutorial_does_not_erase_saved_progress(window):
     window.settings.setValue("tutorial/bell/step",3)

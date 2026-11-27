@@ -1,17 +1,19 @@
 """One scientific engine for all UI modes, counts and snapshots."""
 
 from time import perf_counter
+from dataclasses import asdict, replace
 from secrets import randbits
 from importlib.metadata import version
 import platform
 import numpy as np
 from qiskit.quantum_info import Statevector, DensityMatrix
 from qiskit_aer import AerSimulator
-from core.circuits import build_circuit, _build_hamiltonian
+from core.circuits import build_circuit, build_editor_circuit, _build_hamiltonian
 from core.noise import build_noise_model
 from core.metrics import fidelity, purity, energy_expectation
 from core.types import Experiment, ExperimentResult
 from core import __version__
+from core.reproduction import input_fingerprint
 
 
 class SimulationCancelled(Exception):
@@ -45,7 +47,17 @@ def run_experiment(config, progress=None, is_cancelled=None):
         save_final=True,
     )
     kind = "density_matrix" if config.noise.enabled else "statevector"
-    circuit, labels = build_circuit(**arguments, snapshot_kind=kind)
+
+    def build(snapshot_kind):
+        if config.circuit is not None:
+            return build_editor_circuit(
+                config.circuit,
+                snapshot_kind=snapshot_kind,
+                save_snapshots=p.save_snapshots,
+            )
+        return build_circuit(**arguments, snapshot_kind=snapshot_kind)
+
+    circuit, labels = build(kind)
     sim = AerSimulator(
         method=kind, noise_model=build_noise_model(config.noise), max_parallel_threads=2
     )
@@ -59,7 +71,7 @@ def run_experiment(config, progress=None, is_cancelled=None):
     states = [cls(data[label]) for label in labels]
     final = cls(data["final"])
     if config.noise.enabled:
-        reference, _ = build_circuit(**arguments, snapshot_kind="statevector")
+        reference, _ = build("statevector")
         execution_ideal = (
             AerSimulator(method="statevector", max_parallel_threads=2)
             .run(reference, shots=1, seed_simulator=seed)
@@ -88,7 +100,11 @@ def run_experiment(config, progress=None, is_cancelled=None):
     for instruction in circuit.data:
         if not instruction.operation.name.startswith("save_"):
             display.append(instruction)
-    H = _build_hamiltonian(s.num_qubits, s.hamiltonian, s.J, s.h, s.periodic)
+    H = (
+        None
+        if config.circuit is not None
+        else _build_hamiltonian(s.num_qubits, s.hamiltonian, s.J, s.h, s.periodic)
+    )
     result = ExperimentResult(
         counts=execution.get_counts(),
         statevectors=states if not config.noise.enabled and labels else None,
@@ -100,13 +116,18 @@ def run_experiment(config, progress=None, is_cancelled=None):
         times=np.linspace(0, p.total_time, len(labels)).tolist() if labels else [],
         fidelity=fidelity(final, ideal),
         purity=purity(final),
-        energy=energy_expectation(final, H),
+        energy=None if H is None else energy_expectation(final, H),
         circuit_text=str(display.draw(output="text", fold=100)),
         circuit_depth=display.depth(),
         metadata={
             "entrela_version": __version__,
+            "circuit_global_phase": float(circuit.global_phase),
+            "experiment_kind": "circuit"
+            if config.circuit is not None
+            else "hamiltonian",
             "operations": operations,
             "effective_seed": seed,
+            "input_fingerprint": input_fingerprint(config, seed, operations),
             "requested_seed": config.seed,
             "method": kind,
             "python": platform.python_version(),
@@ -121,11 +142,26 @@ def run_experiment(config, progress=None, is_cancelled=None):
                     "matplotlib",
                 )
             },
-            "fidelity_reference": "Mesmo circuito Suzuki–Trotter sem ruído",
-            "time_unit": "adimensional (ℏ=1)",
+            "fidelity_reference": "Mesmo circuito sem ruído"
+            if config.circuit is not None
+            else "Mesmo circuito Suzuki–Trotter sem ruído",
+            "time_unit": "índice da porta (sem tempo físico)"
+            if config.circuit is not None
+            else "adimensional (ℏ=1)",
             "ising_convention": "+J ΣZZ +h ΣX",
             "bit_order": "q0 à direita",
-            "thermal_gate_time_ns": 50.0,
+            "thermal_gate_time_ns": config.noise.gate_time_1q_ns if config.noise.gate_time_1q_ns == config.noise.gate_time_2q_ns else None,
+            "thermal_gate_durations_ns": {"1q": config.noise.gate_time_1q_ns, "2q": config.noise.gate_time_2q_ns},
+            "reproduction": {
+                "schema_version": 1,
+                "config": asdict(replace(config, seed=seed)),
+                "simulator": "AerSimulator",
+                "simulation_method": kind,
+                "mitigation_method": "none",
+                "max_parallel_threads": 2,
+                "platform": platform.platform(),
+                "note": "Use a configuração com semente efetiva e as versões registradas. Semente não garante identidade entre versões ou plataformas.",
+            },
         },
     )
     checkpoint(100)

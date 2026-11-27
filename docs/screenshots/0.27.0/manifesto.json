@@ -1,0 +1,1991 @@
+{
+  "schema_version": 1,
+  "entrela_version": "0.27.0",
+  "captured_at_utc": "2026-11-18T11:26:36.788364+00:00",
+  "platform": "linux",
+  "qt_platform": "offscreen",
+  "versions": {
+    "PySide6": "6.11.1",
+    "qiskit": "2.4.1",
+    "qiskit-aer": "0.17.2",
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6"
+  },
+  "purpose": "Documentação da interface com simulações computacionais realmente executadas. Não constitui evidência experimental do TCC.",
+  "scenarios_file": "cenarios.json",
+  "scenarios_sha256": "3743f6f4bedd9e90c8ea34674fe2b08c426d480adf01fdc68e83c7e1de5ff4fa",
+  "studies_file": "estudos.json",
+  "studies_sha256": "aa5e2be901634e8f6683b32d8eba977db3476f3cd61b47a37cda140ed9066bb7",
+  "source_relation": "selected_result_id identifica a execução selecionada; formulários de configuração são rascunhos independentes.",
+  "expected_pages": [
+    "analysis",
+    "bloch",
+    "catalog",
+    "circuit",
+    "comparison",
+    "dashboard",
+    "docs",
+    "documentation",
+    "examples",
+    "history",
+    "library",
+    "mitigation",
+    "notebook",
+    "results",
+    "settings",
+    "simulation"
+  ],
+  "captures": [
+    {
+      "file": "01-inicio/01-visao-geral.png",
+      "title": "Projetos e retomada do trabalho",
+      "page": "dashboard",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "e8ec798ad7a05ad7815c86b31a46b196881e96d9d299dd09dd72cc6c830babce"
+    },
+    {
+      "file": "01-inicio/03-projeto.png",
+      "title": "Projeto · experimentos e execuções recentes",
+      "page": "dashboard",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "a583583c873eafd0b9e37c134c4f0310460de6580e836b67d1e2a984e06a9f8e"
+    },
+    {
+      "file": "01-inicio/02-splash.png",
+      "title": "Tela de abertura · imagens atuais do autor",
+      "page": "splash",
+      "pixels": [
+        2200,
+        1300
+      ],
+      "logical_size": [
+        1100,
+        650
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "497ecdb2f249a00ab1298a84d902d3b623a76088bcb2bf7bb502045b8a1e2e1a"
+    },
+    {
+      "file": "02-aprendizado/00-biblioteca.png",
+      "title": "Biblioteca · exemplos e modelos pessoais",
+      "page": "catalog",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b6108216de9fce6e4a96151ca3c180a0fb73aadc2f2e75ee5557a170ce25caff"
+    },
+    {
+      "file": "02-aprendizado/01-exemplos.png",
+      "title": "Galeria de exemplos · Bell",
+      "page": "examples",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "6a327cd38bf3fb65a9d2bd2be16598285419515c109515d4b85b1eca3e6d21e6"
+    },
+    {
+      "file": "02-aprendizado/conceito-qubit.png",
+      "title": "Qubit",
+      "page": "docs",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "1530e6c6dde8d67c8c1320e2851023bf5391c87eebf328df5d35de053334685b"
+    },
+    {
+      "file": "02-aprendizado/conceito-emaranhamento.png",
+      "title": "Emaranhamento",
+      "page": "docs",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "4f1acd33960cf51c274f2f25c3ae910a799fce9a77e3fa1059c51976122007eb"
+    },
+    {
+      "file": "02-aprendizado/conceito-grover.png",
+      "title": "Grover",
+      "page": "docs",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "f0fe07598cc3275679b69fb75ed8bc3ae8b55ccab202f612f709ac9c1550d87b"
+    },
+    {
+      "file": "02-aprendizado/conceito-manual.png",
+      "title": "Manual da plataforma",
+      "page": "docs",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "44cb6872fbd1223b908b182a16d94c399e1a2957ce01069a7dfa21d2bf477618"
+    },
+    {
+      "file": "03-laboratorio/01-configurar-sistema.png",
+      "title": "Configuração guiada · Sistema",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b17f064e0a3a2a6cc4158b737edfd106f4bd117964e8445dd5ccc183b4a86bcd"
+    },
+    {
+      "file": "03-laboratorio/02-configurar-hamiltoniano.png",
+      "title": "Configuração guiada · Hamiltoniano",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "480e969b64ba1bd02e41fd0bc234ea6fa05a16ac4348333cdafbe35f1984db39"
+    },
+    {
+      "file": "03-laboratorio/03-configurar-evolucao.png",
+      "title": "Configuração guiada · Evolução",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "1af4c4d63736540fadc32b27e93b7de4afc2f3cf2fd4eea0a53cba8806a07f6f"
+    },
+    {
+      "file": "03-laboratorio/04-configurar-ruido.png",
+      "title": "Configuração guiada · Ruído",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "6cf73a1a88e3272512e407a6f7fe2d2708a3266ed026d6524137dd9e9ae2172c"
+    },
+    {
+      "file": "03-laboratorio/05-configurar-execucao.png",
+      "title": "Configuração guiada · Execução",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "800061f1d237c1e7cf76110cfdcc1ac0fa26c9b11ea267043227f17f008374ce"
+    },
+    {
+      "file": "03-laboratorio/06-configuracao-avancada.png",
+      "title": "Parâmetros no modo avançado",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "92a358d0b66c2413f66e9eb1923a52c349042469dec3c491e33ade66248b4100"
+    },
+    {
+      "file": "03-laboratorio/14-bancada-protocolo.png",
+      "title": "Revisão do protocolo do rascunho",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "c37273e6cca03068c7277fa59b898711c7cc61c5ab09f61b4646b4dacde28116"
+    },
+    {
+      "file": "03-laboratorio/13-bancada-execucao.png",
+      "title": "Evidência da execução selecionada na bancada",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "0e92578b4ee3cc4ba2744a16bd312f9df8f9f85507328a5cae23a6c83e8c1200"
+    },
+    {
+      "file": "03-laboratorio/07-circuito-inspecao.png",
+      "title": "Circuito executado · inspeção das portas",
+      "page": "circuit",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "f49a69b1a40dd64d066fb19d39d860aa4e3f938e8db990618db8f1656c4eb016"
+    },
+    {
+      "file": "03-laboratorio/08-editor.png",
+      "title": "Editor e biblioteca de portas",
+      "page": "circuit",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "2dd138c7d8bcdaed087407f8dc02368a6bd30c69298eff0fb4a21aebb17e3608"
+    },
+    {
+      "file": "03-laboratorio/09-editor-biblioteca.png",
+      "title": "Biblioteca e revisões do circuito",
+      "page": "circuit",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "63b5ddd15952b08e8cd260bfba7fc20e7fad39ef3b63d0a771f4b3bd4d0c48bd"
+    },
+    {
+      "file": "03-laboratorio/10-editor-operacoes.png",
+      "title": "Lista de operações acessível por teclado",
+      "page": "circuit",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "3a64819bb670d01a63b84a237c803229c988de7719b6fea2837a722f9870bdc2"
+    },
+    {
+      "file": "03-laboratorio/11-editor-avancado.png",
+      "title": "Fase global e parâmetros avançados do circuito",
+      "page": "circuit",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "f0ec4af9385b7245087e2dcc2e40a414f2f204c1ede3312a7d89be33ec8a9a7f"
+    },
+    {
+      "file": "03-laboratorio/12-editor-execucao.png",
+      "title": "Medições, semente e ruído do circuito",
+      "page": "circuit",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "4eb197d101b14db160b32b21bcb0e192f4ef7a8b8cb964214c7436894fcf749f"
+    },
+    {
+      "file": "04-resultados/resultados-distribuicao.png",
+      "title": "Distribuição",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "ed6a83e60a4fe82706d3e8c9f8663f7e8f64021a063c39158530356f9d0da428"
+    },
+    {
+      "file": "04-resultados/resultados-evolucao.png",
+      "title": "Evolução",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "557a05063679434d679bccdd8a808edce27cb05997ac1fad1aa36932468a89c1"
+    },
+    {
+      "file": "04-resultados/resultados-graficos.png",
+      "title": "Distribuição observada e evolução",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 2,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "d6193a81d71b75827e16b96942ec9d1e73110a556a1df772026102979cca9613"
+    },
+    {
+      "file": "04-resultados/resultados-interpretacao.png",
+      "title": "Interpretação dos resultados",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "5e356f16b0b46b09520f94ab26581ab9bbd2b22a420d281194f884df7a676f80"
+    },
+    {
+      "file": "04-resultados/resultados-dados.png",
+      "title": "Contagens, frequências e probabilidades",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "8faca254358226e67b91a9debb229a145f427ac8f4d486ac0cd38bbc4038448f"
+    },
+    {
+      "file": "04-resultados/resultados-reprodutibilidade.png",
+      "title": "Metadados de reprodutibilidade",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "a3e3ddc28bfd910f8469fb965bf79104b8203177c3c1e88abb56b42a4c95c671"
+    },
+    {
+      "file": "04-resultados/resultados-estado-global.png",
+      "title": "Matriz densidade do estado global",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "69d47b293dc369c56ab6a776089e1170d4badbf031767c773f9146f7f11a25ea"
+    },
+    {
+      "file": "04-resultados/bloch-quatro-qubits.png",
+      "title": "Evolução de quatro qubits em uma linha",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.4601366138458252,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "0f2b6312fd6235ea6d329c9033e3dba109b7fa1efb9ba432cce94094d7fa1d92"
+    },
+    {
+      "file": "04-resultados/bloch-qubit-foco.png",
+      "title": "Bloch · qubit, trajetória e métricas locais",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 0.8513944721221923,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "f7183128c6e668447a3e736d3c48d0c44314b0895aca4a7764a93f7403297cc3"
+    },
+    {
+      "file": "04-resultados/bloch-cena.png",
+      "title": "Cena com controles de câmera recolhidos",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.9753071403503417,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "e82d2792b78d7436b1ee55cd667a37f18611ed1e94ce259129e1af9ec9b3e4c9"
+    },
+    {
+      "file": "04-resultados/probabilidades.png",
+      "title": "Probabilidades no snapshot selecionado",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.9753071403503417,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "8276e4d44c7b5de5634208891d83e53f9e5de39e884d0a6ffe7291c234ea6439"
+    },
+    {
+      "file": "04-resultados/bloch-estado-global.png",
+      "title": "Estado global no instante selecionado",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.9753071403503417,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "53b3e03a3941c46422aa40490c2d9674c2c3d0edcb2672c52f0579881dd03c92"
+    },
+    {
+      "file": "04-resultados/bloch-detalhes.png",
+      "title": "Transformação da etapa e estados locais",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.9753071403503417,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "40749637d6e9763255468d798c23c07efaeaf065f1c3c9a4b4ee453947c3f9e3"
+    },
+    {
+      "file": "04-resultados/bloch-estados-locais.png",
+      "title": "Estados locais dos qubits",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.9753071403503417,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "20977f01049f15b54f9c0ecee13ea7a23f9bd60fa38363fc5c3e214fdfc9e0f7"
+    },
+    {
+      "file": "05-pesquisa/configurar-evolucao-temporal.png",
+      "title": "Acompanhar métricas e correlações · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "16e2f0df8a04a74aca7616530dc98523c52e0a185366e60e9261d95aead3f6d6"
+    },
+    {
+      "file": "05-pesquisa/configurar-convergencia-trotter.png",
+      "title": "Avaliar a precisão da Trotterização · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "02c8259dc50613cd7196a7a167fa9e71d58141309b8aa5f37adf9bbe2d608ba7"
+    },
+    {
+      "file": "05-pesquisa/configurar-varredura-parametros.png",
+      "title": "Variar um parâmetro · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "d66b553cb2a4e2b63aaae4d2706abdef506c2e88bdaabcb83e14a8c4eadbb9ab"
+    },
+    {
+      "file": "05-pesquisa/configurar-trotter-e-ruido.png",
+      "title": "Estudar passos Trotter e ruído juntos · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "ffaa7137bcccdd2ab33bcf2ad468f6911668ebef5c933cc100c4ee6ed438ca01"
+    },
+    {
+      "file": "05-pesquisa/configurar-benchmark-mitigacao.png",
+      "title": "Comparar métodos de mitigação · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "76aaf9d7002cd5e01e16da2816a486f772162d04621e1960d0253a3ee5ccc682"
+    },
+    {
+      "file": "05-pesquisa/configurar-mapa-calor.png",
+      "title": "Variar dois parâmetros em um mapa · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "4613f28ceb16593ba50463a7e37161e04bd35e88b3e7e6515d43e1ca4bfa6953"
+    },
+    {
+      "file": "05-pesquisa/configurar-estabilidade-zne.png",
+      "title": "Avaliar a estabilidade da ZNE · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "7bde812fdbae13593138c52101a866c837ba1e08f54b88b12fafa6359d13318b"
+    },
+    {
+      "file": "05-pesquisa/configurar-orcamento-shots.png",
+      "title": "Comparar com o mesmo total de medições · configuração",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "e00c576e130dfa7083e630155dd236a8472c50a949f6cf37163f5ae2f135b20b"
+    },
+    {
+      "file": "05-pesquisa/resultado-evolucao-temporal.png",
+      "title": "Acompanhar métricas e correlações · resultado calculado",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": "d070d73e699e",
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "98d3762c0996b64843fe91efd7409bbf5b98ec2a78884b1a6ee6ac5c9825af68"
+    },
+    {
+      "file": "04-resultados/bloch-metricas.png",
+      "title": "Métricas temporais ligadas ao snapshot",
+      "page": "bloch",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 2,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 1.9753071403503417,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -90.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 5,
+      "sha256": "06a63820c78ec7585515df932de44373edaff252f34cd99c19a0e9ce525db2da"
+    },
+    {
+      "file": "05-pesquisa/resultado-varredura-parametros.png",
+      "title": "Variar um parâmetro · resultado calculado",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": "0cdc1728ab60",
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "ecfaac83203cb7107a331e6a0689aa288f2a5111077a89f83cc2f1989ceee65f"
+    },
+    {
+      "file": "05-pesquisa/resultado-mapa-calor.png",
+      "title": "Variar dois parâmetros em um mapa · resultado calculado",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": "c5537fa58537",
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "938811fb09ef6425c43dad47b38405f4b22968631172ca426fa380fa68e85e3c"
+    },
+    {
+      "file": "05-pesquisa/resultado-benchmark-mitigacao.png",
+      "title": "Comparar métodos de mitigação · resultado calculado",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": "5862f741e4c0",
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b67c1f4d801c643c2068dc181923241f0cedc4acfb16918273c3a828d66dd47c"
+    },
+    {
+      "file": "05-pesquisa/planejamento.png",
+      "title": "Planejamento e protocolo científico",
+      "page": "analysis",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "6b7443aa2ed7b0911a26e18c6876d98939b7a378e00323bfafd6e0ffabc6ab9d"
+    },
+    {
+      "file": "05-pesquisa/mitigacao-zne.png",
+      "title": "ZNE · medições, ajuste e limites",
+      "page": "mitigation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "75724571e443354d94feebbd61922a3131c694e484f2c75bc80c14d5cdf1f59f"
+    },
+    {
+      "file": "05-pesquisa/comparacao-distribuicoes.png",
+      "title": "Distribuições",
+      "page": "comparison",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "82517ff3b66bf974438b7ca72f9beddab517299ba4309e286602716a2d9bfaea"
+    },
+    {
+      "file": "05-pesquisa/comparacao-curvas.png",
+      "title": "Curvas temporais",
+      "page": "comparison",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "cdd01f9054d859cf276db90c9ec36d8448137fb6157d00e1139929f2e5c677fa"
+    },
+    {
+      "file": "05-pesquisa/comparacao-bloch.png",
+      "title": "Bloch lado a lado",
+      "page": "comparison",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 2,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "96423e3296ad7b01828c0e7b5f0f0c28bb124df00df75380915f0e14205d7510"
+    },
+    {
+      "file": "05-pesquisa/comparacao-configuracoes.png",
+      "title": "Configurações e referências",
+      "page": "comparison",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "1ad5b6f178aba6d7b81c1f2744008d045f323da488f05b1c6e6b3b27f663050c"
+    },
+    {
+      "file": "05-pesquisa/comparacao-metricas.png",
+      "title": "Métricas numéricas da comparação",
+      "page": "comparison",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "73914627d3830cb45ea2972da7f99c475acff0b34e3e573d47fae83753202a60"
+    },
+    {
+      "file": "05-pesquisa/comparacao-observaveis-zne.png",
+      "title": "Comparação dos observáveis ZNE",
+      "page": "comparison",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "2927519d0527",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b9c8fb2a567a64c8d394d654376f0cb8cf316fd067cfbcd84f6d3229726cf937"
+    },
+    {
+      "file": "06-acervo/historico-resumo.png",
+      "title": "Histórico e resumo da execução",
+      "page": "history",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "07cab4a111e3e137dee0c12f83d9f278b70fb8defa96def2e1640c3287cb236b"
+    },
+    {
+      "file": "06-acervo/historico-sem-resultados.png",
+      "title": "Histórico · busca sem resultados",
+      "page": "history",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b7b7b07af025c182192441badc6d47c855b3708c4250f2b18f4a36292d8c362c"
+    },
+    {
+      "file": "06-acervo/historico-circuito.png",
+      "title": "Circuito gráfico no histórico",
+      "page": "history",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "5f7b706df5f2",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "6e00c795846368859b10b05e5380f7246108fb89bca00b6265a2596145310a39"
+    },
+    {
+      "file": "06-acervo/caderno.png",
+      "title": "Caderno e plano científico",
+      "page": "library",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "169dcc2dfb4ad5175f964503f62146d32d90b42d67638512fcd972f027e9efaf"
+    },
+    {
+      "file": "06-acervo/configuracoes-salvas.png",
+      "title": "Biblioteca de configurações reutilizáveis",
+      "page": "library",
+      "pixels": [
+        1600,
+        1220
+      ],
+      "logical_size": [
+        800,
+        610
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "680a425678d2efe27351de46f95eeb7efa2eb9701fdf705891b122288d2c99b9"
+    },
+    {
+      "file": "06-acervo/projeto-anotacoes.png",
+      "title": "Caderno · objetivo, hipótese e metodologia do projeto",
+      "page": "notebook",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "fa604d6405ce7d5c8bf51080c126eefa87e8fe10ad6a77116d625d496e7c425d"
+    },
+    {
+      "file": "06-acervo/evidencias.png",
+      "title": "Evidências do estudo",
+      "page": "documentation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "1219bdb9ce7bd88f5e371fa2d51c99690437d685c59b9ad99d85a136806d920c"
+    },
+    {
+      "file": "06-acervo/documentacao.png",
+      "title": "Preparar relatório científico",
+      "page": "documentation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "f9dad6ad623e42213dc8e4b203adb585444d3e7a7408b67499c7b465e6f262b3"
+    },
+    {
+      "file": "06-acervo/exportacao-zip.png",
+      "title": "Pacote científico completo",
+      "page": "documentation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "18d3ecb658e367cedb05a88d12d0b2ce5fe3bd51b65688335cc6391f464557b9"
+    },
+    {
+      "file": "06-acervo/exportacao-gif.png",
+      "title": "Animação com snapshots reais",
+      "page": "documentation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "4aa574312ed4425bcf889a5358463b3eaa3bb48b74dab7adf174a8787d78a5e0"
+    },
+    {
+      "file": "07-preferencias/aparencia.png",
+      "title": "Aparência e tipografia",
+      "page": "settings",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "1ab428e00f5204fc1db4521437d0f4595436fabf647b6b8f5a7c5cbf1b39a78d"
+    },
+    {
+      "file": "07-preferencias/acessibilidade.png",
+      "title": "Acessibilidade",
+      "page": "settings",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "a28d74984c5416de4c3331695ea87ee56a59e008535e8c6a2a47447dac1809d5"
+    },
+    {
+      "file": "07-preferencias/execucao-avisos.png",
+      "title": "Execução e notificações",
+      "page": "settings",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "5cb76935fdf1cca4e59c55e4ff0dbac2108fa7e26e992a945d57920019344b96"
+    },
+    {
+      "file": "07-preferencias/exportacao.png",
+      "title": "Preferências de exportação",
+      "page": "settings",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "06a03a7061acbaf833ccec604cdad5d0fb8ad32b9c99d020237bb83d2b1b9d57"
+    },
+    {
+      "file": "07-preferencias/backup-exportacao.png",
+      "title": "Dados e backup",
+      "page": "settings",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "7a2cfb41aa03bdc31397c35afa2c18a81b49f87a7325a3f41dc5b36231dbf98b"
+    },
+    {
+      "file": "07-preferencias/tema-claro.png",
+      "title": "Resultados · tema claro",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 2,
+      "interface_font_size": 15,
+      "theme": "light",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "3add841a255bc9278e025655ea6e87c9c4d4e3397410f0b53391829515380903"
+    },
+    {
+      "file": "07-preferencias/tema-grafite.png",
+      "title": "Resultados · tema grafite",
+      "page": "results",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 2,
+      "interface_font_size": 15,
+      "theme": "dark",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b77535b8f4fed57a35e8eaeecc802bfc2deb0f07a5410ddaccc1c1cd085d954d"
+    },
+    {
+      "file": "02-aprendizado/tutorial.png",
+      "title": "Tutorial de Bell com etapas verificáveis",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "19f2686c74e815bf0cafc4385f4f90b68236fcae9e73b677958e210f2f9fd68e"
+    },
+    {
+      "file": "02-aprendizado/ajuda-contextual.png",
+      "title": "Ajuda contextual durante a configuração",
+      "page": "simulation",
+      "pixels": [
+        2880,
+        1800
+      ],
+      "logical_size": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 15,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "2810f00631c4ee36c118d028851ff4990081741f2368fa09b512730c1c64d239"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-preparar.png",
+      "title": "1024 × 768 · campos e execução com texto de 24 px",
+      "page": "simulation",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "900c96915294b7733d0f83d61dd2b9997288dec5d6b7c3a96c788bd118264558"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-simulacao.png",
+      "title": "1024 × 768 · revisão com texto ampliado",
+      "page": "simulation",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "8d561064cc6a0900b81d018d816498d9c7f2cabc1f0e20faf43a0fc723f51ba9"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-editor.png",
+      "title": "1024 × 768 · editor adaptável",
+      "page": "circuit",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "e5601b123744679eae221364d21d4811cd988a7d49b1f1e1f36206866da2ae3c"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-preferencias.png",
+      "title": "1024 × 768 · preferências com texto ampliado",
+      "page": "settings",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "bc3c0f29788309e5d55358c2b1e3ebc1f358d93348a5d8f9ecf4877a1d79ee80"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-historico.png",
+      "title": "1024 × 768 · detalhes do histórico",
+      "page": "history",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "b6e40479fbd7e44642812131c588ba5ed5a45dd2f6b73562f6a8d295ad153a8f"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-bloch.png",
+      "title": "1024 × 768 · Bloch e reprodução acessíveis",
+      "page": "bloch",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 1,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": {
+        "zoom": 0.7582593536376953,
+        "pan": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "elev": 22.0,
+        "azim": -60.0,
+        "projection": "persp"
+      },
+      "snapshot_index": 0,
+      "sha256": "2937acc6a805021a2b32dfd2a333ed7d85e64672307f0f8f52a15675f08118df"
+    },
+    {
+      "file": "07-preferencias/texto-ampliado-biblioteca.png",
+      "title": "1024 × 768 · biblioteca com texto ampliado",
+      "page": "catalog",
+      "pixels": [
+        2048,
+        1536
+      ],
+      "logical_size": [
+        1024,
+        768
+      ],
+      "device_pixel_ratio": 2.0,
+      "plot_count": 0,
+      "interface_font_size": 24,
+      "theme": "navy",
+      "selected_result_id": "e8386a09a6f6",
+      "analysis_id": null,
+      "camera": null,
+      "snapshot_index": null,
+      "sha256": "d547389c18e5d68f66ef33299b318ea6d1e2ab8b21c050ce307354513eebcbb8"
+    }
+  ],
+  "identity_assets": {
+    "gui/assets/entrela_logo.png": "ba4a812e1b2fff1cbb5af8a582980278acb3f78924ba6f2b10dcba14391b9c59",
+    "gui/assets/entrela_texto.png": "14f0cb09b5be791b107fc6d0f1ba791539bcd539586e615b2b6ee825866596a0",
+    "gui/assets/icons/entrela.svg": "a2d32b8926092dd321f03035161227db27c9346798e5a80505d5eee2f2810127",
+    "gui/assets/icons/entrela.ico": "78f86dbf044c8146938146bd7c29360de8347a9f37bc1aa3b9876451b184f58f",
+    "gui/assets/icons/entrela.png": "7e9b85ae4483f35df0bfa4514d7673a8d37a238aadd43298abd7df1ef4124381"
+  },
+  "font_assets": {
+    "gui/assets/fonts/IBMPlexSans-Medium.ttf": "a494d5a69fa094f7071a9ffbc98e86c85337d1a29f3fc1ff7c2e1c46161ddf27",
+    "gui/assets/fonts/IBMPlexSans-Regular.ttf": "b47ebd72b5ce53b60f909033ff84d6fc12358cc147e2981f8c321ad3f36246b6",
+    "gui/assets/fonts/IBMPlexSans-SemiBold.ttf": "c51119b25f4a296da2b66edf3201b9aa1735091ed7efc1fca0313346f3851a4d",
+    "gui/assets/fonts/OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
+  }
+}

@@ -2,16 +2,17 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QProgressBar
 STEPS=(
-    ("Dois qubits","Altere o número de qubits para 2.","system"),
-    ("Prepare Bell","Escolha Bell em Estado inicial.","system"),
-    ("Referência ideal","Desative o ruído e mantenha J=0 e h=0.","noise"),
-    ("Registre a evolução","Ative Salvar estados ao longo do tempo.","evolution"),
-    ("Execute","Clique em Executar simulação e aguarde o resultado real.","execution"),
-    ("Interprete","Abra Resultados. Observe a distribuição 00/11 e a interpretação.","execution"),
-    ("Reabra","Abra Histórico e dê duplo clique na execução deste tutorial.","execution"))
+    ("Dois qubits","Em Sistema, altere o número de qubits para 2. O experimento de Bell precisa de um par de qubits.","system"),
+    ("Prepare Bell","Em Estado inicial, escolha Bell. A preparação ideal usa Hadamard (H) e uma porta controlada (CX) para criar um par emaranhado.","system"),
+    ("Referência ideal","Desative o ruído. Mantenha J=0 e h=0 no Hamiltoniano: assim, a evolução não altera o Bell preparado. Você observará primeiro o caso ideal.","noise"),
+    ("Registre a evolução","Em Evolução, ative Salvar estados ao longo do tempo. Os snapshots são os estados calculados que você poderá percorrer em Resultados e Estados 3D.","evolution"),
+    ("Execute","Revise os shots (amostras de medição), clique em Executar simulação e aguarde. Somente a execução produz os resultados que usaremos nas próximas etapas.","execution"),
+    ("Interprete","Abra Resultados e observe o histograma. A previsão ideal é 50% em 00 e 50% em 11; as contagens podem variar. Consulte também a interpretação da mesma execução.","execution"),
+    ("Reabra","Abra Histórico e encontre esta execução. Use o olho (Visualizar) para consultar os detalhes e depois Abrir resultados. Isso consulta o registro sem calcular novamente.","execution"))
 
 class BellTutorial(QWidget):
     section_requested=Signal(str)
+    destination_requested=Signal(str)
     progress_changed=Signal()
     completed=Signal()
     paused=Signal()
@@ -24,6 +25,7 @@ class BellTutorial(QWidget):
         self.experiment=None
         self.config=None
         self.page=""
+        self.displayed_id=None
         self.opened_id=None
         layout=QVBoxLayout(self)
         self.progress=QProgressBar()
@@ -37,9 +39,9 @@ class BellTutorial(QWidget):
         self.feedback=QLabel()
         self.feedback.setWordWrap(True)
         for w in (self.title,self.body,self.feedback):layout.addWidget(w)
-        locate=QPushButton("Ir para a configuração")
-        locate.clicked.connect(lambda:self.section_requested.emit(STEPS[self.step][2]))
-        layout.addWidget(locate)
+        self.locate=QPushButton("Ir para a configuração")
+        self.locate.clicked.connect(self.locate_current_step)
+        layout.addWidget(self.locate)
         row=QHBoxLayout()
         self.btn_back=QPushButton("Voltar")
         self.btn_next=QPushButton("Continuar")
@@ -58,7 +60,7 @@ class BellTutorial(QWidget):
     def run_id(self):return self.experiment.id if self.experiment else None
     @staticmethod
     def matches(cfg):
-        return bool(cfg and cfg.system.num_qubits==2 and cfg.system.initial_state=="bell" and cfg.system.J==0
+        return bool(cfg and cfg.circuit is None and cfg.system.num_qubits==2 and cfg.system.initial_state=="bell" and cfg.system.J==0
                     and cfg.system.h==0 and cfg.system.hamiltonian in ("Ising","Custom")
                     and not cfg.noise.enabled and cfg.protocol.save_snapshots)
     def start(self,step=0,experiment=None):
@@ -69,10 +71,19 @@ class BellTutorial(QWidget):
         self.experiment=experiment
         self.opened_id=None
         self.refresh()
-        self.section_requested.emit(STEPS[self.step][2])
-    def update_context(self,config,page):
+        self.locate_current_step()
+    def update_context(self,config,page,displayed_id=None):
+        """Use the actual displayed record, rather than the selected page alone."""
         self.config,self.page=config,page
+        self.displayed_id=displayed_id
         self.refresh()
+    def locate_current_step(self):
+        if self.step==5:
+            self.destination_requested.emit("results")
+        elif self.step==6:
+            self.destination_requested.emit("history")
+        else:
+            self.section_requested.emit(STEPS[self.step][2])
     def record_run(self,experiment):
         if self.active and self.step>=4 and not experiment.result.error and self.matches(experiment.config):
             self.experiment=experiment
@@ -90,7 +101,7 @@ class BellTutorial(QWidget):
                                     and c.system.J==0 and c.system.h==0 and not c.noise.enabled)
         if self.step==3:return self.matches(c)
         if self.step==4:return self.experiment is not None
-        if self.step==5:return bool(self.experiment and self.page=="results")
+        if self.step==5:return bool(self.run_id and self.page=="results" and self.displayed_id==self.run_id)
         return bool(self.run_id and self.opened_id==self.run_id)
     def refresh(self):
         if self.finished:
@@ -102,11 +113,12 @@ class BellTutorial(QWidget):
         self.btn_back.setEnabled(self.step>0)
         self.btn_next.setText("Concluir" if self.step==6 else "Continuar")
         self.btn_next.setEnabled(self.ready())
+        self.locate.setText("Ver resultados do tutorial" if self.step==5 else "Ir para o histórico" if self.step==6 else "Ir para a configuração")
         if self.experiment:
             counts=self.experiment.result.counts or {}
             total=sum(counts.values())
             correlated=(counts.get("00",0)+counts.get("11",0))/total if total else 0
-            self.feedback.setText(f"Execução {self.run_id}: {total} medições; {correlated:.1%} em 00 ou 11.")
+            self.feedback.setText(f"Seu Bell: {total} medições; {correlated:.1%} em 00 ou 11.")
         else:self.feedback.setText("Ação reconhecida." if self.ready() else "Realize a ação para continuar.")
     def advance(self):
         if not self.active or not self.ready():return
@@ -121,13 +133,13 @@ class BellTutorial(QWidget):
         else:
             self.step+=1
             self.refresh()
-            self.section_requested.emit(STEPS[self.step][2])
+            self.locate_current_step()
         self.progress_changed.emit()
     def back(self):
         if self.step>0:
             self.step-=1
             self.refresh()
-            self.section_requested.emit(STEPS[self.step][2])
+            self.locate_current_step()
             self.progress_changed.emit()
     def pause(self):
         self.active=False

@@ -1,0 +1,101 @@
+name: Distribuição Windows
+
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Compilar e verificar Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      QT_QPA_PLATFORM: windows
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+      - name: Conferir a versão da tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          ENTRELA_TAG: ${{ github.ref_name }}
+        run: |
+          python -c "import os,runpy; expected='v'+runpy.run_path('core/__init__.py')['__version__']; assert os.environ['ENTRELA_TAG']==expected, expected"
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'A tag precisa apontar para um commit integrado à main.' }
+      - name: Gerar portátil e instalador
+        shell: pwsh
+        run: ./scripts/build_windows.ps1 -Python (Get-Command python).Source -Installer
+      - name: Instalar, abrir fora do checkout e desinstalar
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $entrelaInstaller = (Get-ChildItem dist/release/*-setup.exe).FullName
+          $entrelaTarget = Join-Path $env:RUNNER_TEMP 'Entrela com espaço\Árthur'
+          $entrelaProcess = Start-Process $entrelaInstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"$entrelaTarget`"") -Wait -PassThru
+          if ($entrelaProcess.ExitCode -ne 0) { throw 'Falha ao instalar.' }
+          $entrelaReport = Join-Path $env:GITHUB_WORKSPACE 'dist\release\verificacao-instalado.json'
+          $entrelaProcess = Start-Process (Join-Path $entrelaTarget 'Entrela.exe') -WorkingDirectory $env:RUNNER_TEMP -ArgumentList @('--verificar-pacote', "`"$entrelaReport`"") -Wait -PassThru
+          if ($entrelaProcess.ExitCode -ne 0) { throw 'Falha na verificação do aplicativo instalado.' }
+          $entrelaReceipt = Get-Content $entrelaReport -Raw -Encoding UTF8 | ConvertFrom-Json
+          if (-not $entrelaReceipt.success -or -not $entrelaReceipt.frozen -or $entrelaReceipt.qt_platform -ne 'windows') { throw 'Verificação nativa incompleta.' }
+          $entrelaProcess = Start-Process (Join-Path $entrelaTarget 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          if ($entrelaProcess.ExitCode -ne 0) { throw 'Falha na desinstalação.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Entrela-windows-x64
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Guardar diagnóstico se houver falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostico-distribuicao-windows
+          path: |
+            build/native/*.json
+            build/native/*.log
+            build/native/*.png
+            build/native/Entrela/warn-*.txt
+            dist/release/*.json
+          if-no-files-found: ignore
+
+  release:
+    name: Publicar release verificado
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Entrela-windows-x64
+          path: release-assets
+      - name: Publicar os arquivos
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENTRELA_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$ENTRELA_TAG" --draft --verify-tag --title "Entrela $ENTRELA_TAG · Windows x64" --notes-file "docs/releases/$ENTRELA_TAG.md"
+          gh release upload "$ENTRELA_TAG" release-assets/*
+          gh release edit "$ENTRELA_TAG" --draft=false --latest

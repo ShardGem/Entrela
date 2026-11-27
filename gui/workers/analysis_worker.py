@@ -1,6 +1,9 @@
 from PySide6.QtCore import QThread, Signal
 from core.analysis import temporal_analysis, convergence_analysis, parameter_sweep
 from core.simulation import SimulationCancelled
+from core.benchmark import mitigation_benchmark
+from core.study import trotter_noise_study
+from core.research import heatmap_study, zne_stability, equal_budget_study
 
 
 class AnalysisWorker(QThread):
@@ -22,9 +25,14 @@ class AnalysisWorker(QThread):
                 "temporal": temporal_analysis,
                 "convergence": convergence_analysis,
                 "sweep": parameter_sweep,
+                "mitigation_benchmark": mitigation_benchmark,
+                "trotter_noise": trotter_noise_study,
+                "heatmap": heatmap_study,
+                "zne_stability": zne_stability,
+                "equal_budget": equal_budget_study,
             }[self.kind]
             result = callback(
-                self.source if self.kind == "temporal" else self.config,
+                self.config if self.kind in ("convergence", "sweep") else self.source,
                 **self.options,
                 progress=self.progress.emit,
                 is_cancelled=self.isInterruptionRequested,

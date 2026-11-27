@@ -1,0 +1,61 @@
+{
+  "version": "0.24.0",
+  "platform": "Linux · Qt offscreen",
+  "full_suite": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "658",
+    "time": "423.491",
+    "timestamp": "2026-11-12T22:50:12.366945+00:00"
+  },
+  "followup_suite": {
+    "passed": 78,
+    "seconds": 106.55
+  },
+  "checks": [
+    {
+      "step": "complementares",
+      "exit": 0,
+      "seconds": 107.48
+    },
+    {
+      "step": "galeria-publicada",
+      "exit": 0,
+      "seconds": 33.97
+    },
+    {
+      "step": "integridade-galeria",
+      "exit": 0,
+      "seconds": 0.06
+    },
+    {
+      "step": "wheel-final",
+      "exit": 0,
+      "seconds": 0.75
+    },
+    {
+      "step": "pacote-final",
+      "exit": 0,
+      "seconds": 4.85
+    },
+    {
+      "step": "fluxo-final",
+      "exit": 0,
+      "seconds": 9.53
+    },
+    {
+      "step": "dependencias",
+      "exit": 0,
+      "seconds": 0.23
+    }
+  ],
+  "wheel_python_modules": 120,
+  "captures": 66,
+  "native_4k_captures": 61,
+  "limits": [
+    "Validação visual manual nativa no Windows pendente.",
+    "A CI remota não foi executada nesta verificação local."
+  ]
+}

@@ -1,8 +1,10 @@
 """Snapshot viewer: the camera never changes scientific state."""
 
 from __future__ import annotations
+from collections import OrderedDict
+from hashlib import blake2b
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QSignalBlocker, QEvent
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -12,17 +14,29 @@ from PySide6.QtWidgets import (
     QComboBox,
     QCheckBox,
     QScrollArea,
+    QSplitter,
     QGridLayout,
     QTabWidget,
+    QSpinBox,
+    QPlainTextEdit,
+    QSizePolicy,
+    QFrame,
 )
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from qiskit.quantum_info import Statevector, DensityMatrix, partial_trace
+from qiskit.quantum_info import DensityMatrix, partial_trace
 from gui.pages.base import PageBase
 from gui.widgets.card import EmptyState
 from gui.widgets.button import PrimaryButton, GhostButton
 from gui.theme import PALETTE
+from gui.icons import get_icon
 from gui.widgets.plot_canvas import MplCanvas
+from gui.widgets.bloch_canvas import BlochCanvas
+from gui.widgets.bloch_controls import BlochCameraPanel
+from gui.widgets.snapshot_metrics import SnapshotMetrics
+from gui.widgets.flow_layout import FlowLayout
+from gui.widgets.state_inspector import StateInspector
+from gui.widgets.content_tabs import ContentTabs
+from gui.widgets.collapsible import CollapsibleSection
+from PySide6.QtGui import QShortcut, QKeySequence
 
 
 def interpolate_statevectors(svs, steps_per_pair=20):
@@ -30,12 +44,8 @@ def interpolate_statevectors(svs, steps_per_pair=20):
 
 
 def get_bloch_vector(state, qubit_index, num_qubits):
-    rho = DensityMatrix(
-        partial_trace(state, [q for q in range(num_qubits) if q != qubit_index])
-    ).data
-    return np.array(
-        [2 * rho[0, 1].real, -2 * rho[0, 1].imag, (rho[0, 0] - rho[1, 1]).real], float
-    )
+    from core.metrics import bloch_vector
+    return bloch_vector(state, qubit_index)
 
 
 def purity_from_bloch(bvec):
@@ -62,176 +72,10 @@ class QubitInfoPanel(QLabel):
         )
 
 
-class BlochCanvas(FigureCanvas):
-    def __init__(self, parent=None):
-        self.fig = Figure(figsize=(9, 5), facecolor=PALETTE.bg)
-        super().__init__(self.fig)
-        self.setParent(parent)
-        self.setMinimumSize(240, 280)
-        self.ax = self.fig.add_subplot(111, projection="3d")
-        self.fig.subplots_adjust(0, 0, 1, 1)
-        self._sphere_centers = []
-        self._line_handles = []
-        self._ideal_handles = []
-        self._trail_lines = []
-        self._trail_data = []
-        self.zoom = 1.0
-        self.focus = -1
-        self._pan = np.zeros(3)
-        self.mpl_connect("scroll_event", self._on_scroll)
-        self.setToolTip(
-            "Roda: zoom · arrastar: rotação · botão central: pan · Restaurar visão: reset"
-        )
-
-    def setup(self, num_qubits):
-        self.ax.clear()
-        self.ax.set_axis_off()
-        self.ax.set_facecolor(PALETTE.bg)
-        columns = min(3, num_qubits)
-        rows = int(np.ceil(num_qubits / columns))
-        self._sphere_centers = [
-            (
-                (q % columns - (columns - 1) / 2) * 3.5,
-                0,
-                ((rows - 1) / 2 - q // columns) * 3.5,
-            )
-            for q in range(num_qubits)
-        ]
-        self._line_handles = []
-        self._ideal_handles = []
-        self._trail_lines = []
-        self._trail_data = []
-        u, v = np.meshgrid(np.linspace(0, 2 * np.pi, 24), np.linspace(0, np.pi, 16))
-        for q, c in enumerate(self._sphere_centers):
-            color = getattr(PALETTE, f"q{q + 1}")
-            x = c[0] + np.cos(u) * np.sin(v)
-            y = c[1] + np.sin(u) * np.sin(v)
-            z = c[2] + np.cos(v)
-            self.ax.plot_wireframe(
-                x, y, z, color=PALETTE.border_strong, linewidth=0.4, alpha=0.45
-            )
-            for axis, label in enumerate("XYZ"):
-                end = np.array(c, float)
-                end[axis] += 1.3
-                self.ax.plot(*zip(c, end), color=PALETTE.text_dim, linewidth=0.6)
-                self.ax.text(*end, label, color=PALETTE.text_muted, fontsize=9)
-            self.ax.text(c[0], c[1], c[2] - 1.45, f"q{q}", color=color, ha="center")
-            (line,) = self.ax.plot(
-                [],
-                [],
-                [],
-                color=color,
-                linewidth=3,
-                label="Simulado" if q == 0 else None,
-            )
-            (ideal,) = self.ax.plot(
-                [],
-                [],
-                [],
-                "--",
-                color=PALETTE.text,
-                linewidth=1.5,
-                label="Circuito ideal" if q == 0 else None,
-            )
-            (trail,) = self.ax.plot([], [], [], color=color, alpha=0.5, linewidth=1)
-            self._line_handles.append(line)
-            self._ideal_handles.append(ideal)
-            self._trail_lines.append(trail)
-            self._trail_data.append([])
-        self.ax.legend(
-            loc="upper left", facecolor=PALETTE.surface, labelcolor=PALETTE.text
-        )
-        self.focus = -1
-        self.reset_camera()
-
-    def _bounds(self):
-        centers = np.array(self._sphere_centers or [(0, 0, 0)])
-        if 0 <= self.focus < len(centers):
-            return centers[self.focus].copy(), np.array([1.7] * 3)
-        low = centers.min(axis=0) - 1.8
-        high = centers.max(axis=0) + 1.8
-        return (low + high) / 2, (high - low) / 2
-
-    def _apply_camera(self):
-        center, half = self._bounds()
-        center += self._pan
-        half = half / self.zoom
-        self.ax.set_xlim(center[0] - half[0], center[0] + half[0])
-        self.ax.set_ylim(center[1] - half[1], center[1] + half[1])
-        self.ax.set_zlim(center[2] - half[2], center[2] + half[2])
-        self.ax.set_box_aspect(half, zoom=1.55)
-        self.draw_idle()
-
-    def zoom_by(self, factor):
-        if not self._sphere_centers:
-            return
-        self.zoom = float(np.clip(self.zoom * factor, 0.5, 3.0))
-        self._apply_camera()
-
-    def _on_scroll(self, event):
-        if event.inaxes is self.ax:
-            # Capture native pan before applying bounded zoom around the selected sphere.
-            center, _ = self._bounds()
-            self._pan = (
-                np.array(
-                    [
-                        np.mean(self.ax.get_xlim()),
-                        np.mean(self.ax.get_ylim()),
-                        np.mean(self.ax.get_zlim()),
-                    ]
-                )
-                - center
-            )
-            self.zoom_by(np.exp(0.12 * getattr(event, "step", 0)))
-
-    def set_focus(self, index):
-        self.focus = index
-        self.zoom = 1.0
-        self._pan = np.zeros(3)
-        self._apply_camera()
-
-    def pan(self, dx=0, dz=0):
-        _, half = self._bounds()
-        self._pan = np.clip(self._pan + np.array([dx, 0, dz]), -half, half)
-        self._apply_camera()
-
-    def reset_camera(self):
-        self.zoom = 1.0
-        self._pan = np.zeros(3)
-        self.ax.view_init(elev=22, azim=-60)
-        self._apply_camera()
-
-    def clear_trails(self):
-        self._trail_data = [[] for _ in self._sphere_centers]
-        for line in self._trail_lines:
-            line.set_data_3d([], [], [])
-
-    def update_frame(
-        self, bloch_vectors, record_trail=True, ideal_vectors=None, history=None
-    ):
-        for q, c in enumerate(self._sphere_centers):
-            end = np.array(c) + bloch_vectors[q]
-            self._line_handles[q].set_data_3d(*zip(c, end))
-            if ideal_vectors is not None:
-                self._ideal_handles[q].set_data_3d(
-                    *zip(c, np.array(c) + ideal_vectors[q])
-                )
-            else:
-                self._ideal_handles[q].set_data_3d([], [], [])
-            if history is not None:
-                self._trail_data[q] = [
-                    tuple(np.array(c) + frame[q]) for frame in history
-                ]
-            elif record_trail:
-                self._trail_data[q].append(tuple(end))
-            points = self._trail_data[q][-80:]
-            self._trail_lines[q].set_data_3d(*zip(*points) if points else ([], [], []))
-        self.draw_idle()
-
-
 class BlochPage(PageBase):
     frame_changed = Signal(int)
     preferences_changed = Signal()
+    temporal_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(
@@ -239,15 +83,33 @@ class BlochPage(PageBase):
             "Snapshots reais · câmera independente · q0 à direita no histograma.",
             parent,
         )
+        self._camera_layout_timer = QTimer(self)
+        self._camera_layout_timer.setSingleShot(True)
+        self._camera_layout_timer.setInterval(0)
+        self._camera_layout_timer.timeout.connect(self._fit_camera)
         self.original_svs = []
         self.interpolated_svs = []
         self.precomputed_bloch = []
         self.ideal_bloch = []
+        # Cache only small derived arrays, never copies of the scientific states.
+        # Content keys also make a deliberately modified state invalidate safely.
+        self._derived_cache = OrderedDict()
+        self._derived_cache_limit = 512
+        self.snapshot_probabilities = []
+        self.ideal_probabilities = []
+        self._probability_plot_key = None
+        self._probability_bars = []
+        self._probability_annotation = None
+        self._experiment = None
         self.current_frame = 0
         self.num_qubits = 2
         self.playing = False
         self.speed_factor = 1.0
         self.times = None
+        self._refreshing = False
+        self._maximized = False
+        self._camera_auto = True
+        self.time_unit = "adimensional (ℏ=1)"
         self.timer = QTimer(self)
         self.timer.setInterval(350)
         self.timer.timeout.connect(self._on_tick)
@@ -259,15 +121,19 @@ class BlochPage(PageBase):
         self.body().addWidget(self._empty)
         self._content = QWidget()
         layout = QVBoxLayout(self._content)
-        controls = QHBoxLayout()
-        self.btn_play = PrimaryButton("Iniciar")
+        self.transport = QFrame()
+        self.transport.setObjectName("TransportBar")
+        controls = FlowLayout(self.transport)
+        controls.setContentsMargins(10, 8, 10, 8)
+        self.btn_play = PrimaryButton("Reproduzir")
         self.btn_play.clicked.connect(self._toggle_play)
-        self.btn_stop = GhostButton("Parar")
+        self.btn_stop = GhostButton("Reiniciar")
+        self.btn_stop.setToolTip("Volta ao primeiro snapshot; a câmera mantém sua posição.")
         self.btn_stop.clicked.connect(self._stop)
-        self.btn_prev = GhostButton("‹")
+        self.btn_prev = GhostButton("Anterior")
         self.btn_prev.setToolTip("Snapshot anterior")
         self.btn_prev.clicked.connect(self._prev)
-        self.btn_next = GhostButton("›")
+        self.btn_next = GhostButton("Próximo")
         self.btn_next.setToolTip("Próximo snapshot")
         self.btn_next.clicked.connect(self._next)
         self.speed_combo = QComboBox()
@@ -283,72 +149,283 @@ class BlochPage(PageBase):
         self.overlay = QCheckBox("Ideal")
         self.overlay.setChecked(True)
         self.overlay.toggled.connect(self._refresh_ui)
-        for w in (
-            self.btn_play,
-            self.btn_stop,
-            self.btn_prev,
-            self.btn_next,
-            self.speed_combo,
-            self.loop,
-            self.trails,
-            self.overlay,
-        ):
+        for w in (self.btn_play, self.btn_stop, self.btn_prev, self.btn_next):
             controls.addWidget(w)
-        layout.addLayout(controls)
-        camera = QHBoxLayout()
-        self.focus_combo = QComboBox()
-        self.focus_combo.addItem("Todos os qubits", -1)
-        self.focus_combo.currentIndexChanged.connect(self._focus)
-        camera.addWidget(self.focus_combo)
-        for text, callback in [
-            ("+", lambda: self.canvas.zoom_by(1.2)),
-            ("−", lambda: self.canvas.zoom_by(1 / 1.2)),
-            ("←", lambda: self.canvas.pan(-0.25)),
-            ("→", lambda: self.canvas.pan(0.25)),
-            ("↑", lambda: self.canvas.pan(dz=0.25)),
-            ("↓", lambda: self.canvas.pan(dz=-0.25)),
-            ("Restaurar visão", lambda: self.canvas.reset_camera()),
-        ]:
-            button = GhostButton(text)
-            button.clicked.connect(callback)
-            camera.addWidget(button)
-        layout.addLayout(camera)
+        self.selection_label = QLabel("Clique numa esfera para selecionar")
+        self.selection_label.setWordWrap(True)
+        self.selection_label.setObjectName("FieldHint")
+        self.maximize_button = GhostButton("Ampliar área 3D")
+        self.maximize_button.setCheckable(True)
+        self.maximize_button.toggled.connect(self.set_maximized)
+        self.camera_toggle = GhostButton("Inspetor")
+        self.camera_toggle.setCheckable(True)
+        self.camera_toggle.setChecked(True)
+        self.camera_toggle.setToolTip("Mostrar ou recolher o painel de câmera, etapas, qubits e métricas.")
+        self.camera_toggle.setAccessibleName("Mostrar controles da câmera e visualização")
+        self.camera_toggle.clicked.connect(self._camera_chosen)
+        self.camera_toggle.toggled.connect(lambda *_: self._visual_mode_changed(self.visual_tabs.currentIndex()))
+        self.speed_label = QLabel("Velocidade")
+        controls.add_group(self.speed_label, self.speed_combo)
+        controls.addWidget(self.loop)
+
         self.canvas = BlochCanvas()
+        self.canvas.qubit_selected.connect(self._select_qubit)
+        self.camera_panel = BlochCameraPanel(self.canvas)
+        self.focus_combo = self.camera_panel.focus_combo
+        self.focus_combo.currentIndexChanged.connect(self._focus)
+        self.focus_selected = GhostButton("Focar selecionado")
+        self.focus_selected.setEnabled(False)
+        self.focus_selected.clicked.connect(self._toggle_focus)
+        self.canvas.focus_changed.connect(self._sync_focus)
+        self.camera_panel.options_layout.addWidget(self.focus_selected)
+        self.zoom_slider = self.camera_panel.zoom_slider
+        self.zoom_label = self.camera_panel.zoom_label
+        self.axes_check = QCheckBox("Eixos X, Y, Z")
+        self.axes_check.setChecked(True)
+        self.axes_check.toggled.connect(self.canvas.set_axes_visible)
+        for w in (self.overlay, self.trails, self.axes_check):
+            self.camera_panel.options_layout.addWidget(w)
         self.probabilities_canvas = MplCanvas(height=4)
-        self.visual_tabs = QTabWidget()
+        self.probabilities_canvas.mpl_connect("motion_notify_event", self._hover_probability)
+        self.probabilities_canvas.mpl_connect("figure_leave_event", self._hover_probability)
+        self.visual_tabs = ContentTabs()
+        self.visual_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.visual_tabs.setUsesScrollButtons(True)
+        self.visual_tabs.setElideMode(Qt.ElideRight)
         self.visual_tabs.addTab(self.canvas, "Esferas de Bloch")
         self.visual_tabs.addTab(self.probabilities_canvas, "Probabilidades no instante")
+        self.state_inspector = StateInspector()
+        self.visual_tabs.addTab(self.state_inspector, "Estado global")
+        self.visual_tabs.tabBar().hide()
+        self.visual_choice = QComboBox()
+        self.visual_choice.setAccessibleName('Visualização do snapshot')
+        self.visual_choice.addItems(['Esfera de Bloch', 'Probabilidades no instante', 'Estado global no instante'])
+        self.visual_choice.currentIndexChanged.connect(self.visual_tabs.setCurrentIndex)
+        self.visual_tabs.currentChanged.connect(self.visual_choice.setCurrentIndex)
         self.visual_tabs.currentChanged.connect(self._refresh_ui)
-        layout.addWidget(self.visual_tabs, 1)
+        self.visual_tabs.currentChanged.connect(self._visual_mode_changed)
+        self.stage_splitter = QSplitter(Qt.Horizontal)
+        self.stage_splitter.setChildrenCollapsible(False)
+        self.stage_splitter.setHandleWidth(3)
+        self.stage_splitter.addWidget(self.visual_tabs)
+        self.inspector = QFrame()
+        self.inspector.setObjectName("WorkbenchInspector")
+        inspector_layout = QVBoxLayout(self.inspector)
+        inspector_layout.setContentsMargins(12, 12, 12, 8)
+        self.inspector_selector = QComboBox()
+        self.inspector_selector.setAccessibleName("Conteúdo do inspetor da visualização")
+        self.local_qubit = QLabel('Selecione um qubit para inspecionar X, Y, Z e pureza local.')
+        self.local_qubit.setObjectName('ExecutionIdentity')
+        self.local_qubit.setWordWrap(True)
+        self.local_qubit.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        view_row = QHBoxLayout()
+        view_row.addWidget(self.visual_choice)
+        view_row.addWidget(self.selection_label, 1)
+        view_row.addStretch()
+        view_row.addWidget(self.camera_toggle)
+        view_row.addWidget(self.maximize_button)
+        layout.addLayout(view_row)
+        inspector_layout.addWidget(self.focus_combo)
+        inspector_layout.addWidget(self.local_qubit)
+        self.overlay.setText('Mesmo circuito sem ruído')
+        self.trails.setText('Trajetória dos snapshots')
+        for option in (self.overlay, self.trails, self.axes_check):
+            inspector_layout.addWidget(option)
+        inspector_layout.addWidget(self.inspector_selector)
+        self.inspector_tabs = ContentTabs()
+        self.inspector_tabs.tabBar().hide()
+        inspector_layout.addWidget(self.inspector_tabs, 1)
+        self.inspector.setMinimumWidth(280)
+        self.inspector.setMaximumWidth(430)
+        self.camera_scroll = QScrollArea()
+        self.camera_scroll.setWidgetResizable(True)
+        self.camera_scroll.setMinimumWidth(235)
+
+        self.camera_section = CollapsibleSection('Câmera e enquadramento', expanded=False)
+        self.camera_section.content_layout.addWidget(self.camera_panel)
+        self.camera_scroll.setWidget(self.camera_section)
+        self.inspector_tabs.addTab(self.camera_scroll, "Câmera e visualização")
+        self.stage_splitter.addWidget(self.inspector)
+        self.stage_splitter.setStretchFactor(0, 1)
+        self.stage_splitter.setStretchFactor(1, 0)
+        self.stage_splitter.setSizes([900, 320])
+        layout.addWidget(self.stage_splitter, 1)
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setMaximum(0)
         self.slider.valueChanged.connect(self._on_slider)
         layout.addWidget(self.slider)
         self.frame_label = QLabel()
-        layout.addWidget(self.frame_label)
+        self.frame_label.setWordWrap(True)
+        frame_row = QHBoxLayout()
+        frame_row.addWidget(self.frame_label, 1)
+        self.snapshot_label = QLabel("Ir ao snapshot")
+        frame_row.addWidget(self.snapshot_label)
+        self.snapshot_spin = QSpinBox()
+        self.snapshot_spin.setRange(1, 1)
+        self.snapshot_spin.setKeyboardTracking(False)
+        self.snapshot_spin.setAccessibleName("Snapshot selecionado")
+        self.snapshot_spin.valueChanged.connect(
+            lambda value: self.slider.setValue(value - 1)
+        )
+        frame_row.addWidget(self.snapshot_spin)
+        layout.addLayout(frame_row)
+        layout.addWidget(self.transport)
+        self.timeline_detail = QPlainTextEdit()
+        self.timeline_detail.setReadOnly(True)
+        self.timeline_detail.setMinimumHeight(150)
+        self.timeline_detail.setAccessibleName("Transformação e estados do snapshot")
+        self.timeline_detail.setPlaceholderText("Carregue um experimento para inspecionar as etapas.")
+        self.details_section = CollapsibleSection("Etapa, qubits e métricas", expanded=False)
+        self.details_section.set_summary("Consulte a transformação, os estados locais e as métricas do instante selecionado.")
+        self.details_section.expanded_changed.connect(lambda *_: self.preferences_changed.emit())
+        self.details_section.content_layout.addWidget(self.timeline_detail)
         self._info_container = QWidget()
         QGridLayout(self._info_container)
         self._qubit_panels = []
         info_scroll = QScrollArea()
+        self.info_scroll = info_scroll
         info_scroll.setWidgetResizable(True)
         info_scroll.setWidget(self._info_container)
         info_scroll.setFixedHeight(145)
-        layout.addWidget(info_scroll)
+
         note = QLabel(
             "Pureza local baixa pode indicar correlações/emaranhamento: em Bell ideal, cada qubit tem pureza ½. A linha tracejada representa o mesmo circuito sem ruído."
         )
         note.setWordWrap(True)
-        layout.addWidget(note)
+        self.details_section.content_layout.addWidget(note)
+        self.scene_note = note
+        self.metrics = SnapshotMetrics()
+        self.metrics.analyze_requested.connect(self.temporal_requested.emit)
+        self.metrics.snapshot_selected.connect(self.slider.setValue)
+        self.inspector_tabs.addTab(self.details_section, "Etape selecionada")
+        self.inspector_tabs.setTabText(1, "Etapa selecionada")
+        self.inspector_tabs.addTab(info_scroll, "Estados locais dos qubits")
+        self.inspector_tabs.addTab(self.metrics, "Métricas temporais")
+        info_scroll.setMinimumHeight(150)
+        info_scroll.setMaximumHeight(16777215)
+        for i in range(self.inspector_tabs.count()):
+            self.inspector_selector.addItem(self.inspector_tabs.tabText(i))
+        self.inspector_selector.currentIndexChanged.connect(self._inspector_changed)
+        escape = QShortcut(QKeySequence("Esc"), self)
+        escape.setContext(Qt.WidgetWithChildrenShortcut)
+        escape.activated.connect(lambda: self.set_maximized(False))
+        self._escape = escape
         self.body().addWidget(self._content, 1)
         self._content.hide()
+        self._scroll.takeWidget()
+        self._scroll.hide()
+        self._root.insertWidget(1, self._body_widget, 1)
+        self._body.setContentsMargins(20, 0, 20, 8)
+        self._body.setSpacing(0)
+        self.visual_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.stage_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
 
-    def load_statevectors(self, statevectors, times=None, ideal_statevectors=None):
+    def refresh_theme(self):
+        if hasattr(self, "camera_scroll"):
+            self._camera_layout_timer.start()
+
+    def _visual_mode_changed(self, index):
+        self.inspector.setVisible(not self._maximized and self.camera_toggle.isChecked())
+        self.camera_toggle.setVisible(not self._maximized)
+        compact = self.width() < 1180*max(1,self.font().pixelSize()/15)
+        self.selection_label.setVisible(self.visual_tabs.widget(index) is self.canvas and not compact)
+        self.maximize_button.setText('' if compact else ("Restaurar painéis" if self._maximized else "Ampliar visualização"))
+
+    def _inspector_changed(self, index):
+        self.inspector_tabs.setCurrentIndex(index)
+        if index == 1:
+            self.details_section.set_expanded(True, animate=False)
+        self.preferences_changed.emit()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self.refresh_theme()
+
+    def _fit_camera(self):
+        self.camera_panel.ensurePolished()
+        width = max(235, self.camera_panel.minimumSizeHint().width()+24)
+        self.camera_scroll.setMinimumWidth(width)
+        self.inspector.setMinimumWidth(min(430, max(280, width + 8)))
+        if self._camera_auto:
+            self.camera_toggle.setChecked(self.width() >= 1100 * max(1, self.font().pixelSize() / 15))
+        self._visual_mode_changed(self.visual_tabs.currentIndex())
+        self._adapt_transport()
+
+    def _adapt_transport(self):
+        if not hasattr(self, 'snapshot_label'): return
+        compact = self.width() < 1180*max(1,self.font().pixelSize()/15)
+        self.speed_label.setVisible(not compact)
+        self.loop.setVisible(not compact)
+        self.snapshot_label.setText('#' if compact else 'Ir ao snapshot')
+        for button, text, icon in [(self.btn_play,'Reproduzir','pause' if self.playing else 'play'),
+            (self.btn_stop,'Reiniciar','history'), (self.btn_prev,'Anterior','prev'), (self.btn_next,'Próximo','next'),
+            (self.maximize_button,'Restaurar painéis' if self._maximized else 'Ampliar visualização','fit-view'),
+            (self.camera_toggle,'Inspetor','panel-right')]:
+            button.setText('' if compact else text)
+            button.setAccessibleName(text)
+            button.setToolTip(text)
+            button._icon_name = icon
+            button.setIcon(get_icon(icon, PALETTE.action_on if button is self.btn_play else PALETTE.primary))
+        if self.precomputed_bloch: self._refresh_ui()
+
+    def _camera_chosen(self, *_):
+        self._camera_auto = False
+        self.preferences_changed.emit()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_camera_layout_timer'):
+            self._camera_layout_timer.start()
+
+    def collect_view_preferences(self):
+        return {'camera': 'auto' if self._camera_auto else self.camera_toggle.isChecked(),
+                'details': self.details_section.is_expanded, 'inspector': self.inspector_selector.currentIndex()}
+
+    def apply_view_preferences(self, mapping):
+        mapping = mapping if isinstance(mapping, dict) else {}
+        camera = mapping.get('camera', 'auto')
+        self._camera_auto = type(camera) is not bool
+        blockers = [QSignalBlocker(self.camera_toggle), QSignalBlocker(self.details_section)]
+        self.camera_toggle.setChecked(camera if type(camera) is bool else True)
+        self.details_section.set_expanded(mapping.get('details') is True, animate=False)
+        del blockers
+        index = mapping.get("inspector", 0)
+        if type(index) is int and 0 <= index < self.inspector_tabs.count():
+            blocker = QSignalBlocker(self.inspector_selector)
+            self.inspector_selector.setCurrentIndex(index)
+            self.inspector_tabs.setCurrentIndex(index)
+            del blocker
+        self.refresh_theme()
+
+    def load_statevectors(
+        self,
+        statevectors,
+        times=None,
+        ideal_statevectors=None,
+        time_unit="adimensional (ℏ=1)",
+    ):
         self._pause()
+        self._experiment = None
+        self.final_only = False
+        self.timeline_detail.clear()
+        self.time_unit = time_unit
+        self.metrics.clear("Índice da porta" if "porta" in time_unit else "Tempo (ℏ=1)")
+        self.selection_label.setText("Clique numa esfera para selecionar")
+        self.focus_selected.setEnabled(False)
         self.original_svs = list(statevectors or [])
+        self.state_inspector.set_state(None)
         self.interpolated_svs = list(self.original_svs)
         self.precomputed_bloch = []
         self.ideal_bloch = []
+        self.snapshot_probabilities = []
+        self.ideal_probabilities = []
+        self._probability_plot_key = None
+        self._probability_bars = []
+        self._probability_annotation = None
         self.ideal_states = list(ideal_statevectors or [])
+        if len(self.ideal_states) != len(self.original_svs):
+            self.ideal_states = []
         self.times = (
             times
             if times is not None and len(times) == len(self.original_svs)
@@ -360,22 +437,16 @@ class BlochPage(PageBase):
             return
         self.num_qubits = self.original_svs[0].num_qubits
         for state in self.original_svs:
-            self.precomputed_bloch.append(
-                [
-                    get_bloch_vector(state, q, self.num_qubits)
-                    for q in range(self.num_qubits)
-                ]
-            )
-        if ideal_statevectors and len(ideal_statevectors) == len(statevectors):
-            self.ideal_bloch = [
-                [
-                    get_bloch_vector(s, q, self.num_qubits)
-                    for q in range(self.num_qubits)
-                ]
-                for s in ideal_statevectors
-            ]
-        self.canvas.setup(self.num_qubits)
+            vectors, probabilities = self._derived_snapshot(state)
+            self.precomputed_bloch.append(vectors)
+            self.snapshot_probabilities.append(probabilities)
+        for state in self.ideal_states:
+            vectors, probabilities = self._derived_snapshot(state)
+            self.ideal_bloch.append(vectors)
+            self.ideal_probabilities.append(probabilities)
         old_focus = self.focus_combo.currentData()
+        canvas_blocker = QSignalBlocker(self.canvas)
+        self.canvas.setup(self.num_qubits)
         self.focus_combo.blockSignals(True)
         self.focus_combo.clear()
         self.focus_combo.addItem("Todos os qubits", -1)
@@ -388,18 +459,45 @@ class BlochPage(PageBase):
         while layout.count():
             item = layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
         self._qubit_panels = []
         for q in range(self.num_qubits):
             panel = QubitInfoPanel(q)
-            layout.addWidget(panel, q // 3, q % 3)
+            layout.addWidget(panel, q, 0)
             self._qubit_panels.append(panel)
         self.slider.blockSignals(True)
         self.slider.setMaximum(len(self.precomputed_bloch) - 1)
         self.slider.setValue(0)
         self.slider.blockSignals(False)
+        self.snapshot_spin.setRange(1, len(self.precomputed_bloch))
         self.current_frame = 0
-        self._refresh_ui()
+        del canvas_blocker
+        self.camera_panel.sync_from_camera()
+        self._sync_focus(self.canvas.focus, persist=False)
+
+    def _derived_snapshot(self, state):
+        data = np.asarray(state.data)
+        key = (
+            data.shape,
+            data.dtype.str,
+            blake2b(data.tobytes(), digest_size=20).digest(),
+        )
+        cached = self._derived_cache.get(key)
+        if cached is None:
+            vectors = np.asarray([
+                get_bloch_vector(state, q, state.num_qubits)
+                for q in range(state.num_qubits)
+            ])
+            probabilities = np.asarray(state.probabilities()).copy()
+            vectors.setflags(write=False)
+            probabilities.setflags(write=False)
+            cached = (vectors, probabilities)
+            self._derived_cache[key] = cached
+            while len(self._derived_cache) > self._derived_cache_limit:
+                self._derived_cache.popitem(last=False)
+        self._derived_cache.move_to_end(key)
+        return cached
 
     def _focus(self, *_):
         self.canvas.set_focus(
@@ -407,18 +505,110 @@ class BlochPage(PageBase):
             if self.focus_combo.currentData() is not None
             else -1
         )
+
+    def _toggle_focus(self):
+        self.canvas.set_focus(-1 if self.canvas.focus >= 0 else self.canvas.selected_qubit)
+
+    def _sync_focus(self, index, persist=True):
+        blocker = QSignalBlocker(self.focus_combo)
+        self.focus_combo.setCurrentIndex(max(0, self.focus_combo.findData(index)))
+        del blocker
+        self._select_qubit(index)
         self._refresh_ui()
-        self.preferences_changed.emit()
+        if persist:
+            self.preferences_changed.emit()
+
+    def set_experiment(self, experiment):
+        """Describe actual stored transitions, never interpolate invented states."""
+        self._experiment = experiment
+        final_only = not experiment.result.states and bool(self.original_svs)
+        self.final_only = final_only
+        for control in (self.btn_play, self.btn_prev, self.btn_next, self.btn_stop, self.slider, self.snapshot_spin, self.speed_combo, self.loop):
+            control.setEnabled(not final_only)
+        if final_only:
+            self.frame_label.setText("Estado final · esta execução não armazenou etapas intermediárias")
+            self.timeline_detail.setPlainText("Estado final calculado da execução selecionada. Não há snapshots intermediários armazenados; nenhuma trajetória é inferida.")
+        else:
+            self._render_timeline()
+
+    @staticmethod
+    def _state_description(state):
+        data = np.asarray(state.data)
+        if data.ndim == 1:
+            values = np.array2string(data[:8], precision=8, suppress_small=True, max_line_width=100)
+            return "ψ = " + values + (" … (primeiras 8 amplitudes)" if data.size > 8 else "")
+        probabilities = np.real(np.diag(data))
+        return (f"ρ: traço={np.trace(data).real:.12g}; Tr(ρ²)={np.trace(data @ data).real:.12g}; "
+                + "diagonal=" + np.array2string(probabilities[:8], precision=8, suppress_small=True)
+                + (" … (primeiras 8 probabilidades)" if data.shape[0] > 8 else ""))
+
+    def _render_timeline(self):
+        experiment = self._experiment
+        if experiment is None or not self.original_svs:
+            return
+        if getattr(self, 'final_only', False):
+            self.timeline_detail.setPlainText("Estado final calculado. Esta execução não armazenou etapas intermediárias; nenhuma trajetória é inferida.\n" + self._state_description(self.original_svs[0]))
+            return
+        index = self.current_frame
+        config = experiment.config
+        if index == 0:
+            heading = ("Estado inicial |0…0⟩ com a fase global do circuito."
+                       if config.circuit is not None else "Estado após a preparação, antes da evolução de Trotter.")
+        elif config.circuit is not None and index <= len(config.circuit.gates):
+            from core.circuit_document import GATE_HELP
+            gate = config.circuit.gates[index - 1]
+            heading = (f"Porta lógica {index}: {gate.name.upper()} · qubits "
+                       + ", ".join(f"q{q}" for q in gate.qubits)
+                       + (f" · parâmetros={gate.parameters!r} rad" if gate.parameters else "")
+                       + "\n" + GATE_HELP[gate.name]
+                       + "\nIdeal: |ψ′⟩=U|ψ⟩ ou ρ′=UρU†. Com ruído, canais são aplicados às operações nativas.")
+        else:
+            operations = [op for op in experiment.result.metadata.get("operations", [])
+                          if op.get("stage") == "evolution" and op.get("step") == index]
+            dt = config.protocol.total_time / config.protocol.trotter_steps
+            heading = (f"Camada Suzuki–Trotter {index} · Δt={dt:.12g} (ℏ=1) · "
+                       f"{len(operations)} operações nativas.\n"
+                       "Ideal: |ψ′⟩=U_ST(Δt)|ψ⟩; com ruído, a camada inclui canais. "
+                       "Os snapshots delimitam camadas completas; não há estados intermediários por porta.")
+        rows = [heading]
+        if index > 0:
+            rows.append("Antes: " + self._state_description(self.original_svs[index - 1]))
+        rows.append("Depois: " + self._state_description(self.original_svs[index]))
+        if index > 0:
+            delta = self.snapshot_probabilities[index] - self.snapshot_probabilities[index - 1]
+            rows.append(f"Maior alteração absoluta de probabilidade: {np.max(np.abs(delta)):.12g}. "
+                        "Valores mostrados são numéricos; snapshots completos podem ser exportados.")
+        self.timeline_detail.setPlainText("\n".join(rows))
 
     def _refresh_ui(self, *_):
-        if not self.precomputed_bloch:
+        if not self.precomputed_bloch or self._refreshing:
             return
+        self._refreshing = True
+        try:
+            self._render_snapshot()
+        finally:
+            self._refreshing = False
+
+    def _render_snapshot(self):
         idx = self.current_frame
+        blocker = QSignalBlocker(self.snapshot_spin)
+        self.snapshot_spin.setValue(idx + 1)
+        del blocker
         self.frame_label.setText(
-            f"Snapshot {idx + 1} / {len(self.precomputed_bloch)}"
-            + (f" · t={self.times[idx]:.6g} (ℏ=1)" if self.times is not None else "")
+            f"Snapshot {idx + 1} de {len(self.precomputed_bloch)}"
+            + (
+                f" · {'porta' if 'porta' in self.time_unit else 't'}={self.times[idx]:.6g} ({self.time_unit})"
+                if self.times is not None
+                else ""
+            )
             + " · reprodução didática"
         )
+        self.frame_label.setToolTip(self.frame_label.text())
+        if self.width() < 1180*max(1,self.font().pixelSize()/15):
+            unit = 'ℏ=1' if 'adimensional' in self.time_unit else self.time_unit
+            self.frame_label.setText(f"Snapshot {idx+1} de {len(self.precomputed_bloch)} · " + (f"{self.times[idx]:.6g} ({unit})" if self.times is not None else 'índice registrado'))
+        if getattr(self, "final_only", False):
+            self.frame_label.setText("Estado final · sem etapas intermediárias armazenadas")
         self.slider.blockSignals(True)
         self.slider.setValue(idx)
         self.slider.blockSignals(False)
@@ -435,25 +625,30 @@ class BlochPage(PageBase):
         for q, panel in enumerate(self._qubit_panels):
             panel.update_values(self.precomputed_bloch[idx][q])
             panel.setVisible(self.canvas.focus in (-1, q))
-        if self.visual_tabs.currentIndex() == 1:
+        plot_key = (idx, self.overlay.isChecked(), PALETTE.q1, PALETTE.q2, PALETTE.surface, PALETTE.text)
+        if self.visual_tabs.currentIndex() == 1 and plot_key != self._probability_plot_key:
             ax = self.probabilities_canvas.reset_axes()
-            probabilities = self.original_svs[idx].probabilities()
+            probabilities = self.snapshot_probabilities[idx]
             positions = np.arange(len(probabilities))
-            ax.bar(
+            bars = ax.bar(
                 positions - 0.18,
                 probabilities,
                 width=0.36,
-                color=PALETTE.primary,
+                color=PALETTE.q1,
                 label="Simulado",
             )
-            if self.overlay.isChecked() and getattr(self, "ideal_states", None):
-                ax.bar(
+            self._probability_bars = [(bar, int(i), float(value), "Simulado")
+                                      for bar, i, value in zip(bars, positions, probabilities)]
+            if self.overlay.isChecked() and self.ideal_probabilities:
+                bars = ax.bar(
                     positions + 0.18,
-                    self.ideal_states[idx].probabilities(),
+                    self.ideal_probabilities[idx],
                     width=0.36,
                     color=PALETTE.q2,
                     label="Circuito ideal",
                 )
+                self._probability_bars.extend((bar, int(i), float(value), "Circuito ideal")
+                                              for bar, i, value in zip(bars, positions, self.ideal_probabilities[idx]))
             ax.set_xticks(
                 positions,
                 [format(i, f"0{self.num_qubits}b") for i in positions],
@@ -463,8 +658,46 @@ class BlochPage(PageBase):
             ax.set_ylabel("Probabilidade")
             ax.set_xlabel("Bitstring (q0 à direita)")
             ax.legend(facecolor=PALETTE.surface, labelcolor=PALETTE.text)
+            self._probability_annotation = ax.annotate(
+                "", xy=(0, 0), xytext=(10, 12), textcoords="offset points",
+                bbox={"boxstyle": "round,pad=.5", "fc": PALETTE.surface, "ec": PALETTE.border_strong},
+                color=PALETTE.text, zorder=20,
+            )
+            self._probability_annotation.set_visible(False)
             self.probabilities_canvas.draw_idle()
+            self._probability_plot_key = plot_key
+        self._update_local_qubit()
+        self.metrics.select_snapshot(idx)
+        self.state_inspector.set_state(
+            self.original_svs[idx],
+            self.ideal_states[idx] if self.ideal_states else None,
+            f"Snapshot {idx + 1} de {len(self.original_svs)} · estado simulado",
+        )
+        self._render_timeline()
         self.frame_changed.emit(idx)
+
+    def _hover_probability(self, event):
+        annotation = self._probability_annotation
+        if annotation is None:
+            return
+        visible = annotation.get_visible()
+        if getattr(event, "inaxes", None) is annotation.axes:
+            for bar, index, value, series in self._probability_bars:
+                if bar.contains(event)[0]:
+                    bitstring = format(index, f"0{self.num_qubits}b")
+                    time = (f"\nCoordenada: {self.times[self.current_frame]:.17g} ({self.time_unit})"
+                            if self.times is not None else "")
+                    annotation.set_text(
+                        f"{series} · |{bitstring}⟩\nProbabilidade: {value:.17g}\n"
+                        f"Percentual: {100 * value:.17g}%\nSnapshot {self.current_frame + 1}" + time
+                    )
+                    annotation.xy = (bar.get_x() + bar.get_width() / 2, value)
+                    annotation.set_visible(True)
+                    self.probabilities_canvas.draw_idle()
+                    return
+        annotation.set_visible(False)
+        if visible:
+            self.probabilities_canvas.draw_idle()
 
     def _on_tick(self):
         if not self.precomputed_bloch:
@@ -485,9 +718,11 @@ class BlochPage(PageBase):
             self._pause()
 
     def _pause(self):
+        self.btn_play.setIcon(get_icon('play', PALETTE.action_on))
+        self.btn_play.setAccessibleName('Reproduzir snapshots')
         self.timer.stop()
         self.playing = False
-        self.btn_play.setText("Iniciar")
+        self.btn_play.setText('' if self.width() < 1180*max(1,self.font().pixelSize()/15) else "Reproduzir")
 
     def _toggle_play(self):
         if self.playing:
@@ -498,7 +733,9 @@ class BlochPage(PageBase):
                 self._refresh_ui()
             self.playing = True
             self.timer.start()
-            self.btn_play.setText("Pausar")
+            self.btn_play.setIcon(get_icon('pause', PALETTE.action_on))
+            self.btn_play.setAccessibleName('Pausar reprodução')
+            self.btn_play.setText('' if self.width() < 1180*max(1,self.font().pixelSize()/15) else "Pausar")
 
     def _stop(self):
         self._pause()
@@ -525,3 +762,50 @@ class BlochPage(PageBase):
         self.speed_factor = float(text.replace("x", ""))
         self.timer.setInterval(round(350 / self.speed_factor))
         self.preferences_changed.emit()
+
+    def hideEvent(self, event):
+        self._pause()
+        self.canvas._end_drag()
+        if self._maximized:
+            self.set_maximized(False)
+        super().hideEvent(event)
+
+    def set_maximized(self, enabled):
+        enabled = bool(enabled)
+        if self._maximized == enabled:
+            return
+        self._maximized = enabled
+        blocker = QSignalBlocker(self.maximize_button)
+        self.maximize_button.setChecked(enabled)
+        del blocker
+        self.maximize_button.setText(
+            "Restaurar painéis" if enabled else "Ampliar área 3D"
+        )
+        self._header.setVisible(not enabled and not getattr(self, "_embedded_heading", False))
+        self._visual_mode_changed(self.visual_tabs.currentIndex())
+
+    def _select_qubit(self, index):
+        valid = 0 <= index < len(self._qubit_panels)
+        self.selection_label.setText(f"Qubit q{index} selecionado" if valid else "Clique numa esfera para selecionar")
+        self.focus_selected.setText("Mostrar todos os qubits" if self.canvas.focus >= 0 else "Focar selecionado")
+        self.focus_selected.setEnabled(valid or self.canvas.focus >= 0)
+        self.canvas.select_qubit(index)
+        for q, panel in enumerate(self._qubit_panels):
+            panel.setStyleSheet(
+                "border: 2px solid " + getattr(PALETTE, f"q{q + 1}") + ";"
+                if q == index
+                else ""
+            )
+        if valid:
+            self.info_scroll.ensureWidgetVisible(self._qubit_panels[index])
+        self._update_local_qubit()
+
+    def _update_local_qubit(self):
+        if not hasattr(self, 'local_qubit'): return
+        index = self.canvas.selected_qubit
+        if not self.precomputed_bloch or index < 0:
+            self.local_qubit.setText('Selecione um qubit para inspecionar X, Y, Z e pureza local.')
+            return
+        vector = self.precomputed_bloch[self.current_frame][index]
+        x, y, z = vector
+        self.local_qubit.setText(f'Qubit q{index} · snapshot {self.current_frame+1}\n\nX     {x:+.6g}\nY     {y:+.6g}\nZ     {z:+.6g}\nPureza local     {purity_from_bloch(vector):.6g}')

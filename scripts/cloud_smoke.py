@@ -30,12 +30,27 @@ def main():
         repo=ExperimentRepository(Path(directory)/"runs")
         settings=QSettings(str(Path(directory)/"prefs.ini"),QSettings.IniFormat)
         window=MainWindow(repo,settings)
+        window.onboarding.offer_on_startup()
         window.show()
         app.processEvents()
+        wait_until(lambda:window.onboarding.dialog is not None)
+        capture(window.onboarding.dialog,"boas-vindas")
+        window.onboarding.dialog.actions['guide'].click()
+        assert window.is_page_active('docs')
+        guide=window.page_docs.guide
+        guide.next.click()
+        assert guide.step==1
+        window._show_page('simulation')
+        window._command('getting-started')
+        assert guide.step==1
+        assert window._current_experiment is None and window._current_worker is None
+        assert not repo.list_all()
+        capture(window,"primeiros-passos")
+        print("PASS: optional welcome and resumable guide without changing scientific data")
         capture(window,"inicio")
         for key,page in window.pages.items():
             window._show_page(key)
-            assert window.stack.currentWidget() is page
+            assert window.is_page_active(key)
         print("PASS: navigation across",len(window.pages),"pages")
         window._show_page("examples")
         window.page_examples.select_example("bell")
@@ -68,7 +83,9 @@ def main():
         capture(window,"mitigation")
         assert len(repo.list_all())==5
         print("PASS: ZNE analysis as independent record")
-        window._begin_tutorial()
+        window.onboarding.open_guide()
+        guide.select_step(0)
+        guide.practice.click()
         t=window.tutorial
         p.spin_qubits.setValue(2)
         t.advance()

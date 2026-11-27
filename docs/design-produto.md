@@ -1,6 +1,6 @@
 # Entrela — especificação de experiência e design
 
-Status: visão de produto. A base foi recuperada e integrada; os recursos entregues e limites estão em [Entrega do workspace](entrega-workspace.md). Projetos, varreduras e relatórios formatados ainda são evoluções futuras.
+Status: visão de produto, com propostas que não representam um inventário de funcionalidades. Consulte as entregas atuais em [Evolução 0.14](evolucao-0.14.md), [Evolução 0.13](evolucao-0.13.md), [Circuitos 0.12](circuitos-interativos-0.12.md) e [Evolução 0.11](evolucao-0.11.md). Projetos, varreduras e relatórios já estão disponíveis.
 
 ## Princípio de produto
 
@@ -47,7 +47,7 @@ Animações de 120–180 ms, respeitando redução de movimento. Contraste deve 
 | CircuitInspector | Porta selecionável, qubits, camada, parâmetros e origem quando conhecida |
 | EmptyState | Explicação da área e ação útil; não inventa registros |
 | ErrorPanel | Causa conhecida, correção concreta e detalhes técnicos expansíveis sem credenciais |
-| CommandPalette | Ctrl+K; comandos e glossário pesquisáveis; Esc fecha e devolve foco |
+| Busca de recursos | Botão Buscar; comandos e glossário pesquisáveis; Esc fecha e devolve foco |
 
 ## Mapa de telas
 
@@ -114,7 +114,7 @@ Recuperação relativa de fidelidade: (F_mitigado − F_ruidoso)/(F_ideal − F_
 
 ## Rigor científico e reprodutibilidade
 
-- No Ising H = −J Σ ZᵢZᵢ₊₁ − h Σ Xᵢ, J positivo favorece alinhamento e J negativo antialinhamento; outras convenções precisam ser declaradas.
+- Na implementação Ising H = +J Σ ZᵢZᵢ₊₁ + h Σ Xᵢ: J positivo favorece antialinhamento no termo ZZ; a convenção deve acompanhar cada resultado.
 - Separar estado exato, matriz densidade, amostras e estimativas. Para estados puros, F=|⟨ψ|φ⟩|²; para estados mistos, documentar a convenção de fidelidade usada pela biblioteca.
 - Pureza global Tr(ρ²) difere da pureza do estado reduzido de um qubit. Um estado de Bell globalmente puro possui vetor de Bloch local nulo.
 - Mais shots reduzem incerteza de amostragem; não corrigem ruído físico nem erro de aproximação temporal.

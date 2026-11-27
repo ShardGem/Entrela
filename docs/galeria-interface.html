@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrela · Estilos da interface</title>
+<style>
+:root { color-scheme: dark; --bg:#12171e; --panel:#181f28; --text:#e9eff6; --muted:#b0bfd0; --line:#62758a; --accent:#7ad7dd; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui, sans-serif; }
+body[data-theme="claro"] { color-scheme:light; --bg:#f2f5f8; --panel:white; --text:#1c2e42; --muted:#4b6178; --line:#93a8bb; --accent:#1b6f94; }
+body[data-theme="azulado"] { --bg:#0c1524; --panel:#121f32; --text:#e5eef9; --muted:#adc0d7; --line:#637f9e; --accent:#86baff; }
+main { max-width:1504px; margin:auto; padding:40px 32px; }
+header { max-width:980px; margin-bottom:28px; }
+.eyebrow { color:var(--accent); font-size:.85rem; letter-spacing:.1em; text-transform:uppercase; }
+h1 { font-size:clamp(1.8rem,4vw,2.7rem); line-height:1.15; margin:10px 0 16px; }
+p { margin:8px 0; }
+.muted, small { color:var(--muted); }
+a { color:var(--accent); text-underline-offset:3px; }
+fieldset { border:0; margin:0; padding:0; }
+legend { font-weight:600; margin-bottom:10px; }
+.profiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.profile { display:flex; align-items:start; gap:12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:18px; cursor:pointer; }
+.profile:has(input:checked) { border:2px solid var(--accent); padding:17px; }
+.profile strong, .profile small { display:block; }
+.profile input { margin-top:6px; accent-color:var(--accent); width:18px; height:18px; flex-shrink:0; }
+.controls { display:flex; flex-wrap:wrap; align-items:end; gap:20px; margin:24px 0 14px; }
+.field { display:flex; flex-direction:column; gap:6px; }
+.field label { font-weight:600; }
+select { font:inherit; padding:9px 12px; min-width:240px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); }
+:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+.view-link { margin-left:auto; padding:9px 0; }
+figure { margin:0; }
+.image-frame { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
+img { display:block; width:100%; height:auto; }
+figcaption { color:var(--muted); font-size:.9rem; margin-top:10px; }
+.plan { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; margin-top:36px; }
+h2 { font-size:1.1rem; margin:0 0 8px; }
+.plan p { color:var(--muted); }
+footer { border-top:1px solid var(--line); padding-top:20px; margin-top:32px; color:var(--muted); font-size:.9rem; }
+@media(max-width:760px) { main { padding:24px 16px; } .profiles,.plan { grid-template-columns:1fr; } .view-link { margin-left:0; } }
+</style>
+</head>
+<body data-theme="grafite">
+<main>
+<header>
+<div class="eyebrow">Entrela · Interface 0.22</div>
+<h1>Três estilos, o mesmo laboratório.</h1>
+<p>Compare as telas reais do aplicativo. Grafite é o padrão; Claro científico e Azul escuro ficam disponíveis em Preferências.</p>
+<p class="muted">Esta galeria consulta imagens locais. A mudança abaixo serve para comparar as capturas; as preferências do aplicativo são independentes.</p>
+</header>
+<fieldset>
+<legend>Escolha o estilo</legend>
+<div class="profiles">
+<label class="profile"><input type="radio" name="theme" value="grafite" checked><span><strong>Grafite · padrão</strong><small>Superfícies neutras, ciano discreto e identidade Entrela.</small></span></label>
+<label class="profile"><input type="radio" name="theme" value="claro"><span><strong>Claro científico</strong><small>Leitura em fundo claro, com destaque azul.</small></span></label>
+<label class="profile"><input type="radio" name="theme" value="azulado"><span><strong>Azul escuro</strong><small>Superfícies azuladas e destaque azul suave.</small></span></label>
+</div>
+</fieldset>
+<div class="controls">
+<div class="field"><label for="screen">Tela do aplicativo</label><select id="screen">
+<option value="simulacao">Configurar experimento</option>
+<option value="resultados">Resultados</option>
+<option value="bloch">Estados em 3D</option>
+<option value="historico">Histórico e circuito</option>
+<option value="preferencias">Preferências</option>
+</select></div>
+<a class="view-link" id="full-size" href="images/0.22/grafite-simulacao.png" target="_blank" rel="noopener">Abrir imagem em tamanho original ↗</a>
+</div>
+<figure>
+<div class="image-frame"><img id="preview" src="images/0.22/grafite-simulacao.png" width="1440" height="960" alt="Configurar experimento no tema Grafite"></div>
+<figcaption id="caption" aria-live="polite">Grafite · Configurar experimento. Captura Qt em 1440 × 960, com fonte de 15 px.</figcaption>
+</figure>
+<noscript><p>O seletor precisa de JavaScript local. As imagens também estão relacionadas no <a href="interface-0.22.md">guia da entrega</a>.</p></noscript>
+<div class="plan">
+<article><h2>Já aplicado</h2><p>Três temas, cores personalizáveis, painéis mais discretos, menos títulos repetidos e métricas que se reorganizam conforme o espaço.</p></article>
+<article><h2>Próximo refinamento</h2><p>Mais espaço para a cena 3D e gráficos, câmera e detalhes melhor agrupados e acesso mais consistente às ações de exportação.</p></article>
+<article><h2>Preferências úteis</h2><p>Além das opções atuais, priorizar lembrar a disposição dos painéis, restaurar o espaço de trabalho e ajustar o grau de ajuda contextual.</p></article>
+</div>
+<footer>
+<p>As imagens usam uma simulação ideal de Bell em dados temporários. São registros da interface; não constituem evidência experimental para o TCC. Os vetores locais nulos do estado de Bell são esperados.</p>
+<p>A splash, a identidade e as funções científicas foram preservadas. Validação manual no Windows permanece pendente. Consulte o <a href="interface-0.22.md">guia com escopo, próximos passos e limites</a>.</p>
+</footer>
+</main>
+<script>
+const screen = document.getElementById('screen');
+const preview = document.getElementById('preview');
+const caption = document.getElementById('caption');
+const fullSize = document.getElementById('full-size');
+const names = {grafite:'Grafite', claro:'Claro científico', azulado:'Azul escuro'};
+function updatePreview() {
+  const theme = document.querySelector('input[name="theme"]:checked').value;
+  const title = screen.options[screen.selectedIndex].text;
+  const src = `images/0.22/${theme}-${screen.value}.png`;
+  document.body.dataset.theme = theme;
+  preview.src = src;
+  preview.alt = `${title} no tema ${names[theme]}`;
+  fullSize.href = src;
+  caption.textContent = `${names[theme]} · ${title}. Captura Qt em 1440 × 960, com fonte de 15 px.`;
+}
+screen.addEventListener('change', updatePreview);
+document.querySelectorAll('input[name="theme"]').forEach(input => input.addEventListener('change', updatePreview));
+</script>
+</body>
+</html>
