@@ -79,7 +79,7 @@ def test_annotation_draft_survives_refresh_restart_and_explicit_commit(window):
 def test_autosave_runs_before_close_and_falls_back_after_corruption(window):
     window.page_circuit.editor.circuit_name.setText("Protegido durante edição")
     wait_until(lambda: window.drafts.store.path.exists())
-    payload = json.loads(window.drafts.store.path.read_text())
+    payload = json.loads(window.drafts.store.path.read_text(encoding="utf-8"))
     assert payload["state"]["editor"]["name"] == "Protegido durante edição"
     store = window.drafts.store
     window.page_circuit.editor.circuit_name.setText("Versão posterior")

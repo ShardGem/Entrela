@@ -107,11 +107,13 @@ def test_rendered_table_alternate_rows_keep_readable_contrast(qt_app):
             apply_appearance(window, theme, high_contrast=high_contrast)
             qt_app.processEvents()
             image = table.viewport().grab().toImage()
+            pixel_ratio = image.devicePixelRatio()
             foreground = luminance(QColor(PALETTE.text))
             backgrounds = []
             for row in range(2):
                 rect = table.visualItemRect(table.item(row, 0))
-                color = image.pixelColor(rect.right() - 18, rect.center().y())
+                color = image.pixelColor(round((rect.right() - 18) * pixel_ratio),
+                                         round(rect.center().y() * pixel_ratio))
                 backgrounds.append(color.name())
                 background = luminance(color)
                 ratio = (max(foreground, background) + .05) / (min(foreground, background) + .05)

@@ -30,11 +30,31 @@ jobs:
       - name: Qt runtime
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - name: Isolar as dependências da aplicação
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import venv
+          folder = Path('.venv-ci').resolve()
+          venv.create(folder, with_pip=True)
+          executable_folder = folder / ('Scripts' if os.name == 'nt' else 'bin')
+          with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as output:
+              output.write(str(executable_folder) + '\n')
       - name: Install
         run: |
           python -m pip install -r requirements.txt
           python -m pip install --no-deps -e .
           python -m pip install pytest-timeout==2.4.0
+      - name: Conferir dependências
+        run: python -m pip check
+      - name: Verificar as regressões de portabilidade
+        if: runner.os == 'Windows'
+        env:
+          QT_QPA_PLATFORM: offscreen
+          OMP_NUM_THREADS: '2'
+          OPENBLAS_NUM_THREADS: '2'
+        run: python -m pytest -q -p no:cacheprovider --timeout=240 --timeout-method=thread tests/test_appearance_preferences.py::test_rendered_table_alternate_rows_keep_readable_contrast tests/test_recovery_and_focus.py::test_autosave_runs_before_close_and_falls_back_after_corruption tests/test_workspace_backup.py::test_archive_path_traversal_and_unsafe_windows_names_are_rejected
       - name: Validate
         env:
           QT_QPA_PLATFORM: offscreen
@@ -42,7 +62,6 @@ jobs:
           OMP_NUM_THREADS: '2'
           OPENBLAS_NUM_THREADS: '2'
         run: |
-          python -m pip check
           python -m pytest -v -p no:cacheprovider --timeout=240 --timeout-method=thread --durations=10
       - name: Package and launch outside checkout
         env:

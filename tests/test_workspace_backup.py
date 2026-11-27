@@ -63,7 +63,12 @@ def rewrite_archive(path, *, alter_members=None, alter_manifest=None, additions=
         for name, data in members.items():
             archive.writestr(name, data)
         for name, data in additions:
-            archive.writestr(name, data)
+            # ZipInfo normaliza barras no Windows. Grave o nome original para
+            # que o teste continue produzindo um ZIP realmente malformado.
+            entry = name if isinstance(name, zipfile.ZipInfo) else zipfile.ZipInfo()
+            if isinstance(name, str):
+                entry.filename = entry.orig_filename = name
+            archive.writestr(entry, data)
 
 
 def test_roundtrip_preserves_records_ids_preferences_and_even_corrupt_sources(tmp_path, workspace, bell_experiment):

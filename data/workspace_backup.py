@@ -385,6 +385,9 @@ def prepare_workspace_restore(archive, target_dir, *, progress=None, is_cancelle
                 raise ValueError("O backup excede os limites de tamanho ou quantidade de arquivos.")
             names, aliases = set(), set()
             for entry in entries:
+                # ZipInfo.filename já pode estar normalizado pelo Windows.
+                # Valide também os bytes do nome lidos do cabeçalho original.
+                _relative_name(entry.orig_filename)
                 name = entry.filename
                 _relative_name(name)
                 mode = stat.S_IFMT(entry.external_attr >> 16)
